@@ -1,0 +1,77 @@
+{
+  "_source": "Derived from routePolicy() in src/index.js (Chakudya API). Not part of the OpenAPI spec on purpose — this describes runtime policy (rate limits, role gates), not shape.",
+  "default": { "auth": "public", "rateLimit": { "limit": 100, "windowSeconds": 60, "scope": "ip" } },
+  "rules": [
+    { "method": "GET", "path": "/", "auth": "public", "rateLimit": null, "note": "Not rate-limited or auth-gated — served before the router's policy gate." },
+    { "method": "GET", "path": "/health", "auth": "public", "rateLimit": { "limit": 20, "windowSeconds": 60, "scope": "ip" } },
+
+    { "method": "GET", "path": "/admin/keys", "auth": "admin", "requiredRole": "root", "rateLimit": { "limit": 30, "windowSeconds": 60, "scope": "admin" }, "note": "Root ADMIN_API_KEY only — a per-consumer key cannot manage other keys." },
+    { "method": "POST", "path": "/admin/keys", "auth": "admin", "requiredRole": "root", "rateLimit": { "limit": 30, "windowSeconds": 60, "scope": "admin" }, "note": "Root ADMIN_API_KEY only." },
+    { "method": "DELETE", "path": "/admin/keys/{id}", "auth": "admin", "requiredRole": "root", "rateLimit": { "limit": 30, "windowSeconds": 60, "scope": "admin" }, "note": "Root ADMIN_API_KEY only." },
+
+    { "method": "GET", "path": "/foods", "auth": "public", "rateLimit": { "limit": 100, "windowSeconds": 60, "scope": "ip" } },
+    { "method": "GET", "path": "/foods/{id}", "auth": "public", "rateLimit": { "limit": 100, "windowSeconds": 60, "scope": "ip" } },
+    { "method": "POST", "path": "/foods", "auth": "admin", "rateLimit": { "limit": 60, "windowSeconds": 60, "scope": "admin" } },
+    { "method": "PUT", "path": "/foods/{id}", "auth": "admin", "rateLimit": { "limit": 60, "windowSeconds": 60, "scope": "admin" } },
+    { "method": "PATCH", "path": "/foods/{id}", "auth": "admin", "rateLimit": { "limit": 60, "windowSeconds": 60, "scope": "admin" } },
+    { "method": "DELETE", "path": "/foods/{id}", "auth": "admin", "rateLimit": { "limit": 60, "windowSeconds": 60, "scope": "admin" } },
+    { "method": "POST", "path": "/foods/bulk", "auth": "admin", "rateLimit": { "limit": 10, "windowSeconds": 60, "scope": "admin" } },
+    { "method": "GET", "path": "/foods/lookup", "auth": "public", "rateLimit": { "limit": 20, "windowSeconds": 60, "scope": "ip" }, "note": "Can trigger external USDA FDC / Open Food Facts / FatSecret calls." },
+
+    { "method": "GET", "path": "/exchange", "auth": "public", "rateLimit": { "limit": 100, "windowSeconds": 60, "scope": "ip" } },
+    { "method": "POST", "path": "/exchange", "auth": "admin", "rateLimit": { "limit": 60, "windowSeconds": 60, "scope": "admin" } },
+    { "method": "PUT", "path": "/exchange/{id}", "auth": "admin", "rateLimit": { "limit": 60, "windowSeconds": 60, "scope": "admin" } },
+    { "method": "PATCH", "path": "/exchange/{id}", "auth": "admin", "rateLimit": { "limit": 60, "windowSeconds": 60, "scope": "admin" } },
+    { "method": "DELETE", "path": "/exchange/{id}", "auth": "admin", "rateLimit": { "limit": 60, "windowSeconds": 60, "scope": "admin" } },
+    { "method": "POST", "path": "/exchange/bulk", "auth": "admin", "rateLimit": { "limit": 10, "windowSeconds": 60, "scope": "admin" } },
+
+    { "method": "GET", "path": "/renal", "auth": "public", "rateLimit": { "limit": 100, "windowSeconds": 60, "scope": "ip" } },
+    { "method": "POST", "path": "/renal", "auth": "admin", "rateLimit": { "limit": 60, "windowSeconds": 60, "scope": "admin" } },
+    { "method": "PUT", "path": "/renal/{id}", "auth": "admin", "rateLimit": { "limit": 60, "windowSeconds": 60, "scope": "admin" } },
+    { "method": "PATCH", "path": "/renal/{id}", "auth": "admin", "rateLimit": { "limit": 60, "windowSeconds": 60, "scope": "admin" } },
+    { "method": "DELETE", "path": "/renal/{id}", "auth": "admin", "rateLimit": { "limit": 60, "windowSeconds": 60, "scope": "admin" } },
+    { "method": "POST", "path": "/renal/bulk", "auth": "admin", "rateLimit": { "limit": 10, "windowSeconds": 60, "scope": "admin" } },
+
+    { "method": "GET", "path": "/formulas", "auth": "public", "rateLimit": { "limit": 100, "windowSeconds": 60, "scope": "ip" } },
+    { "method": "POST", "path": "/formulas", "auth": "admin", "rateLimit": { "limit": 60, "windowSeconds": 60, "scope": "admin" } },
+    { "method": "PUT", "path": "/formulas/{id}", "auth": "admin", "rateLimit": { "limit": 60, "windowSeconds": 60, "scope": "admin" } },
+    { "method": "PATCH", "path": "/formulas/{id}", "auth": "admin", "rateLimit": { "limit": 60, "windowSeconds": 60, "scope": "admin" } },
+    { "method": "DELETE", "path": "/formulas/{id}", "auth": "admin", "rateLimit": { "limit": 60, "windowSeconds": 60, "scope": "admin" } },
+    { "method": "POST", "path": "/formulas/bulk", "auth": "admin", "rateLimit": { "limit": 10, "windowSeconds": 60, "scope": "admin" } },
+
+    { "method": "GET", "path": "/packaged", "auth": "public", "rateLimit": { "limit": 100, "windowSeconds": 60, "scope": "ip" } },
+    { "method": "GET", "path": "/packaged/pending", "auth": "admin", "requiredRole": "reviewer", "rateLimit": { "limit": 60, "windowSeconds": 60, "scope": "admin" }, "note": "Reviewer-role keys can reach this — it's the whole point of the reviewer role." },
+    { "method": "POST", "path": "/packaged/submit", "auth": "public", "rateLimit": { "limit": 10, "windowSeconds": 60, "scope": "ip" } },
+    { "method": "POST", "path": "/packaged/scan", "auth": "public", "rateLimit": { "limit": 5, "windowSeconds": 60, "scope": "ip" }, "note": "Costs a Groq vision call per request." },
+    { "method": "POST", "path": "/packaged/{id}/approve", "auth": "admin", "requiredRole": "reviewer", "rateLimit": { "limit": 60, "windowSeconds": 60, "scope": "admin" } },
+    { "method": "POST", "path": "/packaged/{id}/reject", "auth": "admin", "requiredRole": "reviewer", "rateLimit": { "limit": 60, "windowSeconds": 60, "scope": "admin" } },
+    { "method": "PUT", "path": "/packaged/{id}", "auth": "admin", "rateLimit": { "limit": 60, "windowSeconds": 60, "scope": "admin" } },
+    { "method": "PATCH", "path": "/packaged/{id}", "auth": "admin", "rateLimit": { "limit": 60, "windowSeconds": 60, "scope": "admin" } },
+    { "method": "DELETE", "path": "/packaged/{id}", "auth": "admin", "rateLimit": { "limit": 60, "windowSeconds": 60, "scope": "admin" } },
+
+    { "method": "GET", "path": "/manufacturers", "auth": "public", "rateLimit": { "limit": 100, "windowSeconds": 60, "scope": "ip" } },
+    { "method": "POST", "path": "/manufacturers", "auth": "admin", "rateLimit": { "limit": 60, "windowSeconds": 60, "scope": "admin" } },
+    { "method": "PATCH", "path": "/manufacturers/{id}", "auth": "admin", "rateLimit": { "limit": 60, "windowSeconds": 60, "scope": "admin" } },
+    { "method": "DELETE", "path": "/manufacturers/{id}", "auth": "admin", "rateLimit": { "limit": 60, "windowSeconds": 60, "scope": "admin" } },
+    { "method": "POST", "path": "/manufacturers/bulk", "auth": "admin", "rateLimit": { "limit": 10, "windowSeconds": 60, "scope": "admin" } },
+
+    { "method": "GET", "path": "/products", "auth": "public", "rateLimit": { "limit": 100, "windowSeconds": 60, "scope": "ip" } },
+    { "method": "GET", "path": "/products/{id}", "auth": "public", "rateLimit": { "limit": 100, "windowSeconds": 60, "scope": "ip" } },
+    { "method": "POST", "path": "/products", "auth": "admin", "rateLimit": { "limit": 60, "windowSeconds": 60, "scope": "admin" } },
+    { "method": "PUT", "path": "/products/{id}", "auth": "admin", "rateLimit": { "limit": 60, "windowSeconds": 60, "scope": "admin" } },
+    { "method": "PATCH", "path": "/products/{id}", "auth": "admin", "rateLimit": { "limit": 60, "windowSeconds": 60, "scope": "admin" } },
+    { "method": "DELETE", "path": "/products/{id}", "auth": "admin", "rateLimit": { "limit": 60, "windowSeconds": 60, "scope": "admin" }, "note": "Soft delete — sets is_active: false." },
+    { "method": "POST", "path": "/products/bulk", "auth": "admin", "rateLimit": { "limit": 10, "windowSeconds": 60, "scope": "admin" } },
+
+    { "method": "GET", "path": "/nutrition", "auth": "public", "rateLimit": { "limit": 100, "windowSeconds": 60, "scope": "ip" } },
+
+    { "method": "POST", "path": "/rag/retrieve", "auth": "public", "rateLimit": { "limit": 20, "windowSeconds": 60, "scope": "ip" }, "note": "Also has a separate KV response cache: 10 min TTL, keyed on context + top_k + normalized query." },
+    { "method": "POST", "path": "/rag/ingest", "auth": "admin", "rateLimit": { "limit": 300, "windowSeconds": 60, "scope": "admin" } },
+    { "method": "POST", "path": "/rag/ask", "auth": "public", "rateLimit": { "limit": 15, "windowSeconds": 60, "scope": "ip" }, "note": "Most expensive route in the API — intent detection + fan-out search + rerank + LLM answer. Whole answers cached 5 min (skipped when session_id is passed)." },
+
+    { "method": "POST", "path": "/memory/write", "auth": "public", "rateLimit": { "limit": 30, "windowSeconds": 60, "scope": "ip" } },
+    { "method": "POST", "path": "/memory/recall", "auth": "public", "rateLimit": { "limit": 30, "windowSeconds": 60, "scope": "ip" }, "note": "Preferred over the deprecated GET form. Separate KV response cache: 2 min TTL, keyed on session_id + top_k + normalized query." },
+    { "method": "GET", "path": "/memory/recall", "auth": "public", "rateLimit": { "limit": 30, "windowSeconds": 60, "scope": "ip" }, "note": "Deprecated — puts session_id and query text in the URL (access logs, browser history). Prefer POST." },
+    { "method": "POST", "path": "/memory/consolidate", "auth": "admin", "rateLimit": { "limit": 60, "windowSeconds": 60, "scope": "admin" }, "note": "Also runs automatically every hour via a cron trigger, bypassing HTTP auth entirely." }
+  ]
+}
