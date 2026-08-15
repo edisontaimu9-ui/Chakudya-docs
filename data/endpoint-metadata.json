@@ -49,12 +49,6 @@
     { "method": "PATCH", "path": "/packaged/{id}", "auth": "admin", "rateLimit": { "limit": 60, "windowSeconds": 60, "scope": "admin" } },
     { "method": "DELETE", "path": "/packaged/{id}", "auth": "admin", "rateLimit": { "limit": 60, "windowSeconds": 60, "scope": "admin" } },
 
-    { "method": "GET", "path": "/manufacturers", "auth": "public", "rateLimit": { "limit": 100, "windowSeconds": 60, "scope": "ip" } },
-    { "method": "POST", "path": "/manufacturers", "auth": "admin", "rateLimit": { "limit": 60, "windowSeconds": 60, "scope": "admin" } },
-    { "method": "PATCH", "path": "/manufacturers/{id}", "auth": "admin", "rateLimit": { "limit": 60, "windowSeconds": 60, "scope": "admin" } },
-    { "method": "DELETE", "path": "/manufacturers/{id}", "auth": "admin", "rateLimit": { "limit": 60, "windowSeconds": 60, "scope": "admin" } },
-    { "method": "POST", "path": "/manufacturers/bulk", "auth": "admin", "rateLimit": { "limit": 10, "windowSeconds": 60, "scope": "admin" } },
-
     { "method": "GET", "path": "/products", "auth": "public", "rateLimit": { "limit": 100, "windowSeconds": 60, "scope": "ip" } },
     { "method": "GET", "path": "/products/{id}", "auth": "public", "rateLimit": { "limit": 100, "windowSeconds": 60, "scope": "ip" } },
     { "method": "POST", "path": "/products", "auth": "admin", "rateLimit": { "limit": 60, "windowSeconds": 60, "scope": "admin" } },
