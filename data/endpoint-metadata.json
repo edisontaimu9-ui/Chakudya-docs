@@ -49,16 +49,6 @@
     { "method": "PATCH", "path": "/packaged/{id}", "auth": "admin", "rateLimit": { "limit": 60, "windowSeconds": 60, "scope": "admin" } },
     { "method": "DELETE", "path": "/packaged/{id}", "auth": "admin", "rateLimit": { "limit": 60, "windowSeconds": 60, "scope": "admin" } },
 
-    { "method": "GET", "path": "/products", "auth": "public", "rateLimit": { "limit": 100, "windowSeconds": 60, "scope": "ip" } },
-    { "method": "GET", "path": "/products/{id}", "auth": "public", "rateLimit": { "limit": 100, "windowSeconds": 60, "scope": "ip" } },
-    { "method": "POST", "path": "/products", "auth": "admin", "rateLimit": { "limit": 60, "windowSeconds": 60, "scope": "admin" } },
-    { "method": "PUT", "path": "/products/{id}", "auth": "admin", "rateLimit": { "limit": 60, "windowSeconds": 60, "scope": "admin" } },
-    { "method": "PATCH", "path": "/products/{id}", "auth": "admin", "rateLimit": { "limit": 60, "windowSeconds": 60, "scope": "admin" } },
-    { "method": "DELETE", "path": "/products/{id}", "auth": "admin", "rateLimit": { "limit": 60, "windowSeconds": 60, "scope": "admin" }, "note": "Soft delete — sets is_active: false." },
-    { "method": "POST", "path": "/products/bulk", "auth": "admin", "rateLimit": { "limit": 10, "windowSeconds": 60, "scope": "admin" } },
-
-    { "method": "GET", "path": "/nutrition", "auth": "public", "rateLimit": { "limit": 100, "windowSeconds": 60, "scope": "ip" } },
-
     { "method": "GET", "path": "/favorites", "auth": "public", "rateLimit": { "limit": 100, "windowSeconds": 60, "scope": "ip" }, "note": "No user-account system — user_id is a client-supplied identifier, same model as memory's session_id." },
     { "method": "POST", "path": "/favorites", "auth": "public", "rateLimit": { "limit": 30, "windowSeconds": 60, "scope": "ip" }, "note": "Idempotent — favoriting an already-favorited item returns the existing row." },
     { "method": "DELETE", "path": "/favorites", "auth": "public", "rateLimit": { "limit": 30, "windowSeconds": 60, "scope": "ip" } },
