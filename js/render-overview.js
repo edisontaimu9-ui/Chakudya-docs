@@ -41,6 +41,10 @@ const RenderOverview = (() => {
     const firstEp = endpoints[0];
     hero.querySelector('[data-jump="first"]').href = firstEp ? `#/${firstEp.slug}` : "#";
 
+    // Live "right now" status — pings GET /health against the current
+    // base URL. Current status only, not a historical uptime tracker.
+    StatusPanel.mount(container);
+
     // Group cards
     const groupsSection = el(`<div class="section"><h2 class="section__title">Explore by resource</h2><div class="group-grid"></div></div>`);
     const grid = groupsSection.querySelector(".group-grid");
