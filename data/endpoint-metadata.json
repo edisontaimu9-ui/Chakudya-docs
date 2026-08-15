@@ -65,6 +65,13 @@
 
     { "method": "GET", "path": "/nutrition", "auth": "public", "rateLimit": { "limit": 100, "windowSeconds": 60, "scope": "ip" } },
 
+    { "method": "GET", "path": "/favorites", "auth": "public", "rateLimit": { "limit": 100, "windowSeconds": 60, "scope": "ip" }, "note": "No user-account system — user_id is a client-supplied identifier, same model as memory's session_id." },
+    { "method": "POST", "path": "/favorites", "auth": "public", "rateLimit": { "limit": 30, "windowSeconds": 60, "scope": "ip" }, "note": "Idempotent — favoriting an already-favorited item returns the existing row." },
+    { "method": "DELETE", "path": "/favorites", "auth": "public", "rateLimit": { "limit": 30, "windowSeconds": 60, "scope": "ip" } },
+
+    { "method": "GET", "path": "/history", "auth": "public", "rateLimit": { "limit": 100, "windowSeconds": 60, "scope": "ip" }, "note": "Recently viewed, most recent first." },
+    { "method": "POST", "path": "/history", "auth": "public", "rateLimit": { "limit": 30, "windowSeconds": 60, "scope": "ip" }, "note": "Opt-in — nothing is tracked automatically. Upserts viewed_at, no duplicate rows per resource." },
+
     { "method": "POST", "path": "/rag/retrieve", "auth": "public", "rateLimit": { "limit": 20, "windowSeconds": 60, "scope": "ip" }, "note": "Also has a separate KV response cache: 10 min TTL, keyed on context + top_k + normalized query." },
     { "method": "POST", "path": "/rag/ingest", "auth": "admin", "rateLimit": { "limit": 300, "windowSeconds": 60, "scope": "admin" } },
     { "method": "POST", "path": "/rag/ask", "auth": "public", "rateLimit": { "limit": 15, "windowSeconds": 60, "scope": "ip" }, "note": "Most expensive route in the API — intent detection + fan-out search + rerank + LLM answer. Whole answers cached 5 min (skipped when session_id is passed)." },
