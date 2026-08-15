@@ -56,20 +56,21 @@ const StatusPanel = (() => {
     if (!wrap) return;
     wrap.innerHTML = "";
     if (!services) return;
-    Object.entries(services).forEach(([name, info]) => {
+    Object.entries(services).forEach(([name, info], i) => {
       const status = info?.status || "unknown";
       const good = status === "ok" || status === "configured" || status === "bound";
       const bad = status === "error";
       const dotClass = good ? "status-service__dot--ok" : bad ? "status-service__dot--error" : "";
-      wrap.appendChild(
-        el(`
-          <div class="status-service">
-            <span class="status-service__dot ${dotClass}" aria-hidden="true"></span>
-            <span class="status-service__name">${name.replace(/_/g, " ")}</span>
-            <span class="status-service__value">${status}</span>
-          </div>
-        `)
-      );
+      const row = el(`
+        <div class="status-service">
+          <span class="status-service__dot ${dotClass}" aria-hidden="true"></span>
+          <span class="status-service__name">${name.replace(/_/g, " ")}</span>
+          <span class="status-service__value">${status}</span>
+        </div>
+      `);
+      // Small stagger so the dots don't all blink in perfect unison.
+      row.querySelector(".status-service__dot").style.animationDelay = `${(i % 6) * 0.15}s`;
+      wrap.appendChild(row);
     });
   }
 
