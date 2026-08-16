@@ -17,6 +17,8 @@
     { "method": "DELETE", "path": "/foods/{id}", "auth": "admin", "rateLimit": { "limit": 60, "windowSeconds": 60, "scope": "admin" } },
     { "method": "POST", "path": "/foods/bulk", "auth": "admin", "rateLimit": { "limit": 10, "windowSeconds": 60, "scope": "admin" } },
     { "method": "GET", "path": "/foods/lookup", "auth": "public", "rateLimit": { "limit": 20, "windowSeconds": 60, "scope": "ip" }, "note": "Can trigger external USDA FDC / Open Food Facts / FatSecret calls." },
+    { "method": "GET", "path": "/foods/autocomplete", "auth": "public", "rateLimit": { "limit": 60, "windowSeconds": 60, "scope": "ip" }, "note": "Wraps FatSecret's Premier-exclusive foods.autocomplete.v2 — 503 if FatSecret credentials aren't configured." },
+    { "method": "GET", "path": "/foods/categories", "auth": "public", "rateLimit": { "limit": 30, "windowSeconds": 60, "scope": "ip" }, "note": "Wraps FatSecret's Premier-exclusive food_categories.get.v2 — 503 if FatSecret credentials aren't configured." },
 
     { "method": "GET", "path": "/exchange", "auth": "public", "rateLimit": { "limit": 100, "windowSeconds": 60, "scope": "ip" } },
     { "method": "POST", "path": "/exchange", "auth": "admin", "rateLimit": { "limit": 60, "windowSeconds": 60, "scope": "admin" } },

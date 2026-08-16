@@ -3,7 +3,7 @@
   "info": {
     "title": "Chakudya API (CNR — Central Nutrition Repository)",
     "description": "Malawi-focused nutrition data API: local food composition tables (foods, exchange lists, renal foods, enteral formulas), packaged/branded products with a community + OCR submission and admin review pipeline, an external lookup cascade (USDA FDC / Open Food Facts / FatSecret), a RAG knowledge base with a search orchestrator (POST /rag/ask), and a per-session clinical memory system (write → consolidate → recall).\nThis file is generated from the README and source (`src/index.js`) and covers every route the Worker actually serves. Row shapes for the nutrition tables (foods, packaged_foods, exchange_lists, etc.) are intentionally loose (`additionalProperties: true` with a few illustrative properties) rather than exhaustively modeling every column — see the README for the full, current column list per table, since that evolves independently of this spec.\n",
-    "version": "1.17.0",
+    "version": "1.18.0",
     "contact": {
       "name": "Edison Taimu",
       "x-location": "Blantyre, Malawi"
@@ -394,11 +394,11 @@
           "Foods"
         ],
         "summary": "External food lookup cascade (public, rate-limited)",
-        "description": "Local cache → USDA FDC (name search) → Open Food Facts (barcode) → FatSecret (name search). First external hit is cached into `external_foods_cache` so subsequent lookups skip upstream calls.\n",
+        "description": "Local cache → USDA FDC (name search) → Open Food Facts (barcode) → FatSecret barcode lookup (Premier-exclusive) → FatSecret (name search). First external hit is cached into external_foods_cache so subsequent lookups skip upstream calls.\n",
         "security": [],
         "parameters": [
           {
-            "name": "search",
+            "name": "q",
             "in": "query",
             "schema": {
               "type": "string"
@@ -411,7 +411,7 @@
             "schema": {
               "type": "string"
             },
-            "description": "Barcode lookup (Open Food Facts)."
+            "description": "Barcode lookup (Open Food Facts, then FatSecret)."
           },
           {
             "$ref": "#/components/parameters/Offset"
@@ -423,6 +423,141 @@
           },
           "429": {
             "$ref": "#/components/responses/RateLimited"
+          }
+        }
+      }
+    },
+    "/foods/autocomplete": {
+      "get": {
+        "tags": [
+          "Foods"
+        ],
+        "summary": "Search-as-you-type suggestions (public, rate-limited)",
+        "description": "Wraps FatSecret's Premier-exclusive foods.autocomplete.v2. Requires FATSECRET_CONSUMER_KEY/SECRET on a Premier or Premier Free plan — returns 503 if not configured on this deployment.\n",
+        "security": [],
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Partial search expression, e.g. \"chic\"."
+          },
+          {
+            "name": "max_results",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "default": 4,
+              "maximum": 10
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Suggested search expressions",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/Success"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          },
+          "503": {
+            "description": "FatSecret credentials not configured on this deployment",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/foods/categories": {
+      "get": {
+        "tags": [
+          "Foods"
+        ],
+        "summary": "Food category list (public, rate-limited, cached 24h)",
+        "description": "Wraps FatSecret's Premier-exclusive food_categories.get.v2 — near-static reference data. Requires FATSECRET_CONSUMER_KEY/SECRET on a Premier or Premier Free plan — returns 503 if not configured on this deployment.\n",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "Food categories",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/Success"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "string"
+                              },
+                              "name": {
+                                "type": "string"
+                              },
+                              "description": {
+                                "type": "string",
+                                "nullable": true
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          },
+          "503": {
+            "description": "FatSecret credentials not configured on this deployment",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
           }
         }
       }
