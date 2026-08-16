@@ -224,6 +224,20 @@
 .stat-card__num { font-family: var(--font-display); font-size: 26px; font-weight: 700; color: var(--accent-strong); }
 .stat-card__label { font-size: 11.5px; color: var(--text-tertiary); text-transform: uppercase; letter-spacing: .5px; margin-top: 2px; }
 
+.feature-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+.feature-list li { display: flex; align-items: flex-start; gap: 10px; color: var(--text-secondary); font-size: 14px; line-height: 1.55; }
+.feature-list li::before {
+  content: ""; width: 6px; height: 6px; border-radius: 50%; background: var(--accent);
+  flex: none; margin-top: 8px;
+}
+.feature-list strong { color: var(--text-primary); font-weight: 600; }
+
+.tag-list { display: flex; flex-wrap: wrap; gap: 8px; }
+.tag-list span {
+  border: 1px solid var(--border); border-radius: 999px; padding: 5px 12px;
+  font-size: 12.5px; color: var(--text-secondary); background: var(--surface);
+}
+
 /* Live "right now" status panel — see js/status-panel.js */
 .status-panel {
   display: flex; align-items: center; gap: 14px; flex-wrap: wrap;

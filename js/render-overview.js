@@ -45,6 +45,42 @@ const RenderOverview = (() => {
     // base URL. Current status only, not a historical uptime tracker.
     StatusPanel.mount(container);
 
+    // What the API provides / who it's for, kept in sync by hand with
+    // the "What the API provides" / "Who it's for" sections at the top of
+    // the chakudya-api README, same convention as openapi.yaml.
+    container.appendChild(el(`
+      <div class="section">
+        <h2 class="section__title">What the API provides</h2>
+        <ul class="feature-list">
+          <li><strong>Malawian food composition data</strong> (<code>/foods</code>). Locally relevant foods and their nutrient values.</li>
+          <li><strong>Food exchange systems</strong> (<code>/exchange</code>). Standard and therapeutic exchange lists.</li>
+          <li><strong>Renal nutrition data</strong> (<code>/renal</code>). Foods and nutrition information relevant to renal dietary planning.</li>
+          <li><strong>Enteral formulas</strong> (<code>/formulas</code>). Structured information for clinical nutrition applications.</li>
+          <li><strong>Packaged and branded foods</strong> (<code>/packaged</code>). Barcode lookup, community product submission, OCR assisted data capture, and an admin review workflow.</li>
+          <li><strong>External food lookup</strong> (<code>/foods/lookup</code>, <code>/foods/autocomplete</code>, <code>/foods/categories</code>). Additional food information from USDA FoodData Central, Open Food Facts, and FatSecret when a food isn't in the local database.</li>
+          <li><strong>RAG powered nutrition knowledge</strong> (<code>/rag/ask</code>, <code>/rag/retrieve</code>). Retrieve relevant knowledge or ask a question directly.</li>
+          <li><strong>Session memory</strong> (<code>/memory/write</code>, <code>/memory/recall</code>, <code>/memory/consolidate</code>). Store, consolidate, and recall contextual information for AI assisted applications.</li>
+        </ul>
+      </div>
+    `));
+
+    container.appendChild(el(`
+      <div class="section">
+        <h2 class="section__title">Who it's for</h2>
+        <p class="section__note" style="margin-bottom:14px;">Chakudya can be used to build:</p>
+        <div class="tag-list">
+          <span>Nutrition and dietetics applications</span>
+          <span>Clinical decision support tools</span>
+          <span>Meal planning systems</span>
+          <span>Fitness and health applications</span>
+          <span>Food and barcode scanners</span>
+          <span>Nutrition research tools</span>
+          <span>AI and RAG powered nutrition assistants</span>
+          <span>Educational applications</span>
+        </div>
+      </div>
+    `));
+
     // Group cards
     const groupsSection = el(`<div class="section"><h2 class="section__title">Explore by resource</h2><div class="group-grid"></div></div>`);
     const grid = groupsSection.querySelector(".group-grid");
