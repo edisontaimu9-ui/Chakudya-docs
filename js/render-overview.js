@@ -17,7 +17,7 @@ const RenderOverview = (() => {
 
     const hero = el(`
       <section class="hero">
-        <p class="eyebrow">CNR — Central Nutrition Repository</p>
+        <p class="eyebrow">Chakudya Nutrition Registry (CNR)</p>
         <h1 class="hero__title">Chakudya Nutrition Registry API</h1>
         <p class="hero__lead"></p>
         <div class="hero__actions">

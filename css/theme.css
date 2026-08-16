@@ -1,10 +1,14 @@
 /* ─────────────────────────────────────────────────────────────
    Chakudya Nutrition Registry — Design tokens
 
-   Palette: near-black slate with a maize-gold accent and a
-   cassava-leaf green, echoing the food registry's subject matter
-   without leaning on the flag literally. Method badges reuse the
-   same four accents so the color language stays closed and legible.
+   Signature idea: this is a nutrition-facts panel rendered as a
+   developer tool. Structural labels (eyebrows, section titles)
+   borrow the thick-rule, tight-caps grammar of a real nutrition
+   label instead of decorative colored text. Palette is grounded in
+   Malawi's food and land rather than generic "premium editorial":
+   a deep lakeside charcoal, a ripe-marigold accent (nsima's maize,
+   not a muted corporate gold), and a cassava-leaf green for
+   affirmative states.
    ───────────────────────────────────────────────────────────── */
 
 :root {
@@ -13,15 +17,15 @@
   --font-mono: 'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
 
   --radius-sm: 5px;
-  --radius-md: 8px;
-  --radius-lg: 14px;
+  --radius-md: 9px;
+  --radius-lg: 16px;
 
   --header-h: 96px;
   --sidebar-w: 288px;
 
-  --shadow-sm: 0 1px 2px rgba(0,0,0,.16);
-  --shadow-md: 0 8px 24px rgba(0,0,0,.28);
-  --shadow-lg: 0 16px 48px rgba(0,0,0,.38);
+  --shadow-sm: 0 1px 2px rgba(0,0,0,.10), 0 1px 1px rgba(0,0,0,.06);
+  --shadow-md: 0 10px 28px rgba(0,0,0,.22), 0 2px 8px rgba(0,0,0,.10);
+  --shadow-lg: 0 20px 52px rgba(0,0,0,.32), 0 4px 14px rgba(0,0,0,.14);
 
   /* method badge colors — same in both themes */
   --method-get: #4C8DFF;
@@ -35,65 +39,65 @@
   --method-delete: #E2574C;
   --method-delete-bg: rgba(226,87,76,.14);
 
-  --focus-ring: 0 0 0 3px rgba(224,169,55,.45);
+  --focus-ring: 0 0 0 3px rgba(230,146,20,.45);
 }
 
 html[data-theme="dark"] {
-  --bg: #12151a;
-  --bg-raised: #171b21;
-  --surface: #1d2229;
-  --surface-hover: #252b33;
-  --surface-active: #2b323c;
-  --border: #2a3038;
-  --border-strong: #3b434d;
+  --bg: #0e1210;
+  --bg-raised: #141a17;
+  --surface: #1a211d;
+  --surface-hover: #212a25;
+  --surface-active: #29332c;
+  --border: #263029;
+  --border-strong: #38443b;
 
-  --text-primary: #edeef1;
-  --text-secondary: #9aa3ad;
-  --text-tertiary: #6b747e;
+  --text-primary: #eef1ec;
+  --text-secondary: #9fa89f;
+  --text-tertiary: #6d766e;
 
-  --accent: #e0a937;
-  --accent-strong: #f3c463;
-  --accent-ink: #221a04;
-  --accent-bg: rgba(224,169,55,.12);
+  --accent: #e69214;
+  --accent-strong: #ffb03e;
+  --accent-ink: #1d1102;
+  --accent-bg: rgba(230,146,20,.14);
 
-  --green: #3fa66b;
-  --green-bg: rgba(63,166,107,.12);
-  --red: #ea6a60;
-  --red-bg: rgba(234,106,96,.14);
+  --green: #4caf7d;
+  --green-bg: rgba(76,175,125,.14);
+  --red: #e2685c;
+  --red-bg: rgba(226,104,92,.14);
   --blue: #4c8dff;
 
-  --code-bg: #14181e;
-  --code-border: #262c34;
-  --scrollbar: #333b45;
+  --code-bg: #10140f;
+  --code-border: #232c26;
+  --scrollbar: #38443b;
 }
 
 html[data-theme="light"] {
-  --bg: #f7f7f4;
+  --bg: #f2f3ed;
   --bg-raised: #ffffff;
   --surface: #ffffff;
-  --surface-hover: #f1f1ec;
-  --surface-active: #ebebe4;
-  --border: #e2e2da;
-  --border-strong: #cfcfc4;
+  --surface-hover: #eaece2;
+  --surface-active: #e0e3d5;
+  --border: #dcdfd2;
+  --border-strong: #c5c9b7;
 
-  --text-primary: #191b1e;
-  --text-secondary: #575f66;
-  --text-tertiary: #838b91;
+  --text-primary: #181c16;
+  --text-secondary: #4f5748;
+  --text-tertiary: #7a8171;
 
-  --accent: #a9761b;
-  --accent-strong: #8a5f13;
-  --accent-ink: #fffaf0;
-  --accent-bg: rgba(169,118,27,.10);
+  --accent: #c56a06;
+  --accent-strong: #9b5405;
+  --accent-ink: #fff8ec;
+  --accent-bg: rgba(197,106,6,.10);
 
-  --green: #227a4c;
-  --green-bg: rgba(34,122,76,.10);
-  --red: #c8392f;
-  --red-bg: rgba(200,57,47,.10);
+  --green: #1f7a4d;
+  --green-bg: rgba(31,122,77,.10);
+  --red: #bf3a2c;
+  --red-bg: rgba(191,58,44,.10);
   --blue: #2563eb;
 
-  --code-bg: #f4f4ef;
-  --code-border: #e2e2da;
-  --scrollbar: #d8d8cf;
+  --code-bg: #eceee4;
+  --code-border: #dcdfd2;
+  --scrollbar: #c5c9b7;
 }
 
 * { box-sizing: border-box; }
