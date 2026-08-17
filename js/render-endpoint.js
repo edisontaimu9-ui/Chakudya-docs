@@ -60,10 +60,12 @@ const RenderEndpoint = (() => {
       })
       .join("");
     return el(`
-      <table class="param-table">
-        <thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead>
-        <tbody>${rows}</tbody>
-      </table>
+      <div class="table-scroll">
+        <table class="param-table">
+          <thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>
     `);
   }
 
@@ -165,10 +167,12 @@ const RenderEndpoint = (() => {
           })
           .join("");
         section.appendChild(el(`
-          <table class="param-table">
-            <thead><tr><th>Field</th><th>Type</th><th>Description</th></tr></thead>
-            <tbody>${rows}</tbody>
-          </table>
+          <div class="table-scroll">
+            <table class="param-table">
+              <thead><tr><th>Field</th><th>Type</th><th>Description</th></tr></thead>
+              <tbody>${rows}</tbody>
+            </table>
+          </div>
         `));
       }
       const example = SchemaExample.forRequestBody(spec, endpoint.requestBody);

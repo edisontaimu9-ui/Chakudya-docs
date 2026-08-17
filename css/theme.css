@@ -102,6 +102,7 @@ html[data-theme="light"] {
 
 * { box-sizing: border-box; }
 html { color-scheme: light dark; }
+html, body { max-width: 100%; overflow-x: hidden; }
 
 body {
   margin: 0;
@@ -112,6 +113,8 @@ body {
   line-height: 1.55;
   -webkit-font-smoothing: antialiased;
 }
+
+img, svg, table { max-width: 100%; }
 
 h1, h2, h3, h4 { font-family: var(--font-display); font-weight: 600; margin: 0; color: var(--text-primary); }
 
