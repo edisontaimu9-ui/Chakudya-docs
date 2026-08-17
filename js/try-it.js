@@ -27,7 +27,7 @@ const TryIt = (() => {
               <div class="field">
                 <label class="field__label">Authorization <span class="param-required">${endpoint.authMode === "admin" ? "required" : "optional"}</span></label>
                 <input type="text" data-role="auth" placeholder="Bearer token (ADMIN_API_KEY or a minted key)" autocomplete="off" spellcheck="false" />
-                <span class="field__hint">Kept in memory for this page only — never saved to storage or sent anywhere but the request below.</span>
+                <span class="field__hint">Kept in memory for this page only - never saved to storage or sent anywhere but the request below.</span>
               </div>
             </div>` : ""}
           ${pathParams.length ? `<div class="field"><label class="field__label" style="margin-bottom:2px">Path parameters</label><div class="field-grid" data-role="path-fields"></div></div>` : ""}
@@ -36,7 +36,7 @@ const TryIt = (() => {
             <div class="field">
               <label class="field__label">Request body (JSON)</label>
               <textarea data-role="body" spellcheck="false"></textarea>
-              <span class="field__hint">Editable — this is a starting example, not the only valid shape.</span>
+              <span class="field__hint">Editable - this is a starting example, not the only valid shape.</span>
             </div>` : ""}
           <div>
             <button class="btn btn--primary" type="button" data-action="send">Send request</button>
@@ -166,7 +166,7 @@ const TryIt = (() => {
     resultBox.appendChild(buildRequestSummary({ url, method: endpoint.method, headers, bodyText }));
 
     if (!result.ok) {
-      errorBox.innerHTML = `Request failed — this is usually a CORS block, an unreachable base URL, or an offline network.
+      errorBox.innerHTML = `Request failed - this is usually a CORS block, an unreachable base URL, or an offline network.
         <br/><span class="mono">${RenderEndpoint.escapeHtml(result.message)}</span>`;
       errorBox.classList.add("is-visible");
       return;
@@ -177,7 +177,7 @@ const TryIt = (() => {
 
   function buildRequestSummary({ url, method, headers, bodyText }) {
     const wrap = el(`<div><h3 class="section__title" style="font-size:13px">Request</h3></div>`);
-    wrap.appendChild(RenderEndpoint.codeBlock(`${method} — request URL`, url, { lang: "text" }));
+    wrap.appendChild(RenderEndpoint.codeBlock(`${method} - request URL`, url, { lang: "text" }));
     const headerLines = Object.entries(headers)
       .map(([k, v]) => `${k}: ${k === "Authorization" ? "Bearer ••••••••" : v}`)
       .join("\n");

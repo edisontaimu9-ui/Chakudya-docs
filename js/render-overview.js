@@ -41,7 +41,7 @@ const RenderOverview = (() => {
     const firstEp = endpoints[0];
     hero.querySelector('[data-jump="first"]').href = firstEp ? `#/${firstEp.slug}` : "#";
 
-    // Live "right now" status — pings GET /health against the current
+    // Live "right now" status - pings GET /health against the current
     // base URL. Current status only, not a historical uptime tracker.
     StatusPanel.mount(container);
 
@@ -103,7 +103,7 @@ const RenderOverview = (() => {
         <h2 class="section__title">Authentication</h2>
         <p class="endpoint-desc">Send <code>Authorization: Bearer &lt;key&gt;</code> on admin-gated routes. The key can be either the
         root <code>ADMIN_API_KEY</code> or a per-consumer key minted via <code>POST /admin/keys</code> (root key only). Per-consumer
-        keys carry a role — <code>admin</code> (full access) or <code>reviewer</code> (packaged review queue + reads only). Public
+        keys carry a role - <code>admin</code> (full access) or <code>reviewer</code> (packaged review queue + reads only). Public
         <code>GET</code> routes and a handful of specific write routes (community submissions, RAG retrieve/ask, memory write/recall)
         need no key at all, but are rate-limited by IP.</p>
       </div>
@@ -125,7 +125,7 @@ const RenderOverview = (() => {
       <div class="section">
         <h2 class="section__title">Pagination</h2>
         <p class="endpoint-desc">List routes support two modes, chosen by whether <code>?cursor=</code> is present. <strong>Offset/limit</strong>
-        (default) — <code>?limit=50&amp;offset=100</code>. <strong>Cursor</strong> (keyset) — add <code>?cursor=</code> (empty for the first page);
+        (default) - <code>?limit=50&amp;offset=100</code>. <strong>Cursor</strong> (keyset) - add <code>?cursor=</code> (empty for the first page);
         each response includes <code>next_cursor</code> to pass as the next request's <code>cursor</code>. Cursor pages are always ordered
         by <code>id.asc</code>, even where the offset mode's default order differs.</p>
       </div>
@@ -135,7 +135,7 @@ const RenderOverview = (() => {
     container.appendChild(el(`
       <div class="section">
         <h2 class="section__title">CORS</h2>
-        <p class="endpoint-desc">The Worker sends permissive CORS headers on every response, so this page (or any origin) can call it directly —
+        <p class="endpoint-desc">The Worker sends permissive CORS headers on every response, so this page (or any origin) can call it directly -
         no proxy needed for Try It below.</p>
       </div>
     `)).lastElementChild;
@@ -149,10 +149,10 @@ const RenderOverview = (() => {
 
     container.appendChild(el(`
       <div class="callout">
-        <strong>Note on Try It —</strong> only response headers the Worker explicitly exposes (like <code>X-Cache</code>) or that
+        <strong>Note on Try It -</strong> only response headers the Worker explicitly exposes (like <code>X-Cache</code>) or that
         browsers always allow (like <code>Content-Type</code>) are readable from JavaScript. Headers such as <code>X-Request-Id</code>
         or <code>Retry-After</code> are sent but not exposed for cross-origin reads, so they won't appear in the Try It response
-        panel even though they're on the real response — check your network tab or a terminal <code>curl</code> if you need them.
+        panel even though they're on the real response - check your network tab or a terminal <code>curl</code> if you need them.
       </div>
     `));
   }

@@ -1,11 +1,11 @@
 {
-  "_source": "Derived from routePolicy() in src/index.js (Chakudya API). Not part of the OpenAPI spec on purpose — this describes runtime policy (rate limits, role gates), not shape.",
+  "_source": "Derived from routePolicy() in src/index.js (Chakudya API). Not part of the OpenAPI spec on purpose - this describes runtime policy (rate limits, role gates), not shape.",
   "default": { "auth": "public", "rateLimit": { "limit": 100, "windowSeconds": 60, "scope": "ip" } },
   "rules": [
-    { "method": "GET", "path": "/", "auth": "public", "rateLimit": null, "note": "Not rate-limited or auth-gated — served before the router's policy gate." },
+    { "method": "GET", "path": "/", "auth": "public", "rateLimit": null, "note": "Not rate-limited or auth-gated - served before the router's policy gate." },
     { "method": "GET", "path": "/health", "auth": "public", "rateLimit": { "limit": 20, "windowSeconds": 60, "scope": "ip" } },
 
-    { "method": "GET", "path": "/admin/keys", "auth": "admin", "requiredRole": "root", "rateLimit": { "limit": 30, "windowSeconds": 60, "scope": "admin" }, "note": "Root ADMIN_API_KEY only — a per-consumer key cannot manage other keys." },
+    { "method": "GET", "path": "/admin/keys", "auth": "admin", "requiredRole": "root", "rateLimit": { "limit": 30, "windowSeconds": 60, "scope": "admin" }, "note": "Root ADMIN_API_KEY only - a per-consumer key cannot manage other keys." },
     { "method": "POST", "path": "/admin/keys", "auth": "admin", "requiredRole": "root", "rateLimit": { "limit": 30, "windowSeconds": 60, "scope": "admin" }, "note": "Root ADMIN_API_KEY only." },
     { "method": "DELETE", "path": "/admin/keys/{id}", "auth": "admin", "requiredRole": "root", "rateLimit": { "limit": 30, "windowSeconds": 60, "scope": "admin" }, "note": "Root ADMIN_API_KEY only." },
 
@@ -17,8 +17,8 @@
     { "method": "DELETE", "path": "/foods/{id}", "auth": "admin", "rateLimit": { "limit": 60, "windowSeconds": 60, "scope": "admin" } },
     { "method": "POST", "path": "/foods/bulk", "auth": "admin", "rateLimit": { "limit": 10, "windowSeconds": 60, "scope": "admin" } },
     { "method": "GET", "path": "/foods/lookup", "auth": "public", "rateLimit": { "limit": 20, "windowSeconds": 60, "scope": "ip" }, "note": "Can trigger external USDA FDC / Open Food Facts / FatSecret calls." },
-    { "method": "GET", "path": "/foods/autocomplete", "auth": "public", "rateLimit": { "limit": 60, "windowSeconds": 60, "scope": "ip" }, "note": "Wraps FatSecret's Premier-exclusive foods.autocomplete.v2 — 503 if FatSecret credentials aren't configured." },
-    { "method": "GET", "path": "/foods/categories", "auth": "public", "rateLimit": { "limit": 30, "windowSeconds": 60, "scope": "ip" }, "note": "Wraps FatSecret's Premier-exclusive food_categories.get.v2 — 503 if FatSecret credentials aren't configured." },
+    { "method": "GET", "path": "/foods/autocomplete", "auth": "public", "rateLimit": { "limit": 60, "windowSeconds": 60, "scope": "ip" }, "note": "Wraps FatSecret's Premier-exclusive foods.autocomplete.v2 - 503 if FatSecret credentials aren't configured." },
+    { "method": "GET", "path": "/foods/categories", "auth": "public", "rateLimit": { "limit": 30, "windowSeconds": 60, "scope": "ip" }, "note": "Wraps FatSecret's Premier-exclusive food_categories.get.v2 - 503 if FatSecret credentials aren't configured." },
 
     { "method": "GET", "path": "/exchange", "auth": "public", "rateLimit": { "limit": 100, "windowSeconds": 60, "scope": "ip" } },
     { "method": "POST", "path": "/exchange", "auth": "admin", "rateLimit": { "limit": 60, "windowSeconds": 60, "scope": "admin" } },
@@ -42,7 +42,7 @@
     { "method": "POST", "path": "/formulas/bulk", "auth": "admin", "rateLimit": { "limit": 10, "windowSeconds": 60, "scope": "admin" } },
 
     { "method": "GET", "path": "/packaged", "auth": "public", "rateLimit": { "limit": 100, "windowSeconds": 60, "scope": "ip" } },
-    { "method": "GET", "path": "/packaged/pending", "auth": "admin", "requiredRole": "reviewer", "rateLimit": { "limit": 60, "windowSeconds": 60, "scope": "admin" }, "note": "Reviewer-role keys can reach this — it's the whole point of the reviewer role." },
+    { "method": "GET", "path": "/packaged/pending", "auth": "admin", "requiredRole": "reviewer", "rateLimit": { "limit": 60, "windowSeconds": 60, "scope": "admin" }, "note": "Reviewer-role keys can reach this - it's the whole point of the reviewer role." },
     { "method": "POST", "path": "/packaged/submit", "auth": "public", "rateLimit": { "limit": 10, "windowSeconds": 60, "scope": "ip" } },
     { "method": "POST", "path": "/packaged/scan", "auth": "public", "rateLimit": { "limit": 5, "windowSeconds": 60, "scope": "ip" }, "note": "Costs a Groq vision call per request." },
     { "method": "POST", "path": "/packaged/{id}/approve", "auth": "admin", "requiredRole": "reviewer", "rateLimit": { "limit": 60, "windowSeconds": 60, "scope": "admin" } },
@@ -51,20 +51,20 @@
     { "method": "PATCH", "path": "/packaged/{id}", "auth": "admin", "rateLimit": { "limit": 60, "windowSeconds": 60, "scope": "admin" } },
     { "method": "DELETE", "path": "/packaged/{id}", "auth": "admin", "rateLimit": { "limit": 60, "windowSeconds": 60, "scope": "admin" } },
 
-    { "method": "GET", "path": "/favorites", "auth": "public", "rateLimit": { "limit": 100, "windowSeconds": 60, "scope": "ip" }, "note": "No user-account system — user_id is a client-supplied identifier, same model as memory's session_id." },
-    { "method": "POST", "path": "/favorites", "auth": "public", "rateLimit": { "limit": 30, "windowSeconds": 60, "scope": "ip" }, "note": "Idempotent — favoriting an already-favorited item returns the existing row." },
+    { "method": "GET", "path": "/favorites", "auth": "public", "rateLimit": { "limit": 100, "windowSeconds": 60, "scope": "ip" }, "note": "No user-account system - user_id is a client-supplied identifier, same model as memory's session_id." },
+    { "method": "POST", "path": "/favorites", "auth": "public", "rateLimit": { "limit": 30, "windowSeconds": 60, "scope": "ip" }, "note": "Idempotent - favoriting an already-favorited item returns the existing row." },
     { "method": "DELETE", "path": "/favorites", "auth": "public", "rateLimit": { "limit": 30, "windowSeconds": 60, "scope": "ip" } },
 
     { "method": "GET", "path": "/history", "auth": "public", "rateLimit": { "limit": 100, "windowSeconds": 60, "scope": "ip" }, "note": "Recently viewed, most recent first." },
-    { "method": "POST", "path": "/history", "auth": "public", "rateLimit": { "limit": 30, "windowSeconds": 60, "scope": "ip" }, "note": "Opt-in — nothing is tracked automatically. Upserts viewed_at, no duplicate rows per resource." },
+    { "method": "POST", "path": "/history", "auth": "public", "rateLimit": { "limit": 30, "windowSeconds": 60, "scope": "ip" }, "note": "Opt-in - nothing is tracked automatically. Upserts viewed_at, no duplicate rows per resource." },
 
     { "method": "POST", "path": "/rag/retrieve", "auth": "public", "rateLimit": { "limit": 20, "windowSeconds": 60, "scope": "ip" }, "note": "Also has a separate KV response cache: 10 min TTL, keyed on context + top_k + normalized query." },
     { "method": "POST", "path": "/rag/ingest", "auth": "admin", "rateLimit": { "limit": 300, "windowSeconds": 60, "scope": "admin" } },
-    { "method": "POST", "path": "/rag/ask", "auth": "public", "rateLimit": { "limit": 15, "windowSeconds": 60, "scope": "ip" }, "note": "Most expensive route in the API — intent detection + fan-out search + rerank + LLM answer. Whole answers cached 5 min (skipped when session_id is passed)." },
+    { "method": "POST", "path": "/rag/ask", "auth": "public", "rateLimit": { "limit": 15, "windowSeconds": 60, "scope": "ip" }, "note": "Most expensive route in the API - intent detection + fan-out search + rerank + LLM answer. Whole answers cached 5 min (skipped when session_id is passed)." },
 
     { "method": "POST", "path": "/memory/write", "auth": "public", "rateLimit": { "limit": 30, "windowSeconds": 60, "scope": "ip" } },
     { "method": "POST", "path": "/memory/recall", "auth": "public", "rateLimit": { "limit": 30, "windowSeconds": 60, "scope": "ip" }, "note": "Preferred over the deprecated GET form. Separate KV response cache: 2 min TTL, keyed on session_id + top_k + normalized query." },
-    { "method": "GET", "path": "/memory/recall", "auth": "public", "rateLimit": { "limit": 30, "windowSeconds": 60, "scope": "ip" }, "note": "Deprecated — puts session_id and query text in the URL (access logs, browser history). Prefer POST." },
+    { "method": "GET", "path": "/memory/recall", "auth": "public", "rateLimit": { "limit": 30, "windowSeconds": 60, "scope": "ip" }, "note": "Deprecated - puts session_id and query text in the URL (access logs, browser history). Prefer POST." },
     { "method": "POST", "path": "/memory/consolidate", "auth": "admin", "rateLimit": { "limit": 60, "windowSeconds": 60, "scope": "admin" }, "note": "Also runs automatically every hour via a cron trigger, bypassing HTTP auth entirely." }
   ]
 }

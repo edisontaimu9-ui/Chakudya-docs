@@ -83,7 +83,7 @@ paths:
     get:
       tags: [API Keys]
       summary: List API keys (root key only)
-      description: Never returns the raw key or its hash — id/label/timestamps only.
+      description: Never returns the raw key or its hash - id/label/timestamps only.
       security: [{ bearerAuth: [] }]
       responses:
         "200":
@@ -103,7 +103,7 @@ paths:
       tags: [API Keys]
       summary: Create a new API key (root key only)
       description: >
-        The raw key is returned exactly once in the response — only its
+        The raw key is returned exactly once in the response - only its
         SHA-256 hash is stored. If lost, revoke it and mint a new one.
       security: [{ bearerAuth: [] }]
       requestBody:
@@ -134,7 +134,7 @@ paths:
                     properties:
                       key:
                         type: string
-                        description: Raw key — shown once only.
+                        description: Raw key - shown once only.
                         example: "cnr_9f2a1b...c81b"
                       data: { $ref: "#/components/schemas/ApiKey" }
         "400": { $ref: "#/components/responses/BadRequest" }
@@ -144,7 +144,7 @@ paths:
     delete:
       tags: [API Keys]
       summary: Revoke an API key (root key only)
-      description: Soft-revoke — sets `revoked_at`, the row is kept for audit history.
+      description: Soft-revoke - sets `revoked_at`, the row is kept for audit history.
       security: [{ bearerAuth: [] }]
       parameters:
         - $ref: "#/components/parameters/PathId"
@@ -197,7 +197,7 @@ paths:
       summary: Bulk-create foods (admin)
       description: >
         Batch insert, max 500 items per request, all-or-nothing (one
-        PostgREST request — a constraint violation on any row rejects the
+        PostgREST request - a constraint violation on any row rejects the
         whole batch).
       security: [{ bearerAuth: [] }]
       requestBody:
@@ -240,7 +240,7 @@ paths:
       summary: Search-as-you-type suggestions (public, rate-limited)
       description: >
         Wraps FatSecret's Premier-exclusive foods.autocomplete.v2. Requires
-        FATSECRET_CONSUMER_KEY/SECRET on a Premier or Premier Free plan —
+        FATSECRET_CONSUMER_KEY/SECRET on a Premier or Premier Free plan -
         returns 503 if not configured on this deployment.
       security: []
       parameters:
@@ -276,9 +276,9 @@ paths:
       tags: [Foods]
       summary: Food category list (public, rate-limited, cached 24h)
       description: >
-        Wraps FatSecret's Premier-exclusive food_categories.get.v2 —
+        Wraps FatSecret's Premier-exclusive food_categories.get.v2 -
         near-static reference data. Requires FATSECRET_CONSUMER_KEY/SECRET
-        on a Premier or Premier Free plan — returns 503 if not configured
+        on a Premier or Premier Free plan - returns 503 if not configured
         on this deployment.
       security: []
       responses:
@@ -640,7 +640,7 @@ paths:
         "200": { $ref: "#/components/responses/MutationSuccess" }
         "400": { $ref: "#/components/responses/BadRequest" }
         "409":
-          description: Barcode already has an approved/pending entry — not inserted.
+          description: Barcode already has an approved/pending entry - not inserted.
           content:
             application/json:
               schema:
@@ -680,11 +680,11 @@ paths:
                     description: data:image/...;base64,... URL or bare base64 (assumed JPEG).
                 barcode:
                   type: string
-                  description: Optional — takes priority over anything the model reads.
+                  description: Optional - takes priority over anything the model reads.
       responses:
         "200": { $ref: "#/components/responses/MutationSuccess" }
         "422":
-          description: No photo showed a legible nutrition label — nothing written.
+          description: No photo showed a legible nutrition label - nothing written.
           content:
             application/json:
               schema:
@@ -810,7 +810,7 @@ paths:
     delete:
       tags: [Favorites]
       summary: Remove a favorite (public, rate-limited)
-      description: No error if the favorite doesn't exist — `removed:false` in the response instead.
+      description: No error if the favorite doesn't exist - `removed:false` in the response instead.
       security: []
       requestBody:
         required: true
@@ -840,7 +840,7 @@ paths:
       tags: [History]
       summary: Log a view (public, rate-limited, opt-in)
       description: >
-        Upserts on (user_id, resource_type, resource_id) — repeat views
+        Upserts on (user_id, resource_type, resource_id) - repeat views
         update viewed_at in place rather than creating duplicate rows.
         Nothing is tracked automatically; the client calls this explicitly.
       security: []
@@ -918,7 +918,7 @@ paths:
                 query: { type: string }
                 context: { type: string, enum: [clinical, general, both], default: both }
                 top_k: { type: integer, default: 6 }
-                session_id: { type: string, description: "Optional — enables memory-personalized answers." }
+                session_id: { type: string, description: "Optional - enables memory-personalized answers." }
       responses:
         "200":
           description: Grounded answer with citations
@@ -989,7 +989,7 @@ paths:
         "429": { $ref: "#/components/responses/RateLimited" }
     get:
       tags: [Memory]
-      summary: Recall (deprecated — use POST, same params as query string)
+      summary: Recall (deprecated - use POST, same params as query string)
       description: >
         Deprecated: puts session_id and query text in the URL, exposed to
         access logs/browser history. Prefer POST /memory/recall.
@@ -1071,7 +1071,7 @@ components:
       name: user_id
       in: query
       required: true
-      description: Client-supplied identifier — no server-side account system exists.
+      description: Client-supplied identifier - no server-side account system exists.
       schema: { type: string }
     ResourceType:
       name: resource_type

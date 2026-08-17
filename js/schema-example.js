@@ -2,7 +2,7 @@ const SchemaExample = (() => {
   /**
    * Build a representative example value for a schema. Prefers an explicit
    * `example`, falls back to `default`, then to a type-shaped placeholder
-   * built from the schema's own declared properties/enum — nothing here is
+   * built from the schema's own declared properties/enum - nothing here is
    * invented data, just a rendering of what the schema already declares.
    */
   function build(spec, schema, depth = 0) {
@@ -50,7 +50,7 @@ const SchemaExample = (() => {
   /**
    * Example for a whole response object (as shown in "Example response").
    * statusCode lets us drop fields the API only actually sends on certain
-   * statuses — e.g. `request_id` on the shared Error schema is documented
+   * statuses - e.g. `request_id` on the shared Error schema is documented
    * as "present on 500 responses" only, so non-5xx examples shouldn't show it.
    */
   function forResponse(spec, responseObj, statusCode) {

@@ -1,5 +1,5 @@
 /**
- * Central, minimal app state. No framework — plain object + a tiny
+ * Central, minimal app state. No framework - plain object + a tiny
  * pub/sub so modules can react without being tightly coupled.
  */
 const AppState = (() => {
@@ -11,7 +11,7 @@ const AppState = (() => {
     activeId: null,           // "GET /foods" style id of the selected endpoint
     searchQuery: "",
     baseUrl: "",
-    authToken: "", // session-only — never persisted to storage
+    authToken: "", // session-only - never persisted to storage
   };
 
   const listeners = {};

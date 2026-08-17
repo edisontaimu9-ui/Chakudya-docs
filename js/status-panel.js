@@ -1,7 +1,7 @@
 /**
  * Prominent "right now" status banner + per-service breakdown, rendered at
  * the top of the Overview page (below the hero). Pings GET /health against
- * the currently selected baseUrl — no manual command needed to see it.
+ * the currently selected baseUrl - no manual command needed to see it.
  *
  * This is current-status only, not a historical uptime tracker: nothing is
  * recorded over time, it just reflects what /health returns at the moment
@@ -36,10 +36,10 @@ const StatusPanel = (() => {
   function labelFor(state) {
     switch (state) {
       case "ok": return "All Systems Operational";
-      case "degraded": return "Degraded — one or more required services are down";
+      case "degraded": return "Degraded - one or more required services are down";
       case "error": return "Unable to reach the API";
       case "checking": return "Checking status…";
-      default: return "Status unknown — set a base URL above";
+      default: return "Status unknown - set a base URL above";
     }
   }
 
@@ -80,7 +80,7 @@ const StatusPanel = (() => {
 
   async function check() {
     if (inFlight) return;
-    if (!panelEl()) { stop(); return; } // panel not on screen — nothing to do
+    if (!panelEl()) { stop(); return; } // panel not on screen - nothing to do
 
     const baseUrl = AppState.state.baseUrl;
     if (!baseUrl) {

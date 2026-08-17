@@ -1,5 +1,5 @@
 /* ─────────────────────────────────────────────────────────────
-   Chakudya Nutrition Registry — Design tokens
+   Chakudya Nutrition Registry - Design tokens
 
    Signature idea: this is a nutrition-facts panel rendered as a
    developer tool. Structural labels (eyebrows, section titles)
@@ -27,7 +27,7 @@
   --shadow-md: 0 10px 28px rgba(0,0,0,.22), 0 2px 8px rgba(0,0,0,.10);
   --shadow-lg: 0 20px 52px rgba(0,0,0,.32), 0 4px 14px rgba(0,0,0,.14);
 
-  /* method badge colors — same in both themes */
+  /* method badge colors - same in both themes */
   --method-get: #4C8DFF;
   --method-get-bg: rgba(76,141,255,.14);
   --method-post: #3FA66B;
@@ -112,6 +112,8 @@ body {
   font-size: 15px;
   line-height: 1.55;
   -webkit-font-smoothing: antialiased;
+  overflow-wrap: break-word;
+  word-wrap: break-word;
 }
 
 img, svg, table { max-width: 100%; }

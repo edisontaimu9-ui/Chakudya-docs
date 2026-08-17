@@ -128,7 +128,7 @@ const RenderEndpoint = (() => {
     container.appendChild(head);
 
     if (endpoint.meta?.note) {
-      container.appendChild(el(`<div class="callout"><strong>Note —</strong> ${escapeHtml(endpoint.meta.note)}</div>`));
+      container.appendChild(el(`<div class="callout"><strong>Note -</strong> ${escapeHtml(endpoint.meta.note)}</div>`));
     }
 
     // Parameters

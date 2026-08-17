@@ -3,7 +3,7 @@ const ThemeModule = (() => {
 
   function apply(theme) {
     document.documentElement.setAttribute("data-theme", theme);
-    try { localStorage.setItem(KEY, theme); } catch (_) { /* storage unavailable — theme just won't persist */ }
+    try { localStorage.setItem(KEY, theme); } catch (_) { /* storage unavailable - theme just won't persist */ }
   }
 
   function current() {

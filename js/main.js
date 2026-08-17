@@ -20,7 +20,7 @@
 
   // ── Header: brand / version / GitHub ──────────────────────
   document.getElementById("version-chip").textContent = `v${spec.info?.version || "?"}`;
-  document.title = `${spec.info?.title || "Chakudya API"} — Docs`;
+  document.title = `${spec.info?.title || "Chakudya API"} - Docs`;
 
   const repoUrl = "https://github.com/edisontaimu9-ui/chakudya-api";
   const githubLink = document.getElementById("github-link");
@@ -62,7 +62,7 @@
     if (!url) { hint.textContent = ""; return; }
     hint.textContent = url === productionUrl
       ? "CORS: wide open (Access-Control-Allow-Origin: *)"
-      : "Custom origin — Try It calls it directly from your browser";
+      : "Custom origin - Try It calls it directly from your browser";
   }
   updateCorsHint(initialBase);
 

@@ -44,7 +44,7 @@ const CopyModule = (() => {
           btn.textContent = original;
         }, 1400);
       } else {
-        toast("Couldn't copy — copy it manually");
+        toast("Couldn't copy - copy it manually");
       }
     });
   }

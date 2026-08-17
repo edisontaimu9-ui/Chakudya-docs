@@ -21,7 +21,7 @@ const ApiClient = (() => {
   }
 
   /**
-   * Executes the request and returns a normalized result. Never throws —
+   * Executes the request and returns a normalized result. Never throws -
    * network/CORS failures come back as { ok:false, networkError:true }.
    */
   async function execute({ url, method, headers, body }) {
