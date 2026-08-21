@@ -52,14 +52,14 @@ const RenderOverview = (() => {
       <div class="section">
         <h2 class="section__title">What the API provides</h2>
         <ul class="feature-list">
-          <li><strong>Malawian food composition data</strong> (<code>/foods</code>). Locally relevant foods and their nutrient values.</li>
-          <li><strong>Food exchange systems</strong> (<code>/exchange</code>). Standard and therapeutic exchange lists.</li>
-          <li><strong>Renal nutrition data</strong> (<code>/renal</code>). Foods and nutrition information relevant to renal dietary planning.</li>
-          <li><strong>Enteral formulas</strong> (<code>/formulas</code>). Structured information for clinical nutrition applications.</li>
-          <li><strong>Packaged and branded foods</strong> (<code>/packaged</code>). Barcode lookup, community product submission, OCR assisted data capture, and an admin review workflow.</li>
-          <li><strong>External food lookup</strong> (<code>/foods/lookup</code>, <code>/foods/autocomplete</code>, <code>/foods/categories</code>). Additional food information from USDA FoodData Central, Open Food Facts, and FatSecret when a food isn't in the local database.</li>
-          <li><strong>RAG powered nutrition knowledge</strong> (<code>/rag/ask</code>, <code>/rag/retrieve</code>). Retrieve relevant knowledge or ask a question directly.</li>
-          <li><strong>Session memory</strong> (<code>/memory/write</code>, <code>/memory/recall</code>, <code>/memory/consolidate</code>). Store, consolidate, and recall contextual information for AI assisted applications.</li>
+          <li><span><strong>Malawian food composition data</strong> (<code>/foods</code>). Locally relevant foods and their nutrient values.</span></li>
+          <li><span><strong>Food exchange systems</strong> (<code>/exchange</code>). Standard and therapeutic exchange lists.</span></li>
+          <li><span><strong>Renal nutrition data</strong> (<code>/renal</code>). Foods and nutrition information relevant to renal dietary planning.</span></li>
+          <li><span><strong>Enteral formulas</strong> (<code>/formulas</code>). Structured information for clinical nutrition applications.</span></li>
+          <li><span><strong>Packaged and branded foods</strong> (<code>/packaged</code>). Barcode lookup, community product submission, OCR assisted data capture, and an admin review workflow.</span></li>
+          <li><span><strong>External food lookup</strong> (<code>/foods/lookup</code>, <code>/foods/autocomplete</code>, <code>/foods/categories</code>). Additional food information from USDA FoodData Central, Open Food Facts, and FatSecret when a food isn't in the local database.</span></li>
+          <li><span><strong>RAG powered nutrition knowledge</strong> (<code>/rag/ask</code>, <code>/rag/retrieve</code>). Retrieve relevant knowledge or ask a question directly.</span></li>
+          <li><span><strong>Session memory</strong> (<code>/memory/write</code>, <code>/memory/recall</code>, <code>/memory/consolidate</code>). Store, consolidate, and recall contextual information for AI assisted applications.</span></li>
         </ul>
       </div>
     `));
