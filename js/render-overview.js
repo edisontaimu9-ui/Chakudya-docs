@@ -87,21 +87,6 @@ const RenderOverview = (() => {
       </div>
     `));
 
-    // How to contribute packaged/branded food data - the two public,
-    // no-key submission routes. Kept next to "Who it's for" so it reads
-    // as an invitation, not buried in the endpoint reference.
-    container.appendChild(el(`
-      <div class="section">
-        <h2 class="section__title">Contribute packaged/branded food data</h2>
-        <p class="endpoint-desc">The packaged foods table grows from community contributions - no key required, either route is public and rate-limited.</p>
-        <ul class="feature-list">
-          <li><span><strong>Submit manually</strong> - <a href="#/post-packaged-submit"><code>POST /packaged/submit</code></a>. Send a barcode and product name (plus whatever nutrition fields you have); it's saved with <code>status: "pending"</code> for review.</span></li>
-          <li><span><strong>Submit a photo</strong> - <a href="#/post-packaged-scan"><code>POST /packaged/scan</code></a>. Send 1-5 photos of the nutrition label; a vision model reads the values and saves the same pending row for you.</span></li>
-        </ul>
-      </div>
-    `));
-
-
     // Group cards
     const groupsSection = el(`<div class="section"><h2 class="section__title">Explore by resource</h2><div class="group-grid"></div></div>`);
     const grid = groupsSection.querySelector(".group-grid");
