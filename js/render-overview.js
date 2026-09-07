@@ -52,6 +52,7 @@ const RenderOverview = (() => {
         <ul class="feature-list">
           <li><span><strong>Natural language meal and ingredient parsing</strong> (<code>/ingredients/parse</code>, <code>/meals/analyze</code>). Turn free text like "2 eggs, 1 cup rice, 100g chicken" into structured, calculable nutrition data.</span></li>
           <li><span><strong>Malawian food composition data</strong> (<code>/foods</code>). Locally relevant foods and their nutrient values.</span></li>
+          <li><span><strong>Codex-style nutrition labels</strong> (<code>/foods/:id/label</code>). Standardized STAN 1-1985 nutrition facts label generated from a food's serving-size data.</span></li>
           <li><span><strong>Food exchange systems</strong> (<code>/exchange</code>). Standard and therapeutic exchange lists.</span></li>
           <li><span><strong>Glycaemic index data</strong> (<code>/glycaemic-index</code>). GI/GL values for foods.</span></li>
           <li><span><strong>Renal nutrition data</strong> (<code>/renal</code>). Foods and nutrition information relevant to renal dietary planning.</span></li>
