@@ -41,6 +41,8 @@ const RenderOverview = (() => {
     const firstEp = endpoints[0];
     hero.querySelector('[data-jump="first"]').href = firstEp ? `#/${firstEp.slug}` : "#";
 
+    DemoTerminal.mount(hero);
+
     // Live "right now" status - pings GET /health against the current
     // base URL. Current status only, not a historical uptime tracker.
     StatusPanel.mount(container);
