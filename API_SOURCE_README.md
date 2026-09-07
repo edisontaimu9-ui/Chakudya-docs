@@ -17,10 +17,14 @@ for AI assisted nutrition tools.
 - **Food exchange systems** (`/exchange`). Standard and therapeutic exchange lists.
 - **Renal nutrition data** (`/renal`). Foods and nutrition information relevant to renal dietary planning.
 - **Enteral formulas** (`/formulas`). Structured information for clinical nutrition applications.
+- **Drug-nutrient interactions** (`/drug-interactions`). 117-entry reference DB (migrated from Oasis CNST) with keyword search, shared across the ecosystem instead of bundled per-app.
+- **Food substitutions** (`/foods/substitutes`). Malawi-specific "what can I use instead" suggestions ranked by nutritional closeness (e.g. chicken → soya pieces → chambo → groundnuts), spanning categories the way people actually substitute rather than a strict taxonomy match.
 - **Packaged and branded foods** (`/packaged`). Barcode lookup, community product submission, OCR assisted data capture, and an admin review workflow.
 - **External food lookup** (`/foods/lookup`, `/foods/autocomplete`, `/foods/categories`). Additional food information from USDA FoodData Central, Open Food Facts, and FatSecret when a food isn't in the local database.
 - **RAG powered nutrition knowledge** (`/rag/ask`, `/rag/retrieve`). Retrieve relevant knowledge or ask a question directly.
 - **Session memory** (`/memory/write`, `/memory/recall`, `/memory/consolidate`). Store, consolidate, and recall contextual information for AI assisted applications like Oasis.
+- **Recipe nutrition calculation** (`/recipes/calculate`). Give it a list of ingredients (name or id, quantity, unit) and it resolves, converts, and sums the nutrition for you — total and per-serving.
+- **Meal analysis** (`/meals/analyze`). Same ingredient resolution as recipes, framed around a single meal: macronutrient % breakdown against the standard adult AMDR range, food-group coverage, an optional comparison against caller-supplied daily targets, and optional per-meal clinical screening flags (diabetes, hypertension, kidney disease).
 
 ## Who it's for
 
@@ -43,7 +47,7 @@ Chakudya can be used to build:
 - **Database:** Supabase REST (`/rest/v1`)
 - **Embeddings:** Cohere (`embed-multilingual-v3.0`)
 - **Rate limiting:** Cloudflare KV
-- **Current CNR version:** `1.18.0`
+- **Current CNR version:** `1.21.1`
 
 ---
 
@@ -54,7 +58,7 @@ chakudya-api/
 ├── src/
 │   └── index.js       # Worker entry, all route handlers, caching, rate limiting
 ├── smoke-test.sh       # Post-deploy verification script (see "Smoke Test" below)
-├── wrangler.toml       # Cloudflare Worker config - KV binding, cron trigger, account ID
+├── wrangler.toml       # Cloudflare Worker config — KV binding, cron trigger, account ID
 └── README.md
 ```
 
@@ -72,13 +76,13 @@ Set these in Cloudflare Worker settings:
 - `ADMIN_API_KEY` (required for admin write routes)
 - `RATE_LIMIT_KV` (KV namespace binding used for rate limiting)
 
-Optional - power the external food lookup cascade (`GET /foods/lookup`), plus `GET /foods/autocomplete` and `GET /foods/categories`, only; the rest of CNR works without them:
+Optional — power the external food lookup cascade (`GET /foods/lookup`), plus `GET /foods/autocomplete` and `GET /foods/categories`, only; the rest of CNR works without them:
 
-- `FATSECRET_CONSUMER_KEY` / `FATSECRET_CONSUMER_SECRET` (OAuth 1.0 Consumer credentials, from your FatSecret Platform dashboard). Name search and `/foods/lookup`'s FatSecret fallback work on any tier; barcode lookup, autocomplete, and categories need a **Premier or Premier Free** plan - see [Foods](#foods).
-- `USDA_FDC_API_KEY` (USDA FoodData Central - free at [api.data.gov/signup](https://api.data.gov/signup))
+- `FATSECRET_CONSUMER_KEY` / `FATSECRET_CONSUMER_SECRET` (OAuth 1.0 Consumer credentials, from your FatSecret Platform dashboard). Name search and `/foods/lookup`'s FatSecret fallback work on any tier; barcode lookup, autocomplete, and categories need a **Premier or Premier Free** plan — see [Foods](#foods).
+- `USDA_FDC_API_KEY` (USDA FoodData Central — free at [api.data.gov/signup](https://api.data.gov/signup))
 
 > If `ADMIN_API_KEY` is missing, admin routes fail closed (writes denied).
-> FatSecret auth is OAuth 1.0 (2-legged, HMAC-SHA1), signed natively inside the Worker via Web Crypto - no token exchange call, no IP whitelist needed.
+> FatSecret auth is OAuth 1.0 (2-legged, HMAC-SHA1), signed natively inside the Worker via Web Crypto — no token exchange call, no IP whitelist needed.
 
 ---
 
@@ -130,9 +134,9 @@ binding = "RATE_LIMIT_KV"
 id = "<the-id-it-printed>"
 ```
 
-(Or bind it via the dashboard instead: **Workers & Pages → your-worker → Settings → Bindings → Add → KV Namespace**, variable name exactly `RATE_LIMIT_KV`. Either way works, but only the `wrangler.toml` version survives a fresh clone/redeploy from a different machine - a dashboard-only binding can silently disappear on redeploy from an unedited config.)
+(Or bind it via the dashboard instead: **Workers & Pages → your-worker → Settings → Bindings → Add → KV Namespace**, variable name exactly `RATE_LIMIT_KV`. Either way works, but only the `wrangler.toml` version survives a fresh clone/redeploy from a different machine — a dashboard-only binding can silently disappear on redeploy from an unedited config.)
 
-Both rate limiting and the RAG/memory query cache **fail open silently** if this binding is missing - the API keeps responding normally, it just isn't rate-limited or cached, with no error to tell you so. After any deploy or binding change, confirm it's live:
+Both rate limiting and the RAG/memory query cache **fail open silently** if this binding is missing — the API keeps responding normally, it just isn't rate-limited or cached, with no error to tell you so. After any deploy or binding change, confirm it's live:
 
 ```bash
 curl -s https://your-worker.workers.dev/ | grep -o '"kv_bound":[a-z]*'
@@ -168,12 +172,12 @@ Runs the full MISS→HIT / rate-limit / cascade verification pass in one command
   - `/formulas`
   - `/packaged/:id`
 - `GET /packaged/pending`, `POST /packaged/:id/approve`, `POST /packaged/:id/reject`
-- `GET /admin/keys`, `POST /admin/keys`, `DELETE /admin/keys/:id` - **root key only**, see [API keys](#api-keys)
+- `GET /admin/keys`, `POST /admin/keys`, `DELETE /admin/keys/:id` — **root key only**, see [API keys](#api-keys)
 - `POST /rag/ingest`
 - `POST /memory/consolidate` (also runs automatically via hourly cron, bypassing HTTP auth)
 
 The `<key>` can be either the root `ADMIN_API_KEY` or a per-consumer key
-minted via `POST /admin/keys` - see [API keys](#api-keys) for the
+minted via `POST /admin/keys` — see [API keys](#api-keys) for the
 difference.
 
 Public exceptions:
@@ -191,35 +195,35 @@ Public exceptions:
 ## API keys
 
 Before this feature existed, every admin action used the same
-`ADMIN_API_KEY` - no way to tell who did what, or revoke one client's
+`ADMIN_API_KEY` — no way to tell who did what, or revoke one client's
 access without breaking everyone else's. Now there are two kinds of valid
 admin credential:
 
-- **Root key** - `env.ADMIN_API_KEY` (the `wrangler secret`). Works
+- **Root key** — `env.ADMIN_API_KEY` (the `wrangler secret`). Works
   exactly like before. Only the root key can manage other keys, and it
   always has full access regardless of role checks.
-- **Per-consumer keys** - minted via `POST /admin/keys`, each with its own
+- **Per-consumer keys** — minted via `POST /admin/keys`, each with its own
   `label` and `role`. The label is what shows up automatically as
   `reviewed_by` on `/packaged/:id/approve|reject`, so approvals/rejections
   are attributable to a specific reviewer without them having to type
   their name every time.
 
-**Roles** - every per-consumer key has one:
+**Roles** — every per-consumer key has one:
 
-- `admin` *(default)* - same access as the root key, everything except
+- `admin` *(default)* — same access as the root key, everything except
   managing other keys.
-- `reviewer` - can only reach the packaged review queue
+- `reviewer` — can only reach the packaged review queue
   (`GET /packaged/pending`, `POST /packaged/:id/approve`,
   `POST /packaged/:id/reject`) plus all public/`GET` routes. Blocked from
-  everything else admin-gated - editing foods, deleting packaged foods, bulk
+  everything else admin-gated — editing foods, deleting packaged foods, bulk
   inserts, RAG ingest, memory consolidation, key management, etc. A
   reviewer key that leaks can't do much beyond what a reviewer is
   supposed to do in the first place.
 
-There's currently no "change a key's role" endpoint - revoke the key and
+There's currently no "change a key's role" endpoint — revoke the key and
 mint a new one with the role you want.
 
-Raw keys are never stored - only a SHA-256 hash, in a new `api_keys`
+Raw keys are never stored — only a SHA-256 hash, in a new `api_keys`
 table. Run this once in the Supabase SQL editor:
 
 ```sql
@@ -235,7 +239,7 @@ create table if not exists api_keys (
 ```
 
 If you already have an `api_keys` table from before roles existed, migrate
-it instead (existing keys default to `admin` - nobody's access shrinks):
+it instead (existing keys default to `admin` — nobody's access shrinks):
 
 ```sql
 alter table api_keys add column if not exists role text not null default 'admin';
@@ -250,19 +254,19 @@ curl -X POST https://your-worker-url/admin/keys \
   -d '{"label":"Grace - reviewer","role":"reviewer"}'
 ```
 
-`role` is optional - omit it (or send `"admin"`) for full access, same as
+`role` is optional — omit it (or send `"admin"`) for full access, same as
 before this feature existed.
 
 ```json
 {
   "status": "success",
-  "message": "API key created - save this now, it will not be shown again",
+  "message": "API key created — save this now, it will not be shown again",
   "key": "cnr_9f2a...c81b",
   "data": { "id": 1, "label": "Grace - reviewer", "role": "reviewer", "created_at": "...", "last_used_at": null, "revoked_at": null }
 }
 ```
 
-The raw `key` value is shown exactly once - there's no way to retrieve it
+The raw `key` value is shown exactly once — there's no way to retrieve it
 again afterward (only its hash exists in the DB). If it's lost, revoke it
 and mint a new one.
 
@@ -272,7 +276,7 @@ and mint a new one.
 curl https://your-worker-url/admin/keys -H "Authorization: Bearer <ADMIN_API_KEY>"
 ```
 
-**Revoke a key** (soft-delete - sets `revoked_at`, keeps the row for audit history):
+**Revoke a key** (soft-delete — sets `revoked_at`, keeps the row for audit history):
 
 ```bash
 curl -X DELETE https://your-worker-url/admin/keys/1 -H "Authorization: Bearer <ADMIN_API_KEY>"
@@ -289,6 +293,7 @@ curl -X DELETE https://your-worker-url/admin/keys/1 -H "Authorization: Bearer <A
 - **Memory recall (`GET /memory/recall`)**: `30/min` per IP
 - **Admin writes (general)**: `60/min` per admin token
 - **RAG ingest (`POST /rag/ingest`)**: `30/min` per admin token
+- **Batch (`POST /batch`)**: `10/min` per IP — on top of whatever limit each sub-request's own resource applies
 
 When exceeded:
 
@@ -299,21 +304,22 @@ When exceeded:
 
 ## Caching (Cloudflare Cache API, `v1.4.0+`)
 
-GET responses for reference-style resources are cached at the Cloudflare edge, keyed on the full request URL (so different filters/query params get distinct cache entries). No extra bindings needed - this uses the Workers built-in `caches.default`.
+GET responses for reference-style resources are cached at the Cloudflare edge, keyed on the full request URL (so different filters/query params get distinct cache entries). No extra bindings needed — this uses the Workers built-in `caches.default`.
 
 | Resource | Cached? | TTL |
 |---|---|---|
-| `GET /foods`, `/exchange`, `/renal`, `/formulas` | ✅ | 1 hour |
+| `GET /foods`, `/exchange`, `/renal`, `/formulas`, `/glycaemic-index` | ✅ | 1 hour |
+| `GET /foods/compare` | ✅ | 1 hour |
 | `GET /foods/lookup` | ✅ | 30 min |
 | `GET /foods/autocomplete` | ✅ | 1 hour |
 | `GET /foods/categories` | ✅ | 24 hours |
-| `GET /packaged*` | ❌ | - (changes often - community/OCR submissions) |
-| `POST /rag/retrieve`, `POST`/`GET /memory/recall` | ❌ (edge cache) - ✅ (separate KV query cache, see below) | - |
-| `POST /rag/ingest`, `POST /memory/write` | ❌ | - (writes; never cached) |
+| `GET /packaged*` | ❌ | — (changes often — community/OCR submissions) |
+| `POST /rag/retrieve`, `POST`/`GET /memory/recall` | ❌ (edge cache) — ✅ (separate KV query cache, see below) | — |
+| `POST /rag/ingest`, `POST /memory/write` | ❌ | — (writes; never cached) |
 
-`/foods/lookup` was already deduping external USDA/FatSecret/Open Food Facts calls via the `external_foods_cache` Supabase table - the edge cache sits on top of that, so a repeat query within 30 min skips the Supabase round-trip entirely too.
+`/foods/lookup` was already deduping external USDA/FatSecret/Open Food Facts calls via the `external_foods_cache` Supabase table — the edge cache sits on top of that, so a repeat query within 30 min skips the Supabase round-trip entirely too.
 
-**Invalidation:** a successful admin write (`POST`/`PUT`/`PATCH`/`DELETE`) to a cached resource automatically purges the bare list URL and the single-id URL for that resource. Filtered/paginated variants beyond those two shapes just expire naturally within the TTL above. Note this is the per-Worker Cache API, not zone-level CDN cache, so there's no dashboard "purge everything" button for it - the automatic purge on write is the main invalidation path.
+**Invalidation:** a successful admin write (`POST`/`PUT`/`PATCH`/`DELETE`) to a cached resource automatically purges the bare list URL and the single-id URL for that resource. Filtered/paginated variants beyond those two shapes just expire naturally within the TTL above. Note this is the per-Worker Cache API, not zone-level CDN cache, so there's no dashboard "purge everything" button for it — the automatic purge on write is the main invalidation path.
 
 **Verifying it's working:** every cached response carries an `X-Cache: HIT` or `X-Cache: MISS` header (Cloudflare's own `cf-cache-status` doesn't apply here since this is the Workers Cache API, not zone-level caching). Check it directly:
 
@@ -324,24 +330,24 @@ curl -sD - -o /dev/null "https://your-worker.workers.dev/foods/lookup?q=nsima" |
 # second request -> X-Cache: HIT
 ```
 
-Note: Cache API entries are per-datacenter, not global - if your first two requests happen to land on different Cloudflare edge nodes, the second one can still show `MISS`. Repeat a couple of times if that happens; it'll settle into `HIT` once requests are routed to a datacenter that already has the entry.
+Note: Cache API entries are per-datacenter, not global — if your first two requests happen to land on different Cloudflare edge nodes, the second one can still show `MISS`. Repeat a couple of times if that happens; it'll settle into `HIT` once requests are routed to a datacenter that already has the entry.
 
-Note: Cloudflare has no dashboard analytics for the Workers Cache API specifically (the "Caching" dashboard tab is for zone-level CDN caching on a proxied domain, which is separate from this). To watch cache activity live instead: Workers & Pages → chakudya-api → Logs → enable **Real-time Logs**, then hit any cached endpoint - you'll see `[cache] HIT`, `[cache] MISS`, and `[cache] PURGE` lines streaming in as requests come through.
+Note: Cloudflare has no dashboard analytics for the Workers Cache API specifically (the "Caching" dashboard tab is for zone-level CDN caching on a proxied domain, which is separate from this). To watch cache activity live instead: Workers & Pages → chakudya-api → Logs → enable **Real-time Logs**, then hit any cached endpoint — you'll see `[cache] HIT`, `[cache] MISS`, and `[cache] PURGE` lines streaming in as requests come through.
 
 ---
 
 ## RAG / Memory Query Cache (Cloudflare KV, `v1.6.0+`)
 
-The edge cache above only applies to `GET` requests - `/rag/retrieve` and `/memory/recall` are `POST` (recall also supports a legacy `GET`), and each one spends a Cohere embed call just to turn the query text into a vector before searching. That's a separate, KV-backed cache (reuses the existing `RATE_LIMIT_KV` binding under its own key prefix - no new binding needed) that caches the *whole response*, so a hit skips the Cohere call **and** the Supabase RPC.
+The edge cache above only applies to `GET` requests — `/rag/retrieve` and `/memory/recall` are `POST` (recall also supports a legacy `GET`), and each one spends a Cohere embed call just to turn the query text into a vector before searching. That's a separate, KV-backed cache (reuses the existing `RATE_LIMIT_KV` binding under its own key prefix — no new binding needed) that caches the *whole response*, so a hit skips the Cohere call **and** the Supabase RPC.
 
 | Route | TTL | Cache key |
 |---|---|---|
 | `POST /rag/retrieve` | 10 min | `context` + `top_k` + normalized query text |
 | `POST`/`GET /memory/recall` | 2 min | `session_id` + `top_k` + normalized query text |
 
-`/memory/recall`'s key always includes `session_id`, so one patient session can never be served from another's cache entry. Its TTL is deliberately short (2 min, vs 10 min for RAG) because a session's facts can change mid-conversation via `/memory/write` - this cache is only meant to absorb rapid repeat/near-repeat recalls, not to serve stale clinical context.
+`/memory/recall`'s key always includes `session_id`, so one patient session can never be served from another's cache entry. Its TTL is deliberately short (2 min, vs 10 min for RAG) because a session's facts can change mid-conversation via `/memory/write` — this cache is only meant to absorb rapid repeat/near-repeat recalls, not to serve stale clinical context.
 
-`/rag/ingest` and `/memory/write` are never cached - caching a write risks silently dropping a distinct document or fact on what looks like a "repeat" call.
+`/rag/ingest` and `/memory/write` are never cached — caching a write risks silently dropping a distinct document or fact on what looks like a "repeat" call.
 
 **Verifying it's working:** both routes return a `cache: "HIT"` or `cache: "MISS"` field in the JSON body (not a header, since this is a query-cache on POST routes, not the edge `GET` cache above):
 
@@ -372,7 +378,7 @@ Takes about 90 seconds (most of that is a deliberate 60s pause to let the rate-l
 ## Endpoints
 
 The full list below is also available as a machine-readable
-[OpenAPI 3.0.3 spec](./openapi.yaml) - import it into Swagger UI, Postman,
+[OpenAPI 3.0.3 spec](./openapi.yaml) — import it into Swagger UI, Postman,
 or an SDK generator. It's a static file (not served by the Worker) kept in
 sync by hand alongside this section; if they ever disagree, this README
 and `src/index.js` are the source of truth. Row shapes for the nutrition
@@ -383,22 +389,22 @@ column list per table lives here in the README and evolves on its own.
 
 ### Root
 
-- `GET /` - returns CNR metadata, version, auth summary, and endpoint map
+- `GET /` — returns CNR metadata, version, auth summary, and endpoint map
 
 ### Health
 
-- `GET /health` *(public, rate-limited)* - pings Supabase, Cohere, Groq,
+- `GET /health` *(public, rate-limited)* — pings Supabase, Cohere, Groq,
   and Open Food Facts in parallel and reports per-service status plus an
   overall `healthy`/`degraded` verdict. Useful for quickly narrowing down
   which upstream is the cause when a route starts failing, instead of
   guessing from a generic `500`.
 
-`open_food_facts` is live-pinged too (it's free/keyless - no
+`open_food_facts` is live-pinged too (it's free/keyless — no
 "configured" state to report, unlike the two below) since it's an
 actively-used dependency for barcode lookups in `GET /foods/lookup` and
 `POST /packaged/scan`. Optional integrations (USDA FDC, FatSecret, the
 rate-limit/query-cache KV) are reported as `configured`/`bound` or not,
-without a network call. None of these four affect the overall verdict -
+without a network call. None of these four affect the overall verdict —
 they're visibility-only, since the rest of the API already degrades
 gracefully without them.
 
@@ -422,13 +428,70 @@ Response:
 ```
 
 Returns `200` when `status: "healthy"`, `503` when `status: "degraded"`
-(i.e. Supabase, Cohere, or Groq - the required upstreams - failed to
+(i.e. Supabase, Cohere, or Groq — the required upstreams — failed to
 respond).
+
+### Batch
+
+- `POST /batch` *(public, rate-limited, max 20 sub-requests)* — runs several
+  sub-requests in one HTTP call and returns all their results together.
+  Built for clients (the MCP server, the SDK, or any caller) that would
+  otherwise make several separate calls per user action — e.g. a few
+  `/foods/lookup` calls plus a `/rag/ask`, or a batch of `/foods/:id` reads —
+  and want one round trip instead.
+
+  Each sub-request goes through the *exact same* auth + rate-limit + edge
+  cache + dispatch path as calling it directly: an admin-only sub-route
+  still needs a valid `Authorization: Bearer <admin key>` (forwarded from
+  the batch call's own header), and it still consumes that resource's own
+  rate-limit bucket. Batching only saves round trips — it can't be used to
+  bypass per-resource auth or rate limits. The `/batch` endpoint itself also
+  has its own limit (see Rate Limits above), since one batch call can fan
+  out into a lot of backend work. Sub-requests run concurrently; results
+  come back in the same order as the request array regardless. A failed
+  sub-request never fails the others — each item carries its own `status`.
+
+  Request:
+
+  ```json
+  {
+    "requests": [
+      { "id": "banana", "method": "GET", "path": "/foods/lookup?q=banana" },
+      { "id": "rice-vs-nsima", "method": "GET", "path": "/foods/compare?foods=rice,nsima" },
+      { "id": "log-it", "method": "POST", "path": "/log", "body": { "user_id": "u1", "meal_type": "lunch", "calories": 450 } }
+    ]
+  }
+  ```
+
+  Response:
+
+  ```json
+  {
+    "status": "success",
+    "data": [
+      { "id": "banana", "status": 200, "body": { "status": "success", "data": { "...": "..." } } },
+      { "id": "rice-vs-nsima", "status": 200, "body": { "status": "success", "data": { "...": "..." } } },
+      { "id": "log-it", "status": 201, "body": { "status": "success", "data": { "...": "..." } } }
+    ],
+    "meta": { "total": 3, "succeeded": 3, "failed": 0, "duration_ms": 187 }
+  }
+  ```
+
+  Notes:
+  - `id` is optional — defaults to the item's index (as a string) if omitted.
+  - `method` defaults to `GET`; supported methods are `GET`, `POST`, `PUT`,
+    `PATCH`, `DELETE`.
+  - `path` must be a path starting with `/` (not a full URL), matching
+    whatever you'd normally call the API with (query string included).
+  - Nested `/batch` sub-requests are rejected with a `400` item.
+  - The envelope itself returns `200` unless the batch request is malformed
+    (bad JSON, missing/empty/oversized `requests`) — individual sub-request
+    failures live in each item's own `status`/`body`, not the envelope status.
 
 ## Request IDs & logging
 
 Every request gets a UUID, returned as the `X-Request-Id` response header
-on every response (success, error, rate-limited, cached - all of them).
+on every response (success, error, rate-limited, cached — all of them).
 Quote it back when reporting an issue; it's also in the corresponding log
 line.
 
@@ -449,7 +512,7 @@ that's the case most worth being able to search logs for afterward:
 
 Set `DISABLE_REQUEST_LOGGING = "true"` in `wrangler.toml`'s `[vars]` (or a
 secret) to silence the per-request info log if volume ever becomes a
-cost/noise concern - errors always log regardless of this setting.
+cost/noise concern — errors always log regardless of this setting.
 
 ## Pagination
 
@@ -457,13 +520,13 @@ cost/noise concern - errors always log regardless of this setting.
 and `/packaged` all support two pagination modes, chosen by
 whether a `cursor` param is present at all:
 
-- **Offset/limit (default)** - `?limit=50&offset=100`, unchanged from
+- **Offset/limit (default)** — `?limit=50&offset=100`, unchanged from
   before. Response includes `count` (total matching rows) and `offset`.
   Simple, but on a large table that's actively changing, rows can shift
   between pages as data is inserted or deleted.
-- **Cursor (keyset)** - add `?cursor=` to switch modes. Start with
+- **Cursor (keyset)** — add `?cursor=` to switch modes. Start with
   `cursor=` (empty) or omit `offset`/leave `cursor` blank for the first
-  page; each response includes `next_cursor` - pass that value as the next
+  page; each response includes `next_cursor` — pass that value as the next
   request's `cursor` to get the following page. Stops when `has_more` is
   `false` (`next_cursor` will be `null`). Not affected by rows shifting
   mid-pagination, which is the point of using it on a big or fast-moving
@@ -482,9 +545,9 @@ curl ".../foods?category=fruit&cursor=187"            # next page (from next_cur
 
 ## Bulk insert
 
-`POST /foods/bulk`, `/exchange/bulk`, `/renal/bulk`, and `/formulas/bulk`
-*(all admin)* accept a batch
-of rows in one request instead of one `POST` per row - useful for loading
+`POST /foods/bulk`, `/exchange/bulk`, `/renal/bulk`, `/formulas/bulk`,
+`/drug-interactions/bulk`, and `/glycaemic-index/bulk` *(all admin)* accept a batch
+of rows in one request instead of one `POST` per row — useful for loading
 data from a spreadsheet or migration script.
 
 ```bash
@@ -503,14 +566,18 @@ curl -X POST https://your-worker-url/foods/bulk \
 { "status": "success", "message": "2 foods created", "count": 2, "data": [ /* the 2 inserted rows */ ] }
 ```
 
-- Max **500 items** per request - split larger loads into multiple calls.
-- `food_name` is required on every item for `/foods/bulk` (mirrors the
-  single-row `POST /foods` validation); the other five resources have no
-  required-field check beyond a non-empty array, matching their single-row
-  endpoints today.
+- Max **500 items** per request — split larger loads into multiple calls.
+- `food_name` is required on every item for `/foods/bulk` and
+  `/glycaemic-index/bulk` (mirrors each resource's single-row `POST`
+  validation), `drug` for `/drug-interactions/bulk`; the other three
+  resources have no required-field check beyond a non-empty array, matching
+  their single-row endpoints today. Note `/glycaemic-index/bulk` does *not*
+  enforce `match_keywords`/`source` per-item the way the single-row `POST`
+  does — a bulk seed file with a missing citation will insert silently, so
+  check your seed JSON before running it.
 - **All-or-nothing:** this is one PostgREST batch insert, not N sequential
   inserts. If any row in the batch violates a constraint (e.g. a duplicate
-  unique key), the *entire* batch is rejected and nothing is inserted -
+  unique key), the *entire* batch is rejected and nothing is inserted —
   intentional, so a bad row doesn't leave you guessing which rows silently
   didn't make it in. Fix the offending row (the error message from
   Postgres usually names the constraint) and resubmit.
@@ -519,11 +586,12 @@ curl -X POST https://your-worker-url/foods/bulk \
 
 - `GET /foods`
 - `GET /foods/:id`
-- `GET /foods/lookup` - see below
-- `GET /foods/autocomplete` - see below
-- `GET /foods/categories` - see below
+- `GET /foods/lookup` — see below
+- `GET /foods/autocomplete` — see below
+- `GET /foods/categories` — see below
+- `GET /foods/substitutes` — see below
 - `POST /foods` *(admin)*
-- `POST /foods/bulk` *(admin)* - see [Bulk insert](#bulk-insert)
+- `POST /foods/bulk` *(admin)* — see [Bulk insert](#bulk-insert)
 - `PUT /foods/:id` *(admin)*
 - `PATCH /foods/:id` *(admin)*
 - `DELETE /foods/:id` *(admin)*
@@ -533,27 +601,224 @@ Query params for `GET /foods`:
 - `search` → maps to `food_name ilike`
 - `category`
 - `limit` (default `50`, capped at `100`)
-- `offset` or `cursor` - see [Pagination](#pagination)
+- `offset` or `cursor` — see [Pagination](#pagination)
+- `with_servings` → `true` to add `serving_sizes` to every row (see below) — works for both pagination modes
 
-**`GET /foods/lookup`** - external cascade for foods not in the local database. Order: local cache → USDA FDC (name search) → Open Food Facts (barcode) → FatSecret barcode lookup (Premier-exclusive) → FatSecret name search. First external hit is cached into `external_foods_cache` so subsequent lookups skip the upstream calls. Public, rate-limited to 20 req/min per IP.
+**Serving-Size Intelligence** — add `?with_servings=true` to `GET /foods/:id` or `GET /foods/lookup` to get a `serving_sizes` array alongside the usual per-100g/100ml fields: realistic Malawian household measures (e.g. "1 cup / chikombe", "1 chunk nsima", "1 sachet RUTF"), each with every nutrient already scaled from the 100g basis so you don't have to do the arithmetic. Three tiers, most specific first — the food's own FCT `measure`/`weight_g` if it has one (`source: "fct"`), a curated keyword match for common Malawian foods (`source: "local_intelligence"`), or a generic per-category estimate (`source: "category_estimate"`) — plus the raw 100g/100ml basis, always included as `source: "reference"`. Fully local/rule-based (no LLM call, no added latency); off by default so existing integrations are unaffected.
+
+```json
+GET /foods/45?with_servings=true
+{
+  "status": "success",
+  "data": {
+    "id": 45,
+    "food_name": "Nsima (thick, maize)",
+    "kcal": 130, "protein_g": 2.8, "carbs_g": 28.6, "...": "...per 100g",
+    "serving_sizes": [
+      { "label": "1 chunk / ndomondo (approx. 1 cup, 200g)", "grams": 200, "source": "local_intelligence",
+        "nutrients": { "kcal": 260, "protein_g": 5.6, "carbs_g": 57.2 } },
+      { "label": "100g", "grams": 100, "source": "reference",
+        "nutrients": { "kcal": 130, "protein_g": 2.8, "carbs_g": 28.6 } }
+    ]
+  }
+}
+```
+
+**`GET /foods/lookup`** — external cascade for foods not in the local database. Order: local cache → USDA FDC (name search) → Open Food Facts (barcode) → FatSecret barcode lookup (Premier-exclusive) → FatSecret name search. First external hit is cached into `external_foods_cache` so subsequent lookups skip the upstream calls. Public, rate-limited to 20 req/min per IP.
 
 - `q` → name search (tries USDA, then FatSecret)
 - `barcode` → barcode lookup (Open Food Facts, then FatSecret)
 - `offset` (default `0`)
+- `with_servings` → `true` to add `serving_sizes` (see above)
 
-**`GET /foods/autocomplete?q=...&max_results=`** *(public, rate-limited, cached 1h)* - search-as-you-type suggestions via FatSecret's Premier-exclusive `foods.autocomplete.v2`. `max_results` defaults to `4`, capped at `10` (FatSecret's own limit). Returns a plain array of strings:
+**`GET /foods/autocomplete?q=...&max_results=`** *(public, rate-limited, cached 1h)* — search-as-you-type suggestions via FatSecret's Premier-exclusive `foods.autocomplete.v2`. `max_results` defaults to `4`, capped at `10` (FatSecret's own limit). Returns a plain array of strings:
 
 ```json
 { "status": "success", "data": ["chicken", "chicken breast", "chicken salad"] }
 ```
 
-**`GET /foods/categories`** *(public, rate-limited, cached 24h)* - the full FatSecret food category list (near-static reference data), via the Premier-exclusive `food_categories.get.v2`:
+**`GET /foods/categories`** *(public, rate-limited, cached 24h)* — the full FatSecret food category list (near-static reference data), via the Premier-exclusive `food_categories.get.v2`:
 
 ```json
 { "status": "success", "data": [{ "id": "1", "name": "Beans & Legumes", "description": "..." }] }
 ```
 
-Both of the above require `FATSECRET_CONSUMER_KEY`/`FATSECRET_CONSUMER_SECRET` on a **Premier or Premier Free** plan - a Basic/free-tier key returns FatSecret error 14 ("Missing scope"), which surfaces here as a `503` ("not configured on this deployment"). See [Required Environment Variables](#required-environment-variables--bindings).
+Both of the above require `FATSECRET_CONSUMER_KEY`/`FATSECRET_CONSUMER_SECRET` on a **Premier or Premier Free** plan — a Basic/free-tier key returns FatSecret error 14 ("Missing scope"), which surfaces here as a `503` ("not configured on this deployment"). See [Required Environment Variables](#required-environment-variables--bindings).
+
+**`GET /foods/substitutes?food_name=chicken&limit=`** *(public, rate-limited, cached 1h)* — Malawi-specific substitution suggestions, entirely local (no FatSecret dependency). Resolves `food_name` the same way a `/meals/analyze` ingredient resolves (local `foods` match, falling back to the external lookup cascade), classifies it into a substitution group, then ranks candidates from `foods` by nutritional closeness on that group's primary nutrient.
+
+The grouping deliberately overrides the plain category taxonomy where it matters for how people actually substitute: chicken/fish/eggs (category `Protein`) and beans/soya/groundnuts (category `Legumes`) are treated as one combined "Protein / body-building foods" group, ranked by protein per 100g; grains plus cassava/potatoes are one "Starches / staples" group, ranked by carbohydrate. Everything else falls back to its own plain category. `limit` defaults to `5`, capped at `15`.
+
+```json
+{ "food_name": "chicken", "limit": 5 }
+```
+```json
+{
+  "status": "success",
+  "data": {
+    "original": { "food_name": "Chicken breast, roasted", "matched_source": "local", "category": "Protein", "per_100g": { "kcal": 165, "protein_g": 31, "carbs_g": 0, "fat_g": 3.6, "iron_mg": 1, "calcium_mg": 15 } },
+    "substitution_group": "Protein / body-building foods",
+    "ranked_by": "closeness in protein per 100g",
+    "substitutes": [
+      { "food_name": "Soya pieces, rehydrated", "category": "Legumes", "per_100g": { "protein_g": 34, "...": "..." }, "comparison_vs_original": { "protein_g": { "substitute": 34, "original": 31, "difference": 3 }, "...": "..." } },
+      { "food_name": "Chambo, grilled", "category": "Protein", "...": "..." },
+      { "food_name": "Groundnuts, roasted", "category": "Legumes", "...": "..." }
+    ],
+    "note": "Values are per 100g (Malawi FCT convention)..."
+  }
+}
+```
+
+`classifyCategory`'s keyword list includes common Lake Malawi fish names (chambo, usipa, kapenta, matemba, mbaba, chisawasawa, ntchila) specifically so they classify as `Protein` and turn up as substitutes/candidates — without that, a food named "Chambo, grilled" would silently fall through both classification and the keyword-based candidate search, since it doesn't contain the word "fish".
+
+Ranking is a single primary nutrient's closeness, not a full dietary-equivalence judgment — it doesn't know about cost, local availability, taste, or realistic portion size, and every candidate's full `comparison_vs_original` (kcal/protein/carbs/fat/iron/calcium) is included precisely so a clinician or cook can see *how* it differs, not just that it's "close".
+
+**`GET /foods/compare?foods=nsima,rice,potatoes`** *(public, rate-limited, cached 1h)* — Nutrient Comparison: lines up 2-6 foods side by side. Resolves each name the same way `/foods/substitutes` does (local match, falling back to the external lookup cascade), then returns per-100g energy, protein, carbohydrate, fiber, fat, and the full micronutrient panel for each — plus `nutrient_comparison`, the same fields pivoted per-nutrient with the highest/lowest food flagged, so "which has more iron" doesn't need re-deriving client-side.
+
+Glycaemic considerations are included **only where a published, sourced value exists** — nothing is estimated or guessed. Each food gets either a `glycaemic.entries[]` (measured GI/GL with citation, from the `glycaemic_index_data` reference table — see below) or `glycaemic: null` plus a clearly-labelled `glycaemic_note` heuristic (fiber-to-carbohydrate ratio only, explicitly not presented as a GI value).
+
+```json
+GET /foods/compare?foods=nsima,rice,potatoes
+{
+  "status": "success",
+  "data": {
+    "foods": [
+      {
+        "requested_as": "nsima", "food_name": "Nsima (thick, maize)", "matched_source": "local", "category": "Grains",
+        "per_100g": { "energy_kcal": 130, "protein_g": 2.8, "carbs_g": 28.6, "fiber_g": 1.2, "...": "..." },
+        "glycaemic": {
+          "entries": [
+            { "matched_as": "Maize stiff porridge (nsima), whole maize flour", "gi_value": 94.06, "gl_value": 47.03, "gi_category": "high", "source": "Mlotha V, et al. 2016...", "...": "..." },
+            { "matched_as": "Maize stiff porridge (nsima), fermented maize grits", "gi_value": 65.49, "gl_value": 32.75, "gi_category": "medium", "source": "Mlotha V, et al. 2016...", "...": "..." }
+          ]
+        },
+        "glycaemic_note": "Measured GI/GL from published sources — see entries[].source. Multiple entries mean multiple processing methods/studies exist..."
+      },
+      { "requested_as": "rice", "food_name": "Rice, white, cooked", "...": "...", "glycaemic": { "entries": [{ "gi_value": 73, "source": "Atkinson et al. 2021", "...": "..." }] } },
+      { "requested_as": "potatoes", "food_name": "Potato, Irish, boiled", "...": "...", "glycaemic": null, "glycaemic_note": "No published GI/GL data on file for this food... Fiber is low relative to carbohydrate..." }
+    ],
+    "nutrient_comparison": {
+      "protein_g": { "label": "Protein (g)", "values": { "Nsima (thick, maize)": 2.8, "Rice, white, cooked": 2.7, "Potato, Irish, boiled": 2.0 }, "highest": "Nsima (thick, maize)", "lowest": "Potato, Irish, boiled" },
+      "...": "..."
+    },
+    "note": "Values are per 100g... Glycaemic figures are only shown where a published, sourced value exists..."
+  }
+}
+```
+
+Note the Malawi-specific nsima entries above come from an actual local study (Mlotha et al. 2016) that tested three processing variants (whole maize flour, maize grits, fermented maize grits) — all three surface if `foods=nsima` matches, since which one applies depends on how it was actually milled/prepared, not something CNR can infer from a food name alone.
+
+### Glycaemic Index / Load Reference (`/glycaemic-index`)
+
+Standalone reference table backing the `glycaemic` block on `GET /foods/compare` (see [`sql/004_add_glycaemic_index.sql`](sql/004_add_glycaemic_index.sql)). Kept separate from `foods` because GI/GL is measured per specific preparation/variety and rarely lines up 1:1 with an FCT row — rows are matched to a food name by keyword (`match_keywords`, e.g. `["nsima", "maize", "cornmeal"]`) at query time instead of a foreign key.
+
+- `GET /glycaemic-index` — `search` (matches `food_name`), standard pagination
+- `GET /glycaemic-index/:id`
+- `POST /glycaemic-index` *(admin)* — requires `food_name`, `match_keywords` (non-empty array), and `source` (citation) — GI/GL values are never accepted without a traceable source
+- `POST /glycaemic-index/bulk` *(admin)* — see [Bulk insert](#bulk-insert); seed file: [`scripts/glycaemic_index_seed.json`](scripts/glycaemic_index_seed.json)
+- `PUT` / `PATCH` / `DELETE /glycaemic-index/:id` *(admin)*
+
+The bundled seed covers Malawi's three nsima processing variants (Mlotha et al. 2016 — the only Malawi-specific GI study found), white/brown rice, boiled/mashed potato, boiled sweet potato, and cassava (flagged as high-variance/no regional consensus rather than given a single confident number). Extend it the same way as `drug_nutrient_interactions_seed.json` — add rows with a real citation, then `POST /glycaemic-index/bulk`.
+
+### Recipes
+
+**`POST /recipes/calculate`** *(public, rate-limited)* — give it a list of ingredients, get back the recipe's total and per-serving nutrition. Builds directly on Serving-Size Intelligence above.
+
+```json
+{
+  "servings": 4,
+  "ingredients": [
+    { "food_name": "rice", "quantity": 2, "unit": "cup" },
+    { "food_name": "beans", "quantity": 1, "unit": "cup" },
+    { "food_id": 34, "quantity": 150, "unit": "g" }
+  ]
+}
+```
+
+- Each ingredient needs `quantity` and either `food_id` (exact row) or `food_name` (matched against local `foods` first, then falling back to the same local→external cascade `GET /foods/lookup` uses — so ingredients outside the local FCT can still resolve).
+- `unit` defaults to `"g"` if omitted. Accepts plain mass/volume units (`g`, `kg`, `ml`, `l`, `oz`, `lb`, `floz`/`fl_oz`, `pint`, `quart`, `gallon`, ...), `"serving"`/`"servings"`, or a household unit (`cup`, `tbsp`, `tsp`, `piece`, `slice`, `handful`, ...) — household units are matched against *that specific food's* own serving-size candidates first (so "2 cups rice" uses rice's own cup measure), falling back to a generic estimate only if there's no food-specific match. Conversion factors cross-checked against the Nutrition Care Manual (NC Dietetic Association).
+- `servings` (top-level, optional, default `1`) — the recipe yield, used to compute `nutrients_per_serving`.
+- Response includes `total_nutrients`, `nutrients_per_serving`, `total_grams`, `grams_per_serving`, a per-ingredient `ingredients[]` breakdown (with `grams_basis` explaining how each quantity was converted), and `unresolved_ingredients[]` for anything that couldn't be matched or converted — one bad ingredient never fails the whole request.
+
+**`POST /meals/analyze`** *(public, rate-limited)* — same ingredient resolution as `/recipes/calculate` (built on the same shared `resolveIngredientsList()`), but framed around a single eaten meal rather than a recipe yield — no `servings`, since a meal is eaten once.
+
+```json
+{
+  "meal_type": "lunch",
+  "ingredients": [
+    { "food_name": "nsima", "quantity": 1, "unit": "cup" },
+    { "food_name": "beans", "quantity": 1, "unit": "cup" }
+  ],
+  "daily_targets": { "kcal": 2000, "protein_g": 50, "carbs_g": 260, "fat_g": 65 }
+}
+```
+
+Adds, on top of the recipe response shape:
+- `macronutrient_breakdown` — kcal from protein/carbs/fat (Atwater 4/4/9 factors) and each as a % of total meal kcal, plus `within_amdr_adult_reference` (whether each % falls inside the standard adult Institute of Medicine Acceptable Macronutrient Distribution Range: protein 10–35%, carbs 45–65%, fat 20–35%). Purely descriptive — a reference range, not a personalized target.
+- `food_groups_present` / `food_groups_missing` — against a core set (Grains, Legumes, Protein, Vegetables, Fruits, Dairy), reusing the same category classification as Serving-Size Intelligence.
+- `daily_target_comparison` — **only included if you supply `daily_targets`** in the request. This endpoint never invents a personalized target on its own (no age/sex/weight-based EER calculation happens here); pass in a target computed elsewhere (e.g. from the Harris-Benedict tools in `chakudya-mcp-server`) if you want this comparison.
+- `clinical_flags` — **only included if you supply `conditions`**. Two families, different flag vocabularies:
+  - **Excess-focused** — `"diabetes"`, `"hypertension"`, `"kidney_disease"`. `{ condition, flag: "appropriate"|"caution"|"avoid"|null, reasons: string[], note }`, evaluated off the meal's own nutrient totals (carbs/fiber for diabetes, sodium/potassium for hypertension, potassium/sodium/protein for kidney disease) against standard per-meal reference thresholds (ADA carb-counting, DASH sodium, KDOQI conservative-CKD).
+  - **Adequacy-focused** — `"pregnancy"`, `"paediatric"`, `"anaemia"`. `{ condition, flag: "good"|"low"|"very_low"|null, reasons: string[], note }` — asks whether the meal meaningfully contributes toward a nutrient the person needs *more* of, using Chakudya's own DRI system (`src/dri_data.js`, the same data behind `GET /dri`) for the resolved life stage's RDA/AI, split evenly across 3 meals/day. Optional top-level `age` (years) and `sex` (`"male"`/`"female"`) narrow the life stage: `pregnancy` defaults to age 24 if omitted (noted in `reasons`), `anaemia` defaults to age 30 + female (also noted), `paediatric` **requires** `age` (and `sex` for age 9+) — omitting it returns `flag: null` with an explanatory reason instead of guessing.
+  - **Allergen screening** — `"food_allergy"` requires a top-level `allergens` array (values from `ALLERGEN_KEYWORDS`: `peanut`, `tree_nut`, `dairy`, `egg`, `soy`, `wheat_gluten`, `fish`, `shellfish`, `sesame`) — a 400 if you request `food_allergy` without it. `{ condition, flag: "appropriate"|"avoid", reasons: string[], note }`, matched by keyword against each resolved ingredient's name (e.g. "groundnut" → peanut, "chambo"/"usipa" → fish) — **not a verified allergen database**; can't catch allergens hidden inside a composite/packaged product's real ingredient list.
+  - All of these are **screening, not a diagnosis or a personalized prescription** — every flag's `note` spells out what it doesn't account for (e.g. kidney-disease phosphorus isn't tracked locally; pregnancy/paediatric screening ignores supplementation; a `null` flag means the underlying data was missing, not that the meal is "fine").
+
+```json
+{ "ingredients": [{ "food_name": "nsima", "quantity": 1, "unit": "cup" }], "conditions": ["diabetes", "kidney_disease"] }
+```
+
+```json
+{ "ingredients": [{ "food_name": "groundnut flour porridge", "quantity": 1, "unit": "cup" }], "conditions": ["pregnancy", "food_allergy"], "age": 26, "allergens": ["peanut"] }
+```
+
+**`POST /ingredients/parse`** *(public, rate-limited)* — turns free text into the `ingredients[]` shape `/recipes/calculate` and `/meals/analyze` accept above, so a caller can paste a plain sentence instead of hand-building JSON.
+
+```json
+{ "text": "2 eggs, 1 cup rice, 100g chicken and ½ avocado" }
+```
+
+```json
+{
+  "status": "success",
+  "data": {
+    "text": "2 eggs, 1 cup rice, 100g chicken and ½ avocado",
+    "count": 4,
+    "ingredients": [
+      { "food_name": "eggs", "quantity": 2, "unit": "serving" },
+      { "food_name": "rice", "quantity": 1, "unit": "cup" },
+      { "food_name": "chicken", "quantity": 100, "unit": "g" },
+      { "food_name": "avocado", "quantity": 0.5, "unit": "serving" }
+    ]
+  }
+}
+```
+
+- Handles unicode fractions (`½`, `¼`, `¾`, ...), mixed numbers (`1 1/2`), compact units (`100g`), and comma/`and`/`&`-separated lists.
+- A bare count with no stated unit (`"2 eggs"`) comes back as `unit: "serving"`, not grams — `resolveIngredientGrams()` treats a missing unit as grams, and "serving" is what it already falls back to for count-like foods via each food's own serving-size candidates (see Serving-Size Intelligence above), so "2 eggs" resolves to 2 whole eggs, not 2g of egg.
+- Primary parse is a Groq LLM call (handles plurals, descriptors like "chopped", word-form quantities like "half"); falls back to a local regex parser if `GROQ_API_KEY` isn't configured or the LLM call/parse fails. The fallback is cruder (numeric quantities only, keeps plurals as-is) but never throws.
+- Pipe the `ingredients[]` straight into `POST /recipes/calculate` or `POST /meals/analyze`.
+
+### Dietary Reference Intakes (DRI)
+
+EAR, RDA, AI, UL, and AMDR by life stage — Food and Nutrition Board (NASEM/IOM) tables, covering infants through >70y, pregnancy, and lactation. Data lives in `src/dri_data.js`; see that file's header for sourcing and what's intentionally left out (a handful of trace-mineral ULs with no clean published number, and Sodium's UL, superseded by the 2019 Chronic Disease Risk Reduction Intake).
+
+**`GET /dri/life-stages`** — the 22 life-stage groups (code, label, sex, age range).
+
+**`GET /dri`** — look up DRI values either by `life_stage` code directly, or by `age`+`sex` (+`life_stage_type=pregnancy|lactation`). Omit `nutrient` to get every nutrient for that life stage plus its AMDR and sodium CDRR; include it for one nutrient only.
+
+```
+GET /dri?age=25&sex=female&nutrient=iron_mg
+→ { "ear": 8.1, "rda": 18, "ai": null, "ul": 45, "target_type": "rda", "target": 18 }
+```
+
+**`POST /dri/compare`** — compares actual intake against RDA/AI, flags UL if exceeded. `intake` uses the same field names as `/recipes/calculate` or `/meals/analyze`'s `total_nutrients`, so either can be piped straight in.
+
+```json
+{ "age": 30, "sex": "female", "intake": { "calcium_mg": 45, "iron_mg": 9.2, "protein_g": 47.95 } }
+```
+
+- Only nutrients CNR's `foods` table actually tracks (`trackable: true` on `GET /dri`) can be compared — protein, carbs, fiber, and 11 vitamins/minerals. Thiamin, riboflavin, niacin, vitamin B6/E/K, and most trace minerals are lookup-only (no intake data exists for them yet); they come back in `skipped` on `/dri/compare` rather than silently dropped.
+- `percent_of_target` is intake ÷ RDA-or-AI × 100 — no clinical interpretation is added (no "deficient"/"adequate" label), since a single day's percentage isn't a diagnosis.
 
 ### Exchange
 
@@ -588,10 +853,33 @@ Query params: `limit`, `offset`/`cursor`
 
 Query params: `route`, `limit`, `offset`/`cursor`
 
+### Drug Interactions
+
+Migrated from Oasis CNST's client-side 117-entry drug-nutrient interaction
+database (`js/dni.js`), so every app in the ecosystem shares one copy
+instead of each bundling its own. Sources: Krause & Mahan's *Food and the
+Nutrition Care Process* 16th ed.; *The Essential Pocket Guide for Clinical
+Nutrition* 4th ed.; LPI/OSU Micronutrient Info Center; NIH PMC6109862.
+Clinical reference only — not a substitute for a current pharmacopoeia or
+a per-patient interaction checker.
+
+- `GET /drug-interactions`
+- `GET /drug-interactions/:id`
+- `GET /drug-interactions/search?q=warfarin` *(public, rate-limited)* — keyword scan across `drug`/`aliases`/`category`/`subcategory`/`tags`/`effects`/`implications` (same whole-row-scan approach `/rag/ask` already uses for `exchange_lists`/`renal_foods`/`enteral_formulas`, since none of these have a single documented column to `ilike` on). `q` can be a drug name, brand name, drug class, or a nutrient/food keyword (e.g. `"grapefruit"`, `"vitamin B12"`); `drug` is also accepted as the param name. Returns rows with a `match_score` (count of matched keywords), sorted descending.
+- `POST /drug-interactions` *(admin)*
+- `POST /drug-interactions/bulk` *(admin)*
+- `PUT /drug-interactions/:id` *(admin)*
+- `PATCH /drug-interactions/:id` *(admin)*
+- `DELETE /drug-interactions/:id` *(admin)*
+
+Query params (list): `category`, `severity`, `limit`, `offset`/`cursor`
+
+Row shape: `{ external_id, drug, aliases[], category, subcategory, effects[], implications[], severity: "info"|"caution"|"moderate"|"major", tags[] }`
+
 ### Packaged
 
 - `GET /packaged`
-- `GET /packaged/pending` *(admin)* - review queue
+- `GET /packaged/pending` *(admin)* — review queue
 - `POST /packaged/submit` *(public, rate-limited)*
 - `POST /packaged/scan` *(public, rate-limited)*
 - `POST /packaged/:id/approve` *(admin)*
@@ -600,18 +888,19 @@ Query params: `route`, `limit`, `offset`/`cursor`
 - `PATCH /packaged/:id` *(admin)*
 - `DELETE /packaged/:id` *(admin)*
 
-Query params for `GET /packaged`: `barcode`, `limit`, `offset`/`cursor`
+Query params for `GET /packaged`: `barcode`, `search` (product_name
+substring match), `limit`, `offset`/`cursor`
 
-**`GET /packaged/pending`** - the admin review queue: rows with
+**`GET /packaged/pending`** — the admin review queue: rows with
 `status: "pending"` from either submission path, oldest first. Query params:
 `source` (`manual` | `ocr_ai`, matches the `source` column set by
 `/packaged/scan`), `limit`, `offset`.
 
-**`POST /packaged/:id/approve`** - moves a row to `status: "approved"`.
+**`POST /packaged/:id/approve`** — moves a row to `status: "approved"`.
 Accepts an optional JSON body of field corrections (e.g. a mis-read
 `energy_kcal`) applied in the same update, so a reviewer doesn't need a
 separate `PATCH` call first. `reviewed_by` defaults to the calling API
-key's label (see [API keys](#api-keys)) - pass an explicit `reviewed_by`
+key's label (see [API keys](#api-keys)) — pass an explicit `reviewed_by`
 string to override it (e.g. when using the shared root key, which has no
 per-caller identity of its own).
 
@@ -619,14 +908,14 @@ per-caller identity of its own).
 { "reviewed_by": "Grace", "energy_kcal": 210 }
 ```
 
-**`POST /packaged/:id/reject`** - moves a row to `status: "rejected"`.
+**`POST /packaged/:id/reject`** — moves a row to `status: "rejected"`.
 Requires a `reason` string, stored in `rejection_reason` for the audit trail:
 
 ```json
 { "reason": "Barcode doesn't match product name", "reviewed_by": "Grace" }
 ```
 
-**Setup required** - run once against `packaged_foods`:
+**Setup required** — run once against `packaged_foods`:
 
 ```sql
 alter table packaged_foods add column if not exists reviewed_at timestamptz;
@@ -635,7 +924,7 @@ alter table packaged_foods add column if not exists rejection_reason text;
 ```
 
 > Duplicate detection assumes `packaged_foods.barcode` already has a
-> `UNIQUE` constraint. If yours doesn't, add one - otherwise two rows for
+> `UNIQUE` constraint. If yours doesn't, add one — otherwise two rows for
 > the same barcode can coexist and the "already exists" check below won't
 > reflect what the database actually allows:
 > `alter table packaged_foods add constraint packaged_foods_barcode_key unique (barcode);`
@@ -653,19 +942,19 @@ Submission is auto-tagged with:
 **Normalization:** if the submitter enters values "per serving" rather than
 per 100g/100ml, pass `per: "serving"` alongside a parseable `serving_size`
 (e.g. `"30g"`, `"250ml"`) and nutrient fields are scaled to per-100 before
-being stored - the same normalization `/packaged/scan` already applies to
+being stored — the same normalization `/packaged/scan` already applies to
 AI-read labels, so `packaged_foods` stays on one consistent basis regardless
 of submission path. `per` is a hint only and is never written to the DB.
 Omit `per` (or send `per: "100g"` / `"100ml"`) if values are already per-100.
 
 **Duplicate detection:** `packaged_foods.barcode` has a `UNIQUE` constraint
-in the database - a second row for the same barcode is rejected by Postgres
+in the database — a second row for the same barcode is rejected by Postgres
 outright, regardless of status. Both `/packaged/submit` and `/packaged/scan`
 check for an existing row with the same barcode *before* attempting an
 insert:
 
 - If a match is `approved` or still `pending`, the new submission is
-  **not** written - the response (`409`) includes `already_exists: true`
+  **not** written — the response (`409`) includes `already_exists: true`
   and the existing row under `data`, so the client can show it immediately
   instead of silently failing on the DB constraint.
 - If a match was previously `rejected`, the submission is treated as a
@@ -678,14 +967,14 @@ insert:
 `carbs_g` are all present, the API cross-checks them against the declared
 calories using Atwater factors (protein 4 kcal/g, carbs 4 kcal/g, fat 9
 kcal/g). A mismatch beyond tolerance (the greater of 20 kcal or 15%) does
-**not** block the submission - it's stored as-is (`status: "pending"`) but
+**not** block the submission — it's stored as-is (`status: "pending"`) but
 the response sets `needs_review: true` and includes a `macro_check` object
 so the client can prompt a double-check before the admin review queue picks
 it up.
 
-`POST /packaged/scan` - client submits one or more photos of the product
+`POST /packaged/scan` — client submits one or more photos of the product
 instead of typing it in (e.g. one of the nutrition panel, one of the
-barcode/front - they don't need to be the same face of the package). Body:
+barcode/front — they don't need to be the same face of the package). Body:
 
 ```json
 {
@@ -694,11 +983,11 @@ barcode/front - they don't need to be the same face of the package). Body:
 }
 ```
 
-- `images` is required - an array of 1-5 photos, each either a full
+- `images` is required — an array of 1-5 photos, each either a full
   `data:image/...;base64,` URL or a bare base64 string (assumed JPEG). Max
   ~6MB decoded per photo, ~15MB combined. The legacy single-image shape
   `{ "image": "data:..." }` is still accepted.
-- `barcode` is optional - if none of the photos have a clear barcode, or you
+- `barcode` is optional — if none of the photos have a clear barcode, or you
   already have it from a barcode scanner on the same screen, pass it
   separately; it takes priority over anything the AI read off the packaging.
 
@@ -715,9 +1004,9 @@ and does **not** write to the database. Otherwise it inserts a row into
 - `ai_confidence`: the model's own 0–1 confidence score
 - `ocr_raw`: the full raw extraction, for admin review/debugging
 
-Response includes the extracted fields and a `needs_review` flag - true when
+Response includes the extracted fields and a `needs_review` flag — true when
 `ai_confidence < 0.6` **or** when the macro/calorie check below flags a
-mismatch - so the client can prompt the user to double-check before treating
+mismatch — so the client can prompt the user to double-check before treating
 the submission as final. Also runs the same macro/calorie cross-check
 documented under `/packaged/submit` above and includes the resulting
 `macro_check` object in the response when energy + macros were all read.
@@ -734,40 +1023,40 @@ alter table packaged_foods add column if not exists ocr_raw jsonb;
 
 ### Favorites & History
 
-No user-account system exists in this API - same model as the memory
+No user-account system exists in this API — same model as the memory
 system's `session_id`: the client generates and keeps its own identifier
 (a device id, an app-level user id, whatever) and passes it as `user_id`
 on every call. These endpoints are public and rate-limited, not
 admin-gated, since there's no server-side account to authenticate against.
 
-Rows are **not** hydrated with the underlying food data - just the
+Rows are **not** hydrated with the underlying food data — just the
 `(user_id, resource_type, resource_id)` linkage plus a timestamp. Look up
 full details separately via the existing `GET /foods/:id` or
 `GET /packaged/:id`. `resource_type` must be one of `food` or `packaged`.
 
-**`GET /favorites?user_id=...&resource_type=...`** *(optional filter)* -
+**`GET /favorites?user_id=...&resource_type=...`** *(optional filter)* —
 list a user's saved items, newest first. Supports `limit`/`offset`.
 
-**`POST /favorites`** - idempotent; favoriting something already favorited
+**`POST /favorites`** — idempotent; favoriting something already favorited
 just returns the existing row instead of erroring.
 
 ```json
 { "user_id": "device-abc123", "resource_type": "food", "resource_id": 7 }
 ```
 
-**`DELETE /favorites`** - same body shape as `POST`; removes the matching
-row if it exists (no error if it doesn't - `removed: false` in the
+**`DELETE /favorites`** — same body shape as `POST`; removes the matching
+row if it exists (no error if it doesn't — `removed: false` in the
 response instead).
 
-**`GET /history?user_id=...&resource_type=...`** - recently viewed, most
+**`GET /history?user_id=...&resource_type=...`** — recently viewed, most
 recent first. Supports `limit`/`offset`.
 
-**`POST /history`** - logs a view. Upserts on
+**`POST /history`** — logs a view. Upserts on
 `(user_id, resource_type, resource_id)`, so repeat views of the same item
-update its `viewed_at` in place rather than piling up duplicate rows - the
+update its `viewed_at` in place rather than piling up duplicate rows — the
 list is already de-duplicated and correctly ordered with no client-side
 work. This is opt-in (the client calls it explicitly when it wants
-something logged) - nothing is tracked automatically.
+something logged) — nothing is tracked automatically.
 
 Requires these tables:
 
@@ -791,6 +1080,65 @@ create table if not exists view_history (
   unique (user_id, resource_type, resource_id)
 );
 create index if not exists view_history_user_id_idx on view_history(user_id, viewed_at desc);
+```
+
+### Food Log (nutrition diary)
+
+Same public, self-declared-identity model as Favorites & History above —
+no server-side account system, `user_id` is whatever the client supplies.
+
+**`GET /log?user_id=...&date=YYYY-MM-DD`** *(date optional)* — diary
+entries, newest first. Supports `limit`/`offset`.
+
+**`GET /log/:id`** — a single entry.
+
+**`POST /log`** — log an item under a meal slot.
+
+```json
+{ "user_id": "device-abc123", "meal_type": "breakfast", "calories": 450, "food_name": "Oatmeal with banana" }
+```
+
+`meal_type` must be one of `breakfast`, `lunch`, `snack`, `dinner`.
+`entry_date` is optional (`YYYY-MM-DD`, defaults to today).
+
+**`DELETE /log/:id?user_id=...`** — delete one entry (scoped to
+`user_id`, so one client can't delete another's rows even without a real
+auth system).
+
+**`GET /log/summary?user_id=...&period=daily|weekly&date=YYYY-MM-DD`** —
+aggregate kcal totals, no client-side summing needed.
+
+- `period=daily` *(default)* → `total_calories`, `by_meal` breakdown,
+  `entry_count`, for one day.
+- `period=weekly` → 7-day window ending on `date` (default today):
+  `total_calories`, `average_daily_calories`, `by_meal` breakdown across
+  the whole week, and `by_date[]` (one entry per day).
+
+Example — a full day logged and summarized:
+
+```
+POST /log  {"user_id":"u1","meal_type":"breakfast","calories":450}
+POST /log  {"user_id":"u1","meal_type":"lunch","calories":720}
+POST /log  {"user_id":"u1","meal_type":"snack","calories":180}
+POST /log  {"user_id":"u1","meal_type":"dinner","calories":650}
+
+GET /log/summary?user_id=u1&period=daily
+→ { "total_calories": 2000, "by_meal": {"breakfast":450,"lunch":720,"snack":180,"dinner":650}, "entry_count": 4 }
+```
+
+Requires this table:
+
+```sql
+create table if not exists food_log_entries (
+  id bigint generated always as identity primary key,
+  user_id text not null,
+  entry_date date not null default current_date,
+  meal_type text not null check (meal_type in ('breakfast','lunch','snack','dinner')),
+  food_name text,
+  calories numeric not null check (calories >= 0),
+  created_at timestamptz not null default now()
+);
+create index if not exists food_log_entries_user_date_idx on food_log_entries(user_id, entry_date);
 ```
 
 ### RAG
@@ -819,7 +1167,7 @@ create index if not exists view_history_user_id_idx on view_history(user_id, vie
 }
 ```
 
-`POST /rag/ask` *(public, rate-limited - 15 req/min per IP)* - RAG Search Orchestrator
+`POST /rag/ask` *(public, rate-limited — 15 req/min per IP)* — RAG Search Orchestrator
 
 Runs the full pipeline: **Intent Detection** (Groq `llama-3.1-8b-instant`, with a
 keyword-based heuristic fallback) → **Search Orchestrator** (fans out, in
@@ -838,8 +1186,9 @@ Sources it can draw from, depending on intent:
 | Diabetes Exchange List | `exchange_lists` (keyword scan) |
 | Renal Exchange List | `renal_foods` (keyword scan) |
 | Enteral Formula Database | `enteral_formulas` (keyword scan) |
+| Drug-Nutrient Interactions | `drug_nutrient_interactions` (keyword scan) |
 | Barcode Lookup | `lookupFoodCascade` (local → cache → Open Food Facts) |
-| USDA FDC / Open Food Facts / FatSecret | `lookupFoodCascade`, **fallback only** - fires when the local sources above returned nothing |
+| USDA FDC / Open Food Facts / FatSecret | `lookupFoodCascade`, **fallback only** — fires when the local sources above returned nothing |
 | Session memory *(optional)* | `assistant_memory` via `match_memory`, only when `session_id` is passed |
 
 Body:
@@ -857,31 +1206,31 @@ Response `data`:
 
 ```json
 {
-  "answer": "string - grounded answer with [n] citations",
-  "intent": "food_search | barcode_search | nutrition_question | exchange_list | enteral_formula | general_chat",
+  "answer": "string — grounded answer with [n] citations",
+  "intent": "food_search | barcode_search | nutrition_question | exchange_list | enteral_formula | drug_interaction | general_chat",
   "barcode_detected": "string | null",
   "sources": [{ "id": 1, "source": "malawi_fct", "title": "..." }]
 }
 ```
 
 Whole answers are cached 5 minutes (keyed on context + top_k + normalized
-query) - skipped entirely whenever `session_id` is passed, since a
+query) — skipped entirely whenever `session_id` is passed, since a
 memory-personalized answer for one session must never be served back to a
 different session asking the same surface question. `/rag/retrieve` and
-`/rag/ingest` above are unchanged - same endpoints, same request/response
+`/rag/ingest` above are unchanged — same endpoints, same request/response
 shape, same query params.
 
 ### Memory (Write → Consolidate → Recall → Apply)
 
 Per-session clinical scratchpad for Oasis AI. Scoped by `session_id` (the
-app's own `SESSION_ID`, regenerated per page load) - this is intentionally
+app's own `SESSION_ID`, regenerated per page load) — this is intentionally
 session-scoped working memory, not a long-term cross-visit profile.
 
 - `POST /memory/write` *(public, rate-limited)*
-- `POST /memory/recall` *(public, rate-limited - preferred)* / `GET /memory/recall` *(deprecated, same params as query string)*
-- `POST /memory/consolidate` *(admin - also run automatically, hourly, by a cron trigger)*
+- `POST /memory/recall` *(public, rate-limited — preferred)* / `GET /memory/recall` *(deprecated, same params as query string)*
+- `POST /memory/consolidate` *(admin — also run automatically, hourly, by a cron trigger)*
 
-**Setup required** (not automatic - run once):
+**Setup required** (not automatic — run once):
 
 1. Run `sql/memory_schema.sql` in the Supabase SQL editor. Creates the
    `assistant_memory` table plus `match_memory` and
@@ -889,10 +1238,10 @@ session-scoped working memory, not a long-term cross-visit profile.
    `embed-multilingual-v3.0` pattern as `rag_knowledge_base` / `match_documents`).
 2. `wrangler.toml` declares an hourly cron trigger
    (`[triggers] crons = ["0 * * * *"]`). Cron triggers are only registered on
-   a real deploy (`npx wrangler deploy`) - a Cloudflare dashboard Quick Edit
+   a real deploy (`npx wrangler deploy`) — a Cloudflare dashboard Quick Edit
    save does **not** pick this up.
 
-`POST /memory/write` body - captures one raw fact ("Write"):
+`POST /memory/write` body — captures one raw fact ("Write"):
 
 ```json
 {
@@ -903,7 +1252,7 @@ session-scoped working memory, not a long-term cross-visit profile.
 }
 ```
 
-`POST /memory/recall` body - top-K most relevant memory rows (facts and/or
+`POST /memory/recall` body — top-K most relevant memory rows (facts and/or
 summaries) for that session ("Recall"), ranked by cosine similarity to `query`:
 
 ```json
@@ -911,12 +1260,12 @@ summaries) for that session ("Recall"), ranked by cosine similarity to `query`:
 ```
 
 `GET /memory/recall?session_id=...&query=...&top_k=5` still works with the
-same params but is deprecated - a GET puts `session_id` and the raw query
+same params but is deprecated — a GET puts `session_id` and the raw query
 text (which can contain clinical detail) into the URL, where it's exposed to
 Cloudflare access logs, browser history, and any proxy in the path. Migrate
 callers to the POST form above when convenient.
 
-`POST /memory/consolidate` body - manually trigger summarization for one
+`POST /memory/consolidate` body — manually trigger summarization for one
 session ("Consolidate"):
 
 ```json
@@ -930,7 +1279,7 @@ single Groq text completion (`llama-3.3-70b-versatile` by default, override
 with `GROQ_TEXT_MODEL`), inserts it as `kind: "summary"`, and marks the
 source facts `consolidated: true` so they drop out of future consolidation
 batches (they remain individually recallable). The hourly cron runs this
-automatically for every session that qualifies - no manual step needed in
+automatically for every session that qualifies — no manual step needed in
 normal operation.
 
 ---
@@ -1002,7 +1351,7 @@ The zero-dependency JS client for this API now lives in its own repo:
 **[github.com/edisontaimu9-ui/Chakudya-sdk](https://github.com/edisontaimu9-ui/Chakudya-sdk)**
 
 It ships browser (`<script>` tag / UMD), ESM, and CommonJS builds, plus
-TypeScript types, and wraps every route in this file - `foods`, `exchange`,
+TypeScript types, and wraps every route in this file — `foods`, `exchange`,
 `renal`, `formulas`, `packaged`,
 `rag`, and `memory`. See that repo's README for install and usage examples.
 

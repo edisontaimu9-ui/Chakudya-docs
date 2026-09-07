@@ -160,15 +160,20 @@ of the OpenAPI document - they're read out of `routePolicy()` in
 
 ---
 
-## 6. Endpoints documented (60 of 60)
+## 6. Endpoints documented (86 of 86)
 
 Every route the Worker actually serves is documented - nothing was skipped.
+`/manufacturers`, `/products`, and `/nutrition` were removed from the API in
+v1.15.0-v1.16.0 and no longer appear here.
 
 **Meta**
 - `GET /` - API metadata
 
 **Health**
 - `GET /health` - Upstream service health check
+
+**Batch**
+- `POST /batch` - Run up to 20 sub-requests in one round trip (public, rate-limited)
 
 **API Keys**
 - `GET /admin/keys` - List API keys (root key only)
@@ -180,10 +185,25 @@ Every route the Worker actually serves is documented - nothing was skipped.
 - `POST /foods` - Create a food (admin)
 - `POST /foods/bulk` - Bulk-create foods (admin)
 - `GET /foods/lookup` - External food lookup cascade (public, rate-limited)
+- `GET /foods/search` - Typo-tolerant fuzzy search (public, rate-limited)
+- `GET /foods/autocomplete` - Type-ahead search (public, rate-limited)
+- `GET /foods/categories` - Food category list (public, rate-limited, cached 24h)
+- `GET /foods/substitutes` - Nutritionally close substitutes for a food (public, rate-limited)
+- `GET /foods/compare` - Side-by-side nutrient comparison of 2-6 foods (public, rate-limited)
 - `GET /foods/{id}` - Get a food by id
+- `GET /foods/{id}/label` - Codex-style nutrition facts label
 - `PUT /foods/{id}` - Replace a food (admin)
 - `PATCH /foods/{id}` - Partially update a food (admin)
 - `DELETE /foods/{id}` - Delete a food (admin)
+
+**Glycaemic Index**
+- `GET /glycaemic-index` - List glycaemic index/load reference entries
+- `POST /glycaemic-index` - Create an entry (admin)
+- `POST /glycaemic-index/bulk` - Bulk-create entries (admin)
+- `GET /glycaemic-index/{id}` - Get an entry by id
+- `PUT /glycaemic-index/{id}` - Replace an entry (admin)
+- `PATCH /glycaemic-index/{id}` - Partially update an entry (admin)
+- `DELETE /glycaemic-index/{id}` - Delete an entry (admin)
 
 **Exchange**
 - `GET /exchange` - List diabetes/renal exchange list entries
@@ -209,6 +229,16 @@ Every route the Worker actually serves is documented - nothing was skipped.
 - `PATCH /formulas/{id}` - Partially update an enteral formula (admin)
 - `DELETE /formulas/{id}` - Delete an enteral formula (admin)
 
+**Drug Interactions**
+- `GET /drug-interactions` - List drug-nutrient interaction entries
+- `POST /drug-interactions` - Create an entry (admin)
+- `POST /drug-interactions/bulk` - Bulk-create entries (admin)
+- `GET /drug-interactions/search` - Keyword search (public, rate-limited)
+- `GET /drug-interactions/{id}` - Get an entry by id
+- `PUT /drug-interactions/{id}` - Replace an entry (admin)
+- `PATCH /drug-interactions/{id}` - Partially update an entry (admin)
+- `DELETE /drug-interactions/{id}` - Delete an entry (admin)
+
 **Packaged**
 - `GET /packaged` - List packaged/branded foods
 - `GET /packaged/pending` - Admin review queue (admin)
@@ -220,29 +250,41 @@ Every route the Worker actually serves is documented - nothing was skipped.
 - `POST /packaged/{id}/approve` - Approve a pending packaged food (admin)
 - `POST /packaged/{id}/reject` - Reject a pending packaged food (admin)
 
-**Manufacturers**
-- `GET /manufacturers` - List manufacturers
-- `POST /manufacturers` - Create a manufacturer (admin)
-- `POST /manufacturers/bulk` - Bulk-create manufacturers (admin)
-- `PATCH /manufacturers/{id}` - Partially update a manufacturer (admin)
-- `DELETE /manufacturers/{id}` - Delete a manufacturer (admin)
+**Favorites**
+- `GET /favorites` - List a user's favorites (public, rate-limited)
+- `POST /favorites` - Save a favorite (public, rate-limited, idempotent)
+- `DELETE /favorites` - Remove a favorite (public, rate-limited)
 
-**Products**
-- `GET /products` - List products
-- `POST /products` - Create a product (admin)
-- `POST /products/bulk` - Bulk-create products (admin)
-- `GET /products/{id}` - Get a product by id
-- `PUT /products/{id}` - Replace a product (admin)
-- `PATCH /products/{id}` - Partially update a product (admin)
-- `DELETE /products/{id}` - Soft-delete a product (admin)
+**History**
+- `GET /history` - Recently viewed, most recent first (public, rate-limited)
+- `POST /history` - Log a view (public, rate-limited, opt-in)
 
-**Nutrition**
-- `GET /nutrition` - Get nutrition facts for a product
+**Food Log**
+- `GET /log` - List nutrition diary entries for a user_id
+- `POST /log` - Log a diary entry
+- `GET /log/{id}` - Get a log entry by id
+- `DELETE /log/{id}` - Delete a log entry
+- `GET /log/summary` - Daily or weekly calorie totals
+
+**Recipes**
+- `POST /recipes/calculate` - Total and per-serving nutrition for a recipe (public, rate-limited)
+
+**Meals**
+- `POST /meals/analyze` - Macro split, food groups, and target comparison for a meal (public, rate-limited)
+
+**Ingredients**
+- `POST /ingredients/parse` - Parse free-text ingredients into structured items (public, rate-limited)
+
+**DRI**
+- `GET /dri` - Look up EAR/RDA/AI/UL by life stage or age+sex
+- `GET /dri/life-stages` - List every DRI life-stage group
+- `POST /dri/compare` - Compare a day's intake against a life stage's RDA/AI targets
 
 **RAG**
 - `POST /rag/ask` - RAG Search Orchestrator (public, rate-limited)
 - `POST /rag/ingest` - Ingest a document into the RAG knowledge base (admin)
 - `POST /rag/retrieve` - Raw semantic retrieval (public, rate-limited)
+- `DELETE /rag/source` - Bulk-remove chunks by citation (admin)
 
 **Memory**
 - `POST /memory/consolidate` - Manually trigger consolidation for one session (admin)
@@ -271,7 +313,7 @@ repo's README / `routePolicy()` instead of the route handlers themselves:
   in the endpoint's callout since it's real, useful context, but it isn't
   something Try It can exercise (there's no HTTP route for the cron path).
 - **Row shapes for `foods`, `exchange`, `renal`, `formulas`, `packaged`,
-  `manufacturers`, `products`** are intentionally modeled loosely in the
+  `glycaemic-index`, `drug-interactions`** are intentionally modeled loosely in the
   spec (`additionalProperties: true` plus a handful of illustrative
   properties) rather than as an exhaustive column list, because - per the
   source README - those tables' columns evolve independently of the code

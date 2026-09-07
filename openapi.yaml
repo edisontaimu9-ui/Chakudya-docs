@@ -10,7 +10,7 @@ info:
     as USDA FoodData Central, Open Food Facts, and FatSecret, and adds
     retrieval augmented question answering and session memory for AI
     assisted applications.
-  version: "1.18.0"
+  version: "1.26.0"
   contact:
     name: Edison Taimu
     x-location: Blantyre, Malawi
@@ -28,14 +28,22 @@ security:
 tags:
   - name: Meta
   - name: Health
+  - name: Batch
   - name: API Keys
   - name: Foods
+  - name: Glycaemic Index
   - name: Exchange
   - name: Renal
   - name: Formulas
+  - name: Drug Interactions
   - name: Packaged
   - name: Favorites
   - name: History
+  - name: Food Log
+  - name: Recipes
+  - name: Meals
+  - name: Ingredients
+  - name: DRI
   - name: RAG
   - name: Memory
 
@@ -78,6 +86,65 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/HealthStatus" }
+
+  /batch:
+    post:
+      tags: [Batch]
+      summary: Run several sub-requests in one round trip
+      description: >
+        Fans out to routeSingle() per sub-request - same auth, rate-limit,
+        and edge-cache pipeline as a normal top-level request, so batching
+        cannot bypass per-resource auth or rate limits. Nested /batch
+        sub-requests are rejected. The batch endpoint has its own (tighter)
+        rate limit. Results always come back in request order; one
+        sub-request failing never short-circuits the rest.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [requests]
+              properties:
+                requests:
+                  type: array
+                  minItems: 1
+                  maxItems: 20
+                  items:
+                    type: object
+                    required: [method, path]
+                    properties:
+                      id: { type: string, description: "Echoed back to match results to requests; defaults to array index." }
+                      method: { type: string, enum: [GET, POST, PUT, PATCH, DELETE] }
+                      path: { type: string, example: "/foods/lookup?query=nsima" }
+                      body: { type: object, additionalProperties: true }
+      responses:
+        "200":
+          description: Per-item results, always in request order
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: string, example: success }
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id: { type: string }
+                        status: { type: integer }
+                        body: {}
+                  meta:
+                    type: object
+                    properties:
+                      total: { type: integer }
+                      succeeded: { type: integer }
+                      failed: { type: integer }
+                      duration_ms: { type: integer }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "429": { $ref: "#/components/responses/RateLimited" }
 
   /admin/keys:
     get:
@@ -306,6 +373,110 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/Error" }
 
+  /foods/search:
+    get:
+      tags: [Foods]
+      summary: Typo-tolerant fuzzy search over foods (public, rate-limited)
+      description: >
+        Postgres pg_trgm word_similarity() over food_name, so a misspelled
+        Malawian food name (e.g. "Chinagwa" for "Chinangwa") still resolves
+        - unlike GET /foods?search=, which requires an exact substring.
+        Runs between the exact-ilike local match and the external cache/API
+        cascade inside /foods/lookup and everything built on it.
+      security: []
+      parameters:
+        - name: q
+          in: query
+          required: true
+          schema: { type: string }
+        - name: max_results
+          in: query
+          schema: { type: integer, default: 8, minimum: 1, maximum: 25 }
+        - name: min_similarity
+          in: query
+          description: Per-word similarity floor, 0-1.
+          schema: { type: number, default: 0.35, minimum: 0, maximum: 1 }
+      responses:
+        "200": { $ref: "#/components/responses/MutationSuccess" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+
+  /foods/substitutes:
+    get:
+      tags: [Foods]
+      summary: Nutritionally close substitutes for a food (public, rate-limited)
+      description: >
+        Resolves the food (local match, falling back to the external
+        lookup cascade), classifies it into a Malawi-relevant substitution
+        group (e.g. protein/legumes are grouped together, cassava/potatoes
+        with grains), and ranks other foods in that group by closeness on
+        the group's primary nutrient per 100g. Purely computational, no
+        writes. Doesn't account for cost, local availability, taste, or
+        portion size.
+      security: []
+      parameters:
+        - name: food_name
+          in: query
+          required: true
+          schema: { type: string, example: chicken }
+        - name: limit
+          in: query
+          schema: { type: integer, default: 5, minimum: 1, maximum: 15 }
+      responses:
+        "200": { $ref: "#/components/responses/MutationSuccess" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+
+  /foods/compare:
+    get:
+      tags: [Foods]
+      summary: Side-by-side nutrient comparison of 2-6 foods (public, rate-limited)
+      description: >
+        Resolves each comma-separated food name the same way
+        /foods/substitutes resolves one, then returns each food's per-100g
+        macro/micronutrient panel plus, only where a sourced row exists in
+        glycaemic_index_data, a measured glycaemic block - GI/GL is never
+        estimated. Also returns nutrient_comparison, the same fields
+        pivoted per-nutrient with the highest/lowest food flagged.
+      security: []
+      parameters:
+        - name: foods
+          in: query
+          required: true
+          description: Comma-separated list of 2-6 food names.
+          schema: { type: string, example: "nsima,rice,potatoes" }
+      responses:
+        "200": { $ref: "#/components/responses/MutationSuccess" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+
+  /foods/{id}/label:
+    get:
+      tags: [Foods]
+      summary: Codex-style nutrition facts label for a food
+      description: >
+        Builds a standardized Codex STAN 1-1985-style nutrition label from
+        a food's serving-size data (see Serving-Size Intelligence). Pass
+        ?serving= to pick a specific serving_sizes label; defaults to the
+        most specific one available (own FCT measure, then a curated
+        keyword match, then a generic per-category estimate).
+      security: []
+      parameters:
+        - $ref: "#/components/parameters/PathId"
+        - name: serving
+          in: query
+          description: Case-insensitive substring match against a serving_sizes label.
+          schema: { type: string }
+      responses:
+        "200": { $ref: "#/components/responses/MutationSuccess" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422":
+          description: No serving-size data available to build a label from
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+
   /foods/{id}:
     get:
       tags: [Foods]
@@ -352,6 +523,105 @@ paths:
         "200": { $ref: "#/components/responses/MutationSuccess" }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "404": { $ref: "#/components/responses/NotFound" }
+
+  /glycaemic-index:
+    get:
+      tags: [Glycaemic Index]
+      summary: List glycaemic index/load reference entries
+      description: >
+        Standalone, source-cited GI/GL reference table (sql/004_add_glycaemic_index.sql).
+        Matched by keyword at query time (see GET /foods/compare and
+        /rag/ask) rather than joined to `foods` by foreign key, since GI/GL
+        is measured per specific preparation/variety and rarely lines up
+        1:1 with a foods row.
+      security: []
+      parameters:
+        - $ref: "#/components/parameters/Search"
+        - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/Offset"
+        - $ref: "#/components/parameters/Cursor"
+      responses:
+        "200": { $ref: "#/components/responses/ListOrCursor" }
+    post:
+      tags: [Glycaemic Index]
+      summary: Create a glycaemic index entry (admin)
+      description: >
+        Requires food_name, a non-empty match_keywords array, and source -
+        GI/GL values are never accepted without a traceable citation.
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [food_name, match_keywords, source]
+              properties:
+                food_name: { type: string }
+                match_keywords: { type: array, items: { type: string } }
+                source: { type: string }
+              additionalProperties: true
+      responses:
+        "200": { $ref: "#/components/responses/MutationSuccess" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+
+  /glycaemic-index/bulk:
+    post:
+      tags: [Glycaemic Index]
+      summary: Bulk-create glycaemic index entries (admin)
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/BulkRequest" }
+      responses:
+        "200": { $ref: "#/components/responses/BulkSuccess" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+
+  /glycaemic-index/{id}:
+    get:
+      tags: [Glycaemic Index]
+      summary: Get a glycaemic index entry by id
+      security: []
+      parameters: [{ $ref: "#/components/parameters/PathId" }]
+      responses:
+        "200": { $ref: "#/components/responses/MutationSuccess" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    put:
+      tags: [Glycaemic Index]
+      summary: Replace a glycaemic index entry (admin)
+      security: [{ bearerAuth: [] }]
+      parameters: [{ $ref: "#/components/parameters/PathId" }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, additionalProperties: true }
+      responses:
+        "200": { $ref: "#/components/responses/MutationSuccess" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+    patch:
+      tags: [Glycaemic Index]
+      summary: Partially update a glycaemic index entry (admin)
+      security: [{ bearerAuth: [] }]
+      parameters: [{ $ref: "#/components/parameters/PathId" }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, additionalProperties: true }
+      responses:
+        "200": { $ref: "#/components/responses/MutationSuccess" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+    delete:
+      tags: [Glycaemic Index]
+      summary: Delete a glycaemic index entry (admin)
+      security: [{ bearerAuth: [] }]
+      parameters: [{ $ref: "#/components/parameters/PathId" }]
+      responses:
+        "200": { $ref: "#/components/responses/MutationSuccess" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
 
   /exchange:
     get:
@@ -575,6 +845,121 @@ paths:
     delete:
       tags: [Formulas]
       summary: Delete an enteral formula (admin)
+      security: [{ bearerAuth: [] }]
+      parameters: [{ $ref: "#/components/parameters/PathId" }]
+      responses:
+        "200": { $ref: "#/components/responses/MutationSuccess" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+
+  /drug-interactions:
+    get:
+      tags: [Drug Interactions]
+      summary: List drug-nutrient interaction entries
+      security: []
+      parameters:
+        - name: category
+          in: query
+          schema: { type: string }
+        - name: severity
+          in: query
+          schema: { type: string }
+        - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/Offset"
+        - $ref: "#/components/parameters/Cursor"
+      responses:
+        "200": { $ref: "#/components/responses/ListOrCursor" }
+    post:
+      tags: [Drug Interactions]
+      summary: Create a drug-nutrient interaction entry (admin)
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [drug]
+              properties:
+                drug: { type: string }
+              additionalProperties: true
+      responses:
+        "200": { $ref: "#/components/responses/MutationSuccess" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+
+  /drug-interactions/bulk:
+    post:
+      tags: [Drug Interactions]
+      summary: Bulk-create drug-nutrient interaction entries (admin)
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/BulkRequest" }
+      responses:
+        "200": { $ref: "#/components/responses/BulkSuccess" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+
+  /drug-interactions/search:
+    get:
+      tags: [Drug Interactions]
+      summary: Keyword search across drug-nutrient interactions
+      description: >
+        Whole-row keyword scan (no single indexed "name" column) - `q` can
+        be a drug name, brand name, drug class, or a nutrient/food keyword
+        (e.g. "grapefruit", "warfarin", "vitamin B12"). Mirrors the
+        client-side search this data previously had in Oasis CNST.
+      security: []
+      parameters:
+        - name: q
+          in: query
+          required: true
+          schema: { type: string, example: warfarin }
+        - name: scan_limit
+          in: query
+          schema: { type: integer, default: 300 }
+      responses:
+        "200": { $ref: "#/components/responses/MutationSuccess" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+
+  /drug-interactions/{id}:
+    get:
+      tags: [Drug Interactions]
+      summary: Get a drug-nutrient interaction entry by id
+      security: []
+      parameters: [{ $ref: "#/components/parameters/PathId" }]
+      responses:
+        "200": { $ref: "#/components/responses/MutationSuccess" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    put:
+      tags: [Drug Interactions]
+      summary: Replace a drug-nutrient interaction entry (admin)
+      security: [{ bearerAuth: [] }]
+      parameters: [{ $ref: "#/components/parameters/PathId" }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, additionalProperties: true }
+      responses:
+        "200": { $ref: "#/components/responses/MutationSuccess" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+    patch:
+      tags: [Drug Interactions]
+      summary: Partially update a drug-nutrient interaction entry (admin)
+      security: [{ bearerAuth: [] }]
+      parameters: [{ $ref: "#/components/parameters/PathId" }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, additionalProperties: true }
+      responses:
+        "200": { $ref: "#/components/responses/MutationSuccess" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+    delete:
+      tags: [Drug Interactions]
+      summary: Delete a drug-nutrient interaction entry (admin)
       security: [{ bearerAuth: [] }]
       parameters: [{ $ref: "#/components/parameters/PathId" }]
       responses:
@@ -854,6 +1239,271 @@ paths:
         "400": { $ref: "#/components/responses/BadRequest" }
         "429": { $ref: "#/components/responses/RateLimited" }
 
+  /log:
+    get:
+      tags: [Food Log]
+      summary: List nutrition diary entries (public, opt-in identity)
+      description: >
+        Same client-supplied user_id model as favorites/history - no
+        server-side account system.
+      security: []
+      parameters:
+        - $ref: "#/components/parameters/UserId"
+        - name: date
+          in: query
+          description: YYYY-MM-DD. Filters to entries on that date.
+          schema: { type: string, format: date }
+        - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/Offset"
+      responses:
+        "200": { $ref: "#/components/responses/ListOrCursor" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+    post:
+      tags: [Food Log]
+      summary: Log a food diary entry
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [user_id, meal_type, calories]
+              properties:
+                user_id: { type: string }
+                meal_type: { type: string, enum: [breakfast, lunch, snack, dinner] }
+                calories: { type: number, minimum: 0 }
+                food_name: { type: string, nullable: true }
+                entry_date: { type: string, format: date, description: "Defaults to today." }
+      responses:
+        "200": { $ref: "#/components/responses/MutationSuccess" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+
+  /log/{id}:
+    get:
+      tags: [Food Log]
+      summary: Get a food log entry by id
+      security: []
+      parameters: [{ $ref: "#/components/parameters/PathId" }]
+      responses:
+        "200": { $ref: "#/components/responses/MutationSuccess" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    delete:
+      tags: [Food Log]
+      summary: Delete a food log entry
+      description: Requires the same user_id the entry was logged under.
+      security: []
+      parameters:
+        - { $ref: "#/components/parameters/PathId" }
+        - $ref: "#/components/parameters/UserId"
+      responses:
+        "200": { $ref: "#/components/responses/MutationSuccess" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /log/summary:
+    get:
+      tags: [Food Log]
+      summary: Daily or weekly calorie totals for a user
+      description: >
+        Daily gives one day's breakdown by meal; weekly gives a 7-day
+        window ending on `date` (default today) with per-day totals, a
+        per-meal breakdown, and the daily average.
+      security: []
+      parameters:
+        - $ref: "#/components/parameters/UserId"
+        - name: period
+          in: query
+          schema: { type: string, enum: [daily, weekly], default: daily }
+        - name: date
+          in: query
+          description: YYYY-MM-DD, the anchor/end date. Defaults to today.
+          schema: { type: string, format: date }
+      responses:
+        "200": { $ref: "#/components/responses/MutationSuccess" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+
+  /recipes/calculate:
+    post:
+      tags: [Recipes]
+      summary: Compute total and per-serving nutrition for a recipe (public, rate-limited)
+      description: >
+        Resolves each ingredient to a food row (local table first, then the
+        same local-to-external lookupFoodCascade used by /foods/lookup),
+        converts quantity/unit to grams via each food's own serving-size
+        data where possible, then scales and sums nutrients across the
+        recipe. Pure calculation, no persistence. Rate-limited like
+        /rag/ask since an unresolved ingredient can fan out to an external
+        lookup.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [ingredients]
+              properties:
+                servings: { type: number, default: 1, minimum: 0 }
+                ingredients:
+                  type: array
+                  minItems: 1
+                  items:
+                    type: object
+                    properties:
+                      food_id: { type: integer }
+                      food_name: { type: string }
+                      quantity: { type: number }
+                      unit: { type: string, example: cup }
+      responses:
+        "200": { $ref: "#/components/responses/MutationSuccess" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+
+  /meals/analyze:
+    post:
+      tags: [Meals]
+      summary: Analyze a meal's macro split, food groups, and (optionally) targets (public, rate-limited)
+      description: >
+        Builds on the same ingredient resolution as /recipes/calculate but
+        frames the result around one eaten meal: macronutrient % of
+        calories (Atwater 4/4/9) compared against the standard adult IOM
+        AMDR range, which core food groups are present/missing, and - only
+        when `daily_targets` is supplied - how the meal compares to them.
+        Never infers a personalized target itself; that should come from a
+        clinician or the caller's own EER/macro calculation. Set
+        `conditions` to also run clinical flags (e.g. "food_allergy"
+        requires a matching `allergens` array).
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [ingredients]
+              properties:
+                meal_type: { type: string, enum: [breakfast, lunch, snack, dinner] }
+                ingredients:
+                  type: array
+                  minItems: 1
+                  items:
+                    type: object
+                    properties:
+                      food_id: { type: integer }
+                      food_name: { type: string }
+                      quantity: { type: number }
+                      unit: { type: string }
+                conditions:
+                  type: array
+                  items: { type: string }
+                  description: Clinical condition flags to evaluate, e.g. "food_allergy", "diabetes".
+                allergens:
+                  type: array
+                  items: { type: string }
+                  description: Required when conditions includes "food_allergy".
+                daily_targets:
+                  type: object
+                  additionalProperties: true
+                  description: Optional caller-supplied daily targets to compare the meal against.
+      responses:
+        "200": { $ref: "#/components/responses/MutationSuccess" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+
+  /ingredients/parse:
+    post:
+      tags: [Ingredients]
+      summary: Parse free-text ingredients into structured items (public, rate-limited)
+      description: >
+        LLM-based extraction, e.g. "2 eggs, 1 cup rice, 100g chicken and
+        1/2 avocado" -> a structured ingredients array suitable for
+        /recipes/calculate or /meals/analyze.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [text]
+              properties:
+                text: { type: string, example: "2 eggs, 1 cup rice, 100g chicken and 1/2 avocado" }
+      responses:
+        "200": { $ref: "#/components/responses/MutationSuccess" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+
+  /dri/life-stages:
+    get:
+      tags: [DRI]
+      summary: List every DRI life-stage group
+      security: []
+      responses:
+        "200": { $ref: "#/components/responses/MutationSuccess" }
+
+  /dri:
+    get:
+      tags: [DRI]
+      summary: Look up EAR/RDA/AI/UL by life stage or age+sex
+      description: >
+        Official Food and Nutrition Board (NASEM/IOM) reference values.
+        Either pass `life_stage` (a code from GET /dri/life-stages), or
+        `age` + `sex` (+ `life_stage_type` for pregnancy/lactation) -
+        life_stage takes priority if both are given. Omit `nutrient` to
+        get every nutrient for the resolved life stage.
+      security: []
+      parameters:
+        - name: life_stage
+          in: query
+          schema: { type: string }
+        - name: age
+          in: query
+          schema: { type: number }
+        - name: sex
+          in: query
+          schema: { type: string, enum: [male, female] }
+        - name: life_stage_type
+          in: query
+          schema: { type: string, enum: [normal, pregnancy, lactation], default: normal }
+        - name: nutrient
+          in: query
+          description: Omit to return every nutrient for the resolved life stage.
+          schema: { type: string }
+      responses:
+        "200": { $ref: "#/components/responses/MutationSuccess" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+
+  /dri/compare:
+    post:
+      tags: [DRI]
+      summary: Compare an actual day's intake against a life stage's RDA/AI targets
+      description: >
+        Resolves a life stage the same way GET /dri does (life_stage code,
+        or age/sex/life_stage_type), then flags each supplied intake value
+        against its RDA/AI target and UL. Pass the total_nutrients object
+        from POST /meals/analyze directly as `intake`.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [intake]
+              properties:
+                intake:
+                  type: object
+                  additionalProperties: { type: number }
+                  example: { calcium_mg: 850, iron_mg: 12 }
+                life_stage: { type: string }
+                age: { type: number }
+                sex: { type: string, enum: [male, female] }
+                life_stage_type: { type: string, enum: [normal, pregnancy, lactation], default: normal }
+      responses:
+        "200": { $ref: "#/components/responses/MutationSuccess" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+
   /rag/retrieve:
     post:
       tags: [RAG]
@@ -869,11 +1519,32 @@ paths:
               required: [query]
               properties:
                 query: { type: string }
-                context: { type: string, enum: [both, oasis, thanzi], default: both }
+                context: { type: string, enum: [clinical, general, both], default: both }
                 top_k: { type: integer, default: 5 }
       responses:
         "200": { $ref: "#/components/responses/MutationSuccess" }
         "429": { $ref: "#/components/responses/RateLimited" }
+
+  /rag/source:
+    delete:
+      tags: [RAG]
+      summary: Bulk-remove RAG chunks by citation (admin)
+      description: >
+        Removes every chunk whose `source` matches exactly. /rag/ingest
+        only ever inserts (never upserts), so re-ingesting a fixed document
+        leaves old bad chunks alongside the new ones unless cleared first
+        via this route.
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: source
+          in: query
+          required: true
+          description: The citation string, matching the --source used at ingest time.
+          schema: { type: string }
+      responses:
+        "200": { $ref: "#/components/responses/MutationSuccess" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
 
   /rag/ingest:
     post:
