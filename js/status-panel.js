@@ -56,15 +56,23 @@ const StatusPanel = (() => {
     if (!wrap) return;
     wrap.innerHTML = "";
     if (!services) return;
+    // Show generic roles instead of vendor names for the underlying
+    // data/infra providers - visitors don't need to know which specific
+    // vendor backs each piece.
+    const LABEL_OVERRIDES = {
+      supabase: "Database",
+      groq: "LLM",
+    };
     Object.entries(services).forEach(([name, info], i) => {
       const status = info?.status || "unknown";
       const good = status === "ok" || status === "configured" || status === "bound";
       const bad = status === "error";
       const dotClass = good ? "status-service__dot--ok" : bad ? "status-service__dot--error" : "";
+      const label = LABEL_OVERRIDES[name.toLowerCase()] || name.replace(/_/g, " ");
       const row = el(`
         <div class="status-service">
           <span class="status-service__dot ${dotClass}" aria-hidden="true"></span>
-          <span class="status-service__name">${name.replace(/_/g, " ")}</span>
+          <span class="status-service__name">${label}</span>
           <span class="status-service__value">${status}</span>
         </div>
       `);
