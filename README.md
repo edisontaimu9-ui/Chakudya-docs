@@ -67,10 +67,11 @@ client-side and the API base URL is configured in the browser (see below).
 ## 3. Configuring the API base URL
 
 The header has a **Base URL** field, pre-filled from the OpenAPI spec's
-`servers[0].url` (currently `https://chakudya-api.edisontaimu9.workers.dev`).
-You can:
+`servers[0].url` (a placeholder - the real deployment URL isn't published
+in this repo; set your own in the field or via **Production** once you
+point the spec at it). You can:
 
-- Pick **Production** from the dropdown (the URL above), or
+- Pick **Production** from the dropdown (whatever URL you've configured), or
 - Pick **Local (wrangler dev)**, which assumes the Worker's default dev port
   (`http://localhost:8787` - Wrangler's standard default; change it if your
   `wrangler dev` uses a different port), or

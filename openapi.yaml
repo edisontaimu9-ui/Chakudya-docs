@@ -18,8 +18,11 @@ info:
     name: UNLICENSED
 
 servers:
-  - url: https://chakudya-api.edisontaimu9.workers.dev
-    description: Production (Cloudflare Workers)
+  - url: "https://{worker-subdomain}.workers.dev"
+    description: Cloudflare Workers deployment - set your own base URL in Try It.
+    variables:
+      worker-subdomain:
+        default: your-worker
 
 security:
   - {}
