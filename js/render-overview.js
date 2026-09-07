@@ -13,8 +13,6 @@ const RenderOverview = (() => {
     const { spec, groups, endpoints } = AppState.state;
     container.innerHTML = "";
 
-    const adminCount = endpoints.filter((e) => e.authMode !== "public").length;
-
     const hero = el(`
       <section class="hero">
         <p class="eyebrow">Chakudya Nutrition Registry (CNR)</p>
@@ -28,8 +26,6 @@ const RenderOverview = (() => {
         <div class="stat-grid">
           <div class="stat-card"><div class="stat-card__num">${endpoints.length}</div><div class="stat-card__label">Endpoints</div></div>
           <div class="stat-card"><div class="stat-card__num">${groups.length}</div><div class="stat-card__label">Resource groups</div></div>
-          <div class="stat-card"><div class="stat-card__num">${endpoints.length - adminCount}</div><div class="stat-card__label">Public routes</div></div>
-          <div class="stat-card"><div class="stat-card__num">${adminCount}</div><div class="stat-card__label">Admin-gated routes</div></div>
         </div>
       </section>
     `);
@@ -58,7 +54,7 @@ const RenderOverview = (() => {
           <li><span><strong>Food exchange systems</strong> (<code>/exchange</code>). Standard and therapeutic exchange lists.</span></li>
           <li><span><strong>Renal nutrition data</strong> (<code>/renal</code>). Foods and nutrition information relevant to renal dietary planning.</span></li>
           <li><span><strong>Enteral formulas</strong> (<code>/formulas</code>). Structured information for clinical nutrition applications.</span></li>
-          <li><span><strong>Packaged and branded foods</strong> (<code>/packaged</code>). Barcode lookup, community product submission, OCR assisted data capture, and an admin review workflow.</span></li>
+          <li><span><strong>Packaged and branded foods</strong> (<code>/packaged</code>). Barcode lookup, community product submission, and OCR assisted data capture.</span></li>
           <li><span><strong>External food lookup</strong> (<code>/foods/lookup</code>, <code>/foods/autocomplete</code>, <code>/foods/categories</code>). Additional food information from USDA FoodData Central, Open Food Facts, and FatSecret when a food isn't in the local database.</span></li>
           <li><span><strong>RAG powered nutrition knowledge</strong> (<code>/rag/ask</code>, <code>/rag/retrieve</code>). Retrieve relevant knowledge or ask a question directly.</span></li>
           <li><span><strong>Session memory</strong> (<code>/memory/write</code>, <code>/memory/recall</code>, <code>/memory/consolidate</code>). Store, consolidate, and recall contextual information for AI assisted applications.</span></li>
@@ -103,11 +99,8 @@ const RenderOverview = (() => {
     container.appendChild(el(`
       <div class="section">
         <h2 class="section__title">Authentication</h2>
-        <p class="endpoint-desc">Send <code>Authorization: Bearer &lt;key&gt;</code> on admin-gated routes. The key can be either the
-        root <code>ADMIN_API_KEY</code> or a per-consumer key minted via <code>POST /admin/keys</code> (root key only). Per-consumer
-        keys carry a role - <code>admin</code> (full access) or <code>reviewer</code> (packaged review queue + reads only). Public
-        <code>GET</code> routes and a handful of specific write routes (community submissions, RAG retrieve/ask, memory write/recall)
-        need no key at all, but are rate-limited by IP.</p>
+        <p class="endpoint-desc">Every route documented here is public and needs no key - just <code>GET</code> reads and a
+        handful of specific write routes (community submissions, RAG retrieve/ask, memory write/recall), all rate-limited by IP.</p>
       </div>
     `));
 

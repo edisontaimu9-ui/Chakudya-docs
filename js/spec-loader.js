@@ -78,9 +78,14 @@ const SpecLoader = (() => {
       }
     }
 
+    // Public docs only ship public, unauthenticated routes - admin-gated
+    // and bearer-optional operations are dropped here so they never show
+    // up in the sidebar, search, routing, or the endpoint list below.
+    const publicEndpoints = endpoints.filter((e) => e.authMode === "public");
+
     // Stable order: as declared in the spec's tags list, "Other" last.
     const tagOrder = (spec.tags || []).map((t) => t.name);
-    endpoints.sort((a, b) => {
+    publicEndpoints.sort((a, b) => {
       const ta = tagOrder.indexOf(a.tags[0]);
       const tb = tagOrder.indexOf(b.tags[0]);
       if (ta !== tb) return (ta === -1 ? 999 : ta) - (tb === -1 ? 999 : tb);
@@ -88,7 +93,7 @@ const SpecLoader = (() => {
       return METHODS.indexOf(a.method.toLowerCase()) - METHODS.indexOf(b.method.toLowerCase());
     });
 
-    return endpoints;
+    return publicEndpoints;
   }
 
   function buildGroups(spec, endpoints) {
