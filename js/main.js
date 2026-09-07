@@ -28,7 +28,22 @@
   githubLink.hidden = false;
 
   // ── Base URL ───────────────────────────────────────────────
-  const productionUrl = spec.servers?.[0]?.url || "";
+  // Resolve any {variable} placeholders in the OpenAPI server URL using
+  // that variable's declared default, so a templated servers[] entry
+  // (e.g. "https://{worker-subdomain}.workers.dev") never gets used
+  // verbatim as a literal, unfetchable hostname.
+  function resolveServerUrl(server) {
+    if (!server?.url) return "";
+    let url = server.url;
+    const vars = server.variables || {};
+    for (const [key, def] of Object.entries(vars)) {
+      if (def?.default !== undefined) {
+        url = url.split(`{${key}}`).join(def.default);
+      }
+    }
+    return url;
+  }
+  const productionUrl = resolveServerUrl(spec.servers?.[0]) || "";
   const presets = [
     { label: "Production", value: productionUrl },
     { label: "Local (wrangler dev)", value: "http://localhost:8787" },
