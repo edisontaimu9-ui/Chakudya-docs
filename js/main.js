@@ -60,6 +60,18 @@
   const input = document.getElementById("base-url-input");
   let savedBase = "";
   try { savedBase = localStorage.getItem(BASE_URL_KEY) || ""; } catch (_) { /* ignore */ }
+  // Discard a saved base URL that's structurally invalid (e.g. leftover
+  // "{worker-subdomain}" from an old, unresolved spec template) so a stale
+  // localStorage value from before a spec fix can't keep the demo broken.
+  if (savedBase && (savedBase.includes("{") || savedBase.includes("}"))) {
+    try { localStorage.removeItem(BASE_URL_KEY); } catch (_) { /* ignore */ }
+    savedBase = "";
+  } else if (savedBase) {
+    try { new URL(savedBase); } catch (_) {
+      try { localStorage.removeItem(BASE_URL_KEY); } catch (_) { /* ignore */ }
+      savedBase = "";
+    }
+  }
   const initialBase = savedBase || productionUrl;
   input.value = initialBase;
   select.value = presets.some((p) => p.value === initialBase) ? initialBase : "";
