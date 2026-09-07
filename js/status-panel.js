@@ -90,7 +90,7 @@ const StatusPanel = (() => {
     }
 
     inFlight = true;
-    setPanel("checking", `Pinging ${baseUrl}/health…`);
+    setPanel("checking", "Checking…");
 
     let url;
     try {

@@ -231,6 +231,79 @@
 .hero__lead { color: var(--text-secondary); font-size: 15.5px; max-width: 62ch; margin-top: 16px; }
 .hero__actions { display: flex; gap: 10px; margin-top: 24px; flex-wrap: wrap; }
 
+/* Animated demo terminal - fixed footprint so the typing/erasing loop
+   never reflows the rest of the page around it. */
+.demo-terminal {
+  margin-top: 28px;
+  max-width: 620px;
+  border: 1px solid var(--code-border);
+  border-radius: var(--radius-lg);
+  background: var(--code-bg);
+  box-shadow: var(--shadow-md);
+  overflow: hidden;
+  /* fixed overall height = bar + body, set once, never changes */
+  height: 340px;
+  display: flex;
+  flex-direction: column;
+}
+.demo-terminal__bar {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--code-border);
+  background: var(--bg-raised);
+}
+.demo-terminal__dots { display: flex; gap: 6px; }
+.demo-terminal__dots span {
+  width: 10px; height: 10px; border-radius: 50%;
+  background: var(--border-strong);
+}
+.demo-terminal__route {
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  color: var(--text-secondary);
+  display: flex;
+  gap: 8px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.demo-terminal__method {
+  color: var(--accent-strong);
+  font-weight: 700;
+  flex: none;
+}
+.demo-terminal__path { overflow: hidden; text-overflow: ellipsis; }
+.demo-terminal__body {
+  flex: 1 1 auto;
+  margin: 0;
+  padding: 14px 16px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  line-height: 1.6;
+  color: var(--text-primary);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.demo-terminal__body::-webkit-scrollbar { width: 8px; }
+.demo-terminal__body::-webkit-scrollbar-thumb { background: var(--scrollbar); border-radius: 4px; }
+.demo-terminal__cursor {
+  display: inline-block;
+  width: 7px; height: 14px;
+  margin-left: 1px;
+  background: var(--accent);
+  vertical-align: text-bottom;
+  animation: demo-terminal-blink 1s step-end infinite;
+}
+@keyframes demo-terminal-blink { 50% { opacity: 0; } }
+@media (max-width: 640px) {
+  .demo-terminal { height: 280px; max-width: 100%; }
+}
+
 .stat-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; margin: 28px 0; }
 .stat-card {
   border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 16px 18px;

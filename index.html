@@ -59,17 +59,7 @@
     </div>
   </div>
 
-  <div class="app-header__row app-header__row--base-url">
-    <label class="base-url" for="base-url-input">
-      <span class="base-url__label">Base URL</span>
-      <select id="base-url-select" aria-label="Choose a preset base URL">
-        <option value="">Custom…</option>
-      </select>
-      <input id="base-url-input" type="text" spellcheck="false" placeholder="https://your-worker.workers.dev" />
-      <button class="base-url__reset" id="base-url-reset" title="Reset to production URL" aria-label="Reset base URL">↺</button>
-    </label>
-    <span class="base-url__hint" id="cors-hint"></span>
-  </div>
+  <div class="app-header__row app-header__row--base-url" hidden></div>
 </header>
 
 <div class="app-shell">

@@ -44,61 +44,12 @@
     return url;
   }
   const productionUrl = resolveServerUrl(spec.servers?.[0]) || "";
-  const presets = [
-    { label: "Production", value: productionUrl },
-    { label: "Local (wrangler dev)", value: "http://localhost:8787" },
-  ].filter((p) => p.value);
 
-  const select = document.getElementById("base-url-select");
-  presets.forEach((p) => {
-    const opt = document.createElement("option");
-    opt.value = p.value;
-    opt.textContent = p.label;
-    select.appendChild(opt);
-  });
-
-  const input = document.getElementById("base-url-input");
-  let savedBase = "";
-  try { savedBase = localStorage.getItem(BASE_URL_KEY) || ""; } catch (_) { /* ignore */ }
-  // Discard a saved base URL that's structurally invalid (e.g. leftover
-  // "{worker-subdomain}" from an old, unresolved spec template) so a stale
-  // localStorage value from before a spec fix can't keep the demo broken.
-  if (savedBase && (savedBase.includes("{") || savedBase.includes("}"))) {
-    try { localStorage.removeItem(BASE_URL_KEY); } catch (_) { /* ignore */ }
-    savedBase = "";
-  } else if (savedBase) {
-    try { new URL(savedBase); } catch (_) {
-      try { localStorage.removeItem(BASE_URL_KEY); } catch (_) { /* ignore */ }
-      savedBase = "";
-    }
-  }
-  const initialBase = savedBase || productionUrl;
-  input.value = initialBase;
-  select.value = presets.some((p) => p.value === initialBase) ? initialBase : "";
-  AppState.set({ baseUrl: initialBase });
-
-  function setBaseUrl(url) {
-    input.value = url;
-    AppState.set({ baseUrl: url });
-    try { localStorage.setItem(BASE_URL_KEY, url); } catch (_) { /* ignore */ }
-    updateCorsHint(url);
-  }
-
-  function updateCorsHint(url) {
-    const hint = document.getElementById("cors-hint");
-    if (!url) { hint.textContent = ""; return; }
-    hint.textContent = url === productionUrl
-      ? "CORS: wide open (Access-Control-Allow-Origin: *)"
-      : "Custom origin - Try It calls it directly from your browser";
-  }
-  updateCorsHint(initialBase);
-
-  select.addEventListener("change", () => { if (select.value) setBaseUrl(select.value); });
-  input.addEventListener("change", () => setBaseUrl(input.value.trim()));
-  document.getElementById("base-url-reset").addEventListener("click", () => {
-    select.value = productionUrl;
-    setBaseUrl(productionUrl);
-  });
+  // The docs always call production - no picker, no URL shown to visitors,
+  // nothing persisted. Clear anything left over from before this was locked
+  // down so an old saved override can't quietly reappear.
+  try { localStorage.removeItem(BASE_URL_KEY); } catch (_) { /* ignore */ }
+  AppState.set({ baseUrl: productionUrl });
 
   // ── Sidebar / search / mobile toggle ─────────────────────────
   Sidebar.render();
