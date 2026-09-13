@@ -18,7 +18,7 @@ const DemoTerminal = (() => {
           id: 214,
           food_name: "Nsima (thick, maize)",
           category: "Staples",
-          measure: "1 chunk / mpanda (200g)",
+          measure: "1 chunk / chipande/mtanda (200g)",
           weight_g: 200,
           kcal: 123,
           protein_g: 2.6,
