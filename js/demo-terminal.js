@@ -1,61 +1,82 @@
 /**
- * Animated terminal-style demo for the overview hero — types out a real
- * Chakudya response (shape taken straight from handleFoodsLookup/success()),
- * pauses, then loops to the next example. Purely decorative: doesn't call
- * the live API, so it never depends on the base URL or network access.
+ * Animated terminal-style demo for the overview hero — types out real,
+ * live Chakudya API responses (fetched from the same base URL the rest
+ * of the docs use), pauses, then loops to the next example.
+ *
+ * Each request is made once per page load and cached in memory; if a
+ * request fails (offline, CORS, upstream error) that example silently
+ * falls back to a last-known-good static snapshot so the demo never
+ * shows an error state to a visitor.
  */
 const DemoTerminal = (() => {
-  const EXAMPLES = [
+  const REQUESTS = [
     {
       method: "GET",
       route: "/foods/lookup?q=nsima",
-      data: {
-        status: "success",
-        source: "local",
-        cached: true,
-        freshly_cached: false,
-        data: {
-          id: 214,
-          food_name: "Nsima (thick, maize)",
-          category: "Staples",
-          measure: "1 chunk / chipande/mtanda (200g)",
-          weight_g: 200,
-          kcal: 123,
-          protein_g: 2.6,
-          carbs_g: 27.1,
-          fat_g: 0.5,
-          iron_mg: 0.9,
-          calcium_mg: 5,
-        },
-      },
+      path: "/foods/lookup",
+      query: { q: "nsima" },
     },
     {
       method: "GET",
       route: "/foods/compare?foods=nsima,rice,potatoes",
-      data: {
-        status: "success",
-        data: {
-          nutrient_comparison: {
-            energy_kcal: { label: "Energy (kcal)", highest: "Rice", lowest: "Potatoes" },
-            fiber_g: { label: "Fiber (g)", highest: "Potatoes", lowest: "Rice" },
-          },
-        },
-      },
+      path: "/foods/compare",
+      query: { foods: "nsima,rice,potatoes" },
     },
     {
       method: "POST",
       route: "/meals/analyze",
+      path: "/meals/analyze",
+      body: {
+        meal_type: "lunch",
+        ingredients: [
+          { food_name: "nsima", quantity: 1, unit: "chunk" },
+          { food_name: "beans", quantity: 1, unit: "cup" },
+          { food_name: "tomato", quantity: 1, unit: "medium" },
+        ],
+      },
+    },
+  ];
+
+  // Last-known-good snapshots, used only if the live request fails.
+  const FALLBACKS = [
+    {
+      status: "success",
+      source: "local",
+      cached: true,
+      freshly_cached: false,
       data: {
-        status: "success",
-        data: {
-          macronutrient_breakdown: {
-            percent_kcal_from_protein: 14,
-            percent_kcal_from_carbs: 61,
-            percent_kcal_from_fat: 25,
-          },
-          food_groups_present: ["Grains", "Legumes", "Vegetables"],
-          food_groups_missing: ["Dairy", "Fruits"],
+        id: 214,
+        food_name: "Nsima (thick, maize)",
+        category: "Staples",
+        measure: "1 chunk / chipande/mtanda (200g)",
+        weight_g: 200,
+        kcal: 123,
+        protein_g: 2.6,
+        carbs_g: 27.1,
+        fat_g: 0.5,
+        iron_mg: 0.9,
+        calcium_mg: 5,
+      },
+    },
+    {
+      status: "success",
+      data: {
+        nutrient_comparison: {
+          energy_kcal: { label: "Energy (kcal)", highest: "Rice", lowest: "Potatoes" },
+          fiber_g: { label: "Fiber (g)", highest: "Potatoes", lowest: "Rice" },
         },
+      },
+    },
+    {
+      status: "success",
+      data: {
+        macronutrient_breakdown: {
+          percent_kcal_from_protein: 14,
+          percent_kcal_from_carbs: 61,
+          percent_kcal_from_fat: 25,
+        },
+        food_groups_present: ["Grains", "Legumes", "Vegetables"],
+        food_groups_missing: ["Dairy", "Fruits"],
       },
     },
   ];
@@ -63,6 +84,38 @@ const DemoTerminal = (() => {
   const TYPE_MS = 12;
   const HOLD_MS = 2200;
   const ERASE_MS = 5;
+
+  let examplesPromise = null;
+
+  /** Fetches all demo responses once, falling back per-example on failure. */
+  function loadExamples() {
+    if (examplesPromise) return examplesPromise;
+
+    const baseUrl = AppState.state.baseUrl;
+
+    examplesPromise = Promise.all(
+      REQUESTS.map(async (req, i) => {
+        if (!baseUrl) return { method: req.method, route: req.route, data: FALLBACKS[i] };
+        try {
+          const url = ApiClient.buildUrl(baseUrl, req.path, {}, req.query);
+          const hasBody = !!req.body;
+          const headers = ApiClient.buildHeaders({ hasBody });
+          const result = await ApiClient.execute({
+            url,
+            method: req.method,
+            headers,
+            body: hasBody ? JSON.stringify(req.body) : undefined,
+          });
+          const data = result.ok && result.bodyJson ? result.bodyJson : FALLBACKS[i];
+          return { method: req.method, route: req.route, data };
+        } catch (_) {
+          return { method: req.method, route: req.route, data: FALLBACKS[i] };
+        }
+      })
+    );
+
+    return examplesPromise;
+  }
 
   function highlight(json) {
     const escaped = json
@@ -81,7 +134,7 @@ const DemoTerminal = (() => {
     );
   }
 
-  function mount(hero) {
+  async function mount(hero) {
     const wrap = document.createElement("div");
     wrap.className = "demo-terminal";
     wrap.innerHTML = `
@@ -99,8 +152,11 @@ const DemoTerminal = (() => {
 
     const reduceMotion = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
+    const examples = await loadExamples();
+    if (!document.body.contains(wrap)) return; // navigated away while fetching
+
     if (reduceMotion) {
-      const ex = EXAMPLES[0];
+      const ex = examples[0];
       methodEl.textContent = ex.method;
       pathEl.textContent = ex.route;
       codeEl.innerHTML = highlight(JSON.stringify(ex.data, null, 2));
@@ -141,7 +197,7 @@ const DemoTerminal = (() => {
     async function loop() {
       let index = 0;
       while (document.body.contains(wrap)) {
-        const ex = EXAMPLES[index % EXAMPLES.length];
+        const ex = examples[index % examples.length];
         methodEl.textContent = ex.method;
         pathEl.textContent = ex.route;
         await typeText(JSON.stringify(ex.data, null, 2));
