@@ -5,6 +5,44 @@ const TryIt = (() => {
     return t.content.firstElementChild;
   }
 
+  // Name-based fallbacks for params the spec doesn't declare an example/default
+  // for, so a visitor always has something sensible pre-filled to click "Send"
+  // with. Chosen from real Chakudya data (nsima, rice, etc.) where relevant.
+  const NAME_HINTS = {
+    q: "nsima",
+    query: "nsima",
+    search: "nsima",
+    food_name: "chicken",
+    foods: "nsima,rice,potatoes",
+    barcode: "6009880123456",
+    category: "Staples",
+    id: "1",
+    food_id: "214",
+    session_id: "demo-session",
+    user_id: "demo-user",
+    severity: "moderate",
+    type: "general",
+    route: "GET /foods",
+    nutrient: "iron_mg",
+    age: 30,
+    serving: "1 cup",
+  };
+
+  /** Best-effort sample value so a param field never has to be filled by hand. */
+  function sampleValue(spec, param) {
+    const schema = SpecLoader.deref(spec, param.schema) || {};
+    if (schema.example !== undefined) return schema.example;
+    if (param.example !== undefined) return param.example;
+    if (schema.default !== undefined) return schema.default;
+    if (schema.enum && schema.enum.length) return schema.enum[0];
+    if (param.name === "date") return new Date().toISOString().slice(0, 10);
+    if (param.name in NAME_HINTS) return NAME_HINTS[param.name];
+    if (param.name === "cursor") return ""; // opaque pagination token - nothing sensible to pre-fill
+    if (schema.type === "integer" || schema.type === "number") return 1;
+    if (schema.type === "boolean") return true;
+    return "";
+  }
+
   function mount(endpoint, container) {
     const spec = AppState.state.spec;
     const pathParams = endpoint.parameters.filter((p) => p.in === "path");
@@ -51,10 +89,11 @@ const TryIt = (() => {
     if (pathParams.length) {
       const grid = panel.querySelector('[data-role="path-fields"]');
       pathParams.forEach((p) => {
+        const sample = sampleValue(spec, p);
         const f = el(`
           <div class="field">
             <label class="field__label">${p.name}<span class="param-required">required</span></label>
-            <input type="text" data-path-param="${p.name}" autocomplete="off" spellcheck="false" placeholder="${p.name}" />
+            <input type="text" data-path-param="${p.name}" autocomplete="off" spellcheck="false" placeholder="${p.name}" value="${RenderEndpoint.escapeHtml(String(sample ?? ""))}" />
           </div>
         `);
         grid.appendChild(f);
@@ -66,11 +105,12 @@ const TryIt = (() => {
       const grid = panel.querySelector('[data-role="query-fields"]');
       queryParams.forEach((p) => {
         const schema = SpecLoader.deref(spec, p.schema) || {};
+        const sample = sampleValue(spec, p);
         const f = el(`
           <div class="field">
             <label class="field__label">${p.name}${p.required ? '<span class="param-required">required</span>' : ""}</label>
             <input type="text" data-query-param="${p.name}" autocomplete="off" spellcheck="false"
-              placeholder="${schema.default !== undefined ? schema.default : p.name}" />
+              placeholder="${schema.default !== undefined ? schema.default : p.name}" value="${RenderEndpoint.escapeHtml(String(sample ?? ""))}" />
           </div>
         `);
         grid.appendChild(f);
