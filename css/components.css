@@ -51,6 +51,15 @@
 
 /* ── Endpoint doc page ───────────────────────────────────── */
 
+.breadcrumb-home {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-family: var(--font-mono); font-size: 12px; font-weight: 600;
+  color: var(--text-secondary); text-decoration: none;
+  margin-bottom: 12px; transition: color 0.15s;
+}
+.breadcrumb-home:hover { color: var(--accent); }
+.breadcrumb-home svg { flex-shrink: 0; }
+
 .eyebrow {
   display: inline-flex; align-items: baseline; gap: 8px;
   font-family: var(--font-mono); font-size: 11px; font-weight: 700; text-transform: uppercase;

@@ -106,6 +106,10 @@ const RenderEndpoint = (() => {
 
     const head = el(`
       <div class="endpoint-head">
+        <a class="breadcrumb-home" href="#/">
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M2 7.5 8 2l6 5.5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/><path d="M3.5 6.5V13a1 1 0 0 0 1 1H11.5a1 1 0 0 0 1-1V6.5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          <span>Home</span>
+        </a>
         <p class="eyebrow">${escapeHtml(endpoint.tags[0])}</p>
         <div class="endpoint-head__row">
           <span class="badge-method badge-method--lg badge-method--${endpoint.method}">${endpoint.method}</span>
