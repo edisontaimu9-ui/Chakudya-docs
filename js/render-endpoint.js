@@ -200,6 +200,36 @@ const RenderEndpoint = (() => {
     const tryItSection = el(`<div class="section"><h2 class="section__title">Try it</h2></div>`);
     TryIt.mount(endpoint, tryItSection);
     container.appendChild(tryItSection);
+
+    // Prev / next — same order as the sidebar, so it reads front-to-back
+    // through the whole endpoint list regardless of group boundaries.
+    container.appendChild(pagerSection(endpoint));
+  }
+
+  function pagerCard(ep, direction) {
+    if (!ep) return el(`<span class="endpoint-pager__spacer"></span>`);
+    const card = el(`
+      <a class="endpoint-pager__card endpoint-pager__card--${direction}" href="#/${ep.slug}" title="${direction === "prev" ? "←" : "→"} keyboard shortcut">
+        <span class="endpoint-pager__label">${direction === "prev" ? "← Previous" : "Next →"}</span>
+        <span class="endpoint-pager__row">
+          <span class="badge-method badge-method--${ep.method}">${ep.method}</span>
+          <span class="endpoint-pager__path"></span>
+        </span>
+      </a>
+    `);
+    card.querySelector(".endpoint-pager__path").textContent = ep.path;
+    return card;
+  }
+
+  function pagerSection(endpoint) {
+    const list = AppState.state.endpoints;
+    const i = list.findIndex((e) => e.id === endpoint.id);
+    const prevEp = i > 0 ? list[i - 1] : null;
+    const nextEp = i >= 0 && i < list.length - 1 ? list[i + 1] : null;
+    const nav = el(`<nav class="endpoint-pager" aria-label="Endpoint navigation"></nav>`);
+    nav.appendChild(pagerCard(prevEp, "prev"));
+    nav.appendChild(pagerCard(nextEp, "next"));
+    return nav;
   }
 
   function buildCurlBlock(endpoint) {

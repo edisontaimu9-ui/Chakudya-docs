@@ -79,6 +79,7 @@
     if (!hash) {
       RenderOverview.render(content);
       Sidebar.setActive(null);
+      AppState.set({ activeId: null });
       document.getElementById("main").focus({ preventScroll: true });
       window.scrollTo(0, 0);
       return;
@@ -91,10 +92,12 @@
           <p>No documented route matches <span class="mono">${RenderEndpoint.escapeHtml(hash)}</span>.</p>
           <a class="btn" href="#/">Back to overview</a>
         </div>`;
+      AppState.set({ activeId: null });
       return;
     }
     RenderEndpoint.render(endpoint, content);
     Sidebar.setActive(endpoint.id);
+    AppState.set({ activeId: endpoint.id });
     document.getElementById("main").focus({ preventScroll: true });
     window.scrollTo(0, 0);
     closeSidebar();
@@ -102,4 +105,23 @@
 
   window.addEventListener("hashchange", route);
   route();
+
+  // ── Prev/next keyboard shortcuts (← / →) ──────────────────
+  // Only while viewing an endpoint, and never while the person is
+  // typing anywhere (search box, Try It params/body, etc.).
+  document.addEventListener("keydown", (e) => {
+    if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
+    if (e.metaKey || e.ctrlKey || e.altKey) return;
+    const tag = document.activeElement?.tagName;
+    if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" || document.activeElement?.isContentEditable) return;
+    const activeId = AppState.state.activeId;
+    if (!activeId) return;
+    const list = AppState.state.endpoints;
+    const i = list.findIndex((ep) => ep.id === activeId);
+    if (i === -1) return;
+    const target = e.key === "ArrowLeft" ? list[i - 1] : list[i + 1];
+    if (!target) return;
+    e.preventDefault();
+    location.hash = `#/${target.slug}`;
+  });
 })();
