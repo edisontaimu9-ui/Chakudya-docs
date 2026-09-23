@@ -161,7 +161,7 @@ of the OpenAPI document - they're read out of `routePolicy()` in
 
 ---
 
-## 6. Endpoints documented (86 of 86)
+## 6. Endpoints documented (89 of 89)
 
 Every route the Worker actually serves is documented - nothing was skipped.
 `/manufacturers`, `/products`, and `/nutrition` were removed from the API in
@@ -205,6 +205,11 @@ v1.15.0-v1.16.0 and no longer appear here.
 - `PUT /glycaemic-index/{id}` - Replace an entry (admin)
 - `PATCH /glycaemic-index/{id}` - Partially update an entry (admin)
 - `DELETE /glycaemic-index/{id}` - Delete an entry (admin)
+
+**BMI for age**
+- `GET /bmi-for-age/classify` - Classify BMI-for-age for a child/adolescent 5y 1m-19y 0m (public, rate-limited)
+- `GET /bmi-for-age` - List reference rows (-3SD to +3SD cut-offs)
+- `POST /bmi-for-age/bulk` - Bulk-create reference rows (admin)
 
 **Exchange**
 - `GET /exchange` - List diabetes/renal exchange list entries
