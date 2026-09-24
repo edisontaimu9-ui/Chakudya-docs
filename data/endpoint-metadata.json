@@ -37,6 +37,8 @@
     { "method": "GET", "path": "/bmi-for-age/classify", "auth": "public", "rateLimit": { "limit": 100, "windowSeconds": 60, "scope": "ip" } },
     { "method": "GET", "path": "/bmi-for-age", "auth": "public", "rateLimit": { "limit": 100, "windowSeconds": 60, "scope": "ip" } },
     { "method": "POST", "path": "/bmi-for-age/bulk", "auth": "admin", "rateLimit": { "limit": 10, "windowSeconds": 60, "scope": "admin" } },
+    { "method": "GET", "path": "/fenton-preterm/classify", "auth": "public", "rateLimit": { "limit": 100, "windowSeconds": 60, "scope": "ip" } },
+    { "method": "POST", "path": "/fenton-preterm/bulk", "auth": "admin", "rateLimit": { "limit": 10, "windowSeconds": 60, "scope": "admin" } },
 
     { "method": "GET", "path": "/exchange", "auth": "public", "rateLimit": { "limit": 100, "windowSeconds": 60, "scope": "ip" } },
     { "method": "POST", "path": "/exchange", "auth": "admin", "rateLimit": { "limit": 60, "windowSeconds": 60, "scope": "admin" } },

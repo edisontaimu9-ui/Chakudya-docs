@@ -161,7 +161,7 @@ of the OpenAPI document - they're read out of `routePolicy()` in
 
 ---
 
-## 6. Endpoints documented (89 of 89)
+## 6. Endpoints documented (91 of 91)
 
 Every route the Worker actually serves is documented - nothing was skipped.
 `/manufacturers`, `/products`, and `/nutrition` were removed from the API in
@@ -210,6 +210,10 @@ v1.15.0-v1.16.0 and no longer appear here.
 - `GET /bmi-for-age/classify` - Classify BMI-for-age for a child/adolescent 5y 1m-19y 0m (public, rate-limited)
 - `GET /bmi-for-age` - List reference rows (-3SD to +3SD cut-offs)
 - `POST /bmi-for-age/bulk` - Bulk-create reference rows (admin)
+
+**Fenton Preterm** (licensed data — no list/dump route, classify only)
+- `GET /fenton-preterm/classify` - Weight/length/HC z-score, percentile, status for a preterm infant (public, rate-limited)
+- `POST /fenton-preterm/bulk` - Bulk-create reference rows (admin)
 
 **Exchange**
 - `GET /exchange` - List diabetes/renal exchange list entries
