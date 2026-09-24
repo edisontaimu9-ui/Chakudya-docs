@@ -161,7 +161,7 @@ of the OpenAPI document - they're read out of `routePolicy()` in
 
 ---
 
-## 6. Endpoints documented (91 of 91)
+## 6. Endpoints documented (96 of 96)
 
 Every route the Worker actually serves is documented - nothing was skipped.
 `/manufacturers`, `/products`, and `/nutrition` were removed from the API in
@@ -211,8 +211,13 @@ v1.15.0-v1.16.0 and no longer appear here.
 - `GET /bmi-for-age` - List reference rows (-3SD to +3SD cut-offs)
 - `POST /bmi-for-age/bulk` - Bulk-create reference rows (admin)
 
-**Fenton Preterm** (licensed data — no list/dump route, classify only)
+**Fenton Preterm** (licensed data — no list/dump route; every read returns a computed result, static metadata, or a rendered image, never raw L/M/S)
 - `GET /fenton-preterm/classify` - Weight/length/HC z-score, percentile, status for a preterm infant (public, rate-limited)
+- `POST /fenton-preterm/profile` - Classify weight+length+HC together at one timepoint (public, rate-limited)
+- `POST /fenton-preterm/growth` - Classify a series of same-metric measurements over time; chart-ready trajectory + trend (public, rate-limited)
+- `POST /fenton-preterm/velocity` - Growth velocity (g/kg/day weight, cm/week length/HC) between measurements (public, rate-limited)
+- `GET /fenton-preterm/chart` - Server-rendered SVG growth chart with reference curves + optional overlay points (public, rate-limited)
+- `GET /fenton-preterm/references` - Static metadata: years, sexes, metrics, valid age ranges, citations, license (public, rate-limited)
 - `POST /fenton-preterm/bulk` - Bulk-create reference rows (admin)
 
 **Exchange**
