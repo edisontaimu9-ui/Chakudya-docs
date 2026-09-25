@@ -1,119 +1,1026 @@
 {
   "_source": "Derived from routePolicy() in src/index.js (Chakudya API). Not part of the OpenAPI spec on purpose - this describes runtime policy (rate limits, role gates), not shape.",
-  "default": { "auth": "public", "rateLimit": { "limit": 100, "windowSeconds": 60, "scope": "ip" } },
+  "default": {
+    "auth": "public",
+    "rateLimit": {
+      "limit": 100,
+      "windowSeconds": 60,
+      "scope": "ip"
+    }
+  },
   "rules": [
-    { "method": "GET", "path": "/", "auth": "public", "rateLimit": null, "note": "Not rate-limited or auth-gated - served before the router's policy gate." },
-    { "method": "GET", "path": "/health", "auth": "public", "rateLimit": { "limit": 20, "windowSeconds": 60, "scope": "ip" } },
-
-    { "method": "POST", "path": "/batch", "auth": "public", "rateLimit": { "limit": 10, "windowSeconds": 60, "scope": "ip" }, "note": "Caps how many batches (i.e. total fan-out) one IP can trigger per minute - each sub-request still pays its own cost against its own resource's own rate-limit bucket, so batching cannot bypass per-resource auth or limits." },
-
-    { "method": "GET", "path": "/admin/keys", "auth": "admin", "requiredRole": "root", "rateLimit": { "limit": 30, "windowSeconds": 60, "scope": "admin" }, "note": "Root ADMIN_API_KEY only - a per-consumer key cannot manage other keys." },
-    { "method": "POST", "path": "/admin/keys", "auth": "admin", "requiredRole": "root", "rateLimit": { "limit": 30, "windowSeconds": 60, "scope": "admin" }, "note": "Root ADMIN_API_KEY only." },
-    { "method": "DELETE", "path": "/admin/keys/{id}", "auth": "admin", "requiredRole": "root", "rateLimit": { "limit": 30, "windowSeconds": 60, "scope": "admin" }, "note": "Root ADMIN_API_KEY only." },
-
-    { "method": "GET", "path": "/foods", "auth": "public", "rateLimit": { "limit": 100, "windowSeconds": 60, "scope": "ip" } },
-    { "method": "GET", "path": "/foods/{id}", "auth": "public", "rateLimit": { "limit": 100, "windowSeconds": 60, "scope": "ip" } },
-    { "method": "POST", "path": "/foods", "auth": "admin", "rateLimit": { "limit": 60, "windowSeconds": 60, "scope": "admin" } },
-    { "method": "PUT", "path": "/foods/{id}", "auth": "admin", "rateLimit": { "limit": 60, "windowSeconds": 60, "scope": "admin" } },
-    { "method": "PATCH", "path": "/foods/{id}", "auth": "admin", "rateLimit": { "limit": 60, "windowSeconds": 60, "scope": "admin" } },
-    { "method": "DELETE", "path": "/foods/{id}", "auth": "admin", "rateLimit": { "limit": 60, "windowSeconds": 60, "scope": "admin" } },
-    { "method": "POST", "path": "/foods/bulk", "auth": "admin", "rateLimit": { "limit": 10, "windowSeconds": 60, "scope": "admin" } },
-    { "method": "GET", "path": "/foods/lookup", "auth": "public", "rateLimit": { "limit": 20, "windowSeconds": 60, "scope": "ip" }, "note": "Can trigger external USDA FDC / Open Food Facts / FatSecret calls." },
-    { "method": "GET", "path": "/foods/autocomplete", "auth": "public", "rateLimit": { "limit": 60, "windowSeconds": 60, "scope": "ip" }, "note": "Wraps FatSecret's Premier-exclusive foods.autocomplete.v2 - 503 if FatSecret credentials aren't configured." },
-    { "method": "GET", "path": "/foods/categories", "auth": "public", "rateLimit": { "limit": 30, "windowSeconds": 60, "scope": "ip" }, "note": "Wraps FatSecret's Premier-exclusive food_categories.get.v2 - 503 if FatSecret credentials aren't configured." },
-    { "method": "GET", "path": "/foods/search", "auth": "public", "rateLimit": { "limit": 60, "windowSeconds": 60, "scope": "ip" }, "note": "Typo-tolerant fuzzy search - a single indexed Postgres RPC call (pg_trgm + levenshtein), no external API cost." },
-    { "method": "GET", "path": "/foods/substitutes", "auth": "public", "rateLimit": { "limit": 30, "windowSeconds": 60, "scope": "ip" }, "note": "Fans out one ilike query per keyword in the matched substitution group." },
-    { "method": "GET", "path": "/foods/compare", "auth": "public", "rateLimit": { "limit": 20, "windowSeconds": 60, "scope": "ip" }, "note": "Resolves 2-6 foods per request, each potentially falling back to the external lookup cascade." },
-    { "method": "GET", "path": "/foods/{id}/label", "auth": "public", "rateLimit": { "limit": 100, "windowSeconds": 60, "scope": "ip" } },
-
-    { "method": "GET", "path": "/glycaemic-index", "auth": "public", "rateLimit": { "limit": 100, "windowSeconds": 60, "scope": "ip" } },
-    { "method": "GET", "path": "/glycaemic-index/{id}", "auth": "public", "rateLimit": { "limit": 100, "windowSeconds": 60, "scope": "ip" } },
-    { "method": "POST", "path": "/glycaemic-index", "auth": "admin", "rateLimit": { "limit": 60, "windowSeconds": 60, "scope": "admin" } },
-    { "method": "PUT", "path": "/glycaemic-index/{id}", "auth": "admin", "rateLimit": { "limit": 60, "windowSeconds": 60, "scope": "admin" } },
-    { "method": "PATCH", "path": "/glycaemic-index/{id}", "auth": "admin", "rateLimit": { "limit": 60, "windowSeconds": 60, "scope": "admin" } },
-    { "method": "DELETE", "path": "/glycaemic-index/{id}", "auth": "admin", "rateLimit": { "limit": 60, "windowSeconds": 60, "scope": "admin" } },
-    { "method": "POST", "path": "/glycaemic-index/bulk", "auth": "admin", "rateLimit": { "limit": 10, "windowSeconds": 60, "scope": "admin" } },
-
-    { "method": "GET", "path": "/bmi-for-age/classify", "auth": "public", "rateLimit": { "limit": 100, "windowSeconds": 60, "scope": "ip" } },
-    { "method": "GET", "path": "/bmi-for-age", "auth": "public", "rateLimit": { "limit": 100, "windowSeconds": 60, "scope": "ip" } },
-    { "method": "POST", "path": "/bmi-for-age/bulk", "auth": "admin", "rateLimit": { "limit": 10, "windowSeconds": 60, "scope": "admin" } },
-    { "method": "GET", "path": "/fenton-preterm/classify", "auth": "public", "rateLimit": { "limit": 100, "windowSeconds": 60, "scope": "ip" } },
-    { "method": "POST", "path": "/fenton-preterm/profile", "auth": "public", "rateLimit": { "limit": 100, "windowSeconds": 60, "scope": "ip" } },
-    { "method": "POST", "path": "/fenton-preterm/growth", "auth": "public", "rateLimit": { "limit": 100, "windowSeconds": 60, "scope": "ip" } },
-    { "method": "POST", "path": "/fenton-preterm/velocity", "auth": "public", "rateLimit": { "limit": 100, "windowSeconds": 60, "scope": "ip" } },
-    { "method": "GET", "path": "/fenton-preterm/chart", "auth": "public", "rateLimit": { "limit": 60, "windowSeconds": 60, "scope": "ip" } },
-    { "method": "GET", "path": "/fenton-preterm/references", "auth": "public", "rateLimit": { "limit": 100, "windowSeconds": 60, "scope": "ip" } },
-    { "method": "POST", "path": "/fenton-preterm/bulk", "auth": "admin", "rateLimit": { "limit": 10, "windowSeconds": 60, "scope": "admin" } },
-
-    { "method": "GET", "path": "/exchange", "auth": "public", "rateLimit": { "limit": 100, "windowSeconds": 60, "scope": "ip" } },
-    { "method": "POST", "path": "/exchange", "auth": "admin", "rateLimit": { "limit": 60, "windowSeconds": 60, "scope": "admin" } },
-    { "method": "PUT", "path": "/exchange/{id}", "auth": "admin", "rateLimit": { "limit": 60, "windowSeconds": 60, "scope": "admin" } },
-    { "method": "PATCH", "path": "/exchange/{id}", "auth": "admin", "rateLimit": { "limit": 60, "windowSeconds": 60, "scope": "admin" } },
-    { "method": "DELETE", "path": "/exchange/{id}", "auth": "admin", "rateLimit": { "limit": 60, "windowSeconds": 60, "scope": "admin" } },
-    { "method": "POST", "path": "/exchange/bulk", "auth": "admin", "rateLimit": { "limit": 10, "windowSeconds": 60, "scope": "admin" } },
-
-    { "method": "GET", "path": "/renal", "auth": "public", "rateLimit": { "limit": 100, "windowSeconds": 60, "scope": "ip" } },
-    { "method": "POST", "path": "/renal", "auth": "admin", "rateLimit": { "limit": 60, "windowSeconds": 60, "scope": "admin" } },
-    { "method": "PUT", "path": "/renal/{id}", "auth": "admin", "rateLimit": { "limit": 60, "windowSeconds": 60, "scope": "admin" } },
-    { "method": "PATCH", "path": "/renal/{id}", "auth": "admin", "rateLimit": { "limit": 60, "windowSeconds": 60, "scope": "admin" } },
-    { "method": "DELETE", "path": "/renal/{id}", "auth": "admin", "rateLimit": { "limit": 60, "windowSeconds": 60, "scope": "admin" } },
-    { "method": "POST", "path": "/renal/bulk", "auth": "admin", "rateLimit": { "limit": 10, "windowSeconds": 60, "scope": "admin" } },
-
-    { "method": "GET", "path": "/formulas", "auth": "public", "rateLimit": { "limit": 100, "windowSeconds": 60, "scope": "ip" } },
-    { "method": "POST", "path": "/formulas", "auth": "admin", "rateLimit": { "limit": 60, "windowSeconds": 60, "scope": "admin" } },
-    { "method": "PUT", "path": "/formulas/{id}", "auth": "admin", "rateLimit": { "limit": 60, "windowSeconds": 60, "scope": "admin" } },
-    { "method": "PATCH", "path": "/formulas/{id}", "auth": "admin", "rateLimit": { "limit": 60, "windowSeconds": 60, "scope": "admin" } },
-    { "method": "DELETE", "path": "/formulas/{id}", "auth": "admin", "rateLimit": { "limit": 60, "windowSeconds": 60, "scope": "admin" } },
-    { "method": "POST", "path": "/formulas/bulk", "auth": "admin", "rateLimit": { "limit": 10, "windowSeconds": 60, "scope": "admin" } },
-
-    { "method": "GET", "path": "/drug-interactions", "auth": "public", "rateLimit": { "limit": 100, "windowSeconds": 60, "scope": "ip" } },
-    { "method": "GET", "path": "/drug-interactions/{id}", "auth": "public", "rateLimit": { "limit": 100, "windowSeconds": 60, "scope": "ip" } },
-    { "method": "GET", "path": "/drug-interactions/search", "auth": "public", "rateLimit": { "limit": 30, "windowSeconds": 60, "scope": "ip" }, "note": "Whole-row keyword scan capped by scan_limit, same cost class as the exchange/renal keyword scans /rag/ask runs internally." },
-    { "method": "POST", "path": "/drug-interactions", "auth": "admin", "rateLimit": { "limit": 60, "windowSeconds": 60, "scope": "admin" } },
-    { "method": "PUT", "path": "/drug-interactions/{id}", "auth": "admin", "rateLimit": { "limit": 60, "windowSeconds": 60, "scope": "admin" } },
-    { "method": "PATCH", "path": "/drug-interactions/{id}", "auth": "admin", "rateLimit": { "limit": 60, "windowSeconds": 60, "scope": "admin" } },
-    { "method": "DELETE", "path": "/drug-interactions/{id}", "auth": "admin", "rateLimit": { "limit": 60, "windowSeconds": 60, "scope": "admin" } },
-    { "method": "POST", "path": "/drug-interactions/bulk", "auth": "admin", "rateLimit": { "limit": 10, "windowSeconds": 60, "scope": "admin" } },
-
-    { "method": "GET", "path": "/packaged", "auth": "public", "rateLimit": { "limit": 100, "windowSeconds": 60, "scope": "ip" } },
-    { "method": "GET", "path": "/packaged/pending", "auth": "admin", "requiredRole": "reviewer", "rateLimit": { "limit": 60, "windowSeconds": 60, "scope": "admin" }, "note": "Reviewer-role keys can reach this - it's the whole point of the reviewer role." },
-    { "method": "POST", "path": "/packaged/submit", "auth": "public", "rateLimit": { "limit": 10, "windowSeconds": 60, "scope": "ip" } },
-    { "method": "POST", "path": "/packaged/scan", "auth": "public", "rateLimit": { "limit": 5, "windowSeconds": 60, "scope": "ip" }, "note": "Costs a Groq vision call per request." },
-    { "method": "POST", "path": "/packaged/{id}/approve", "auth": "admin", "requiredRole": "reviewer", "rateLimit": { "limit": 60, "windowSeconds": 60, "scope": "admin" } },
-    { "method": "POST", "path": "/packaged/{id}/reject", "auth": "admin", "requiredRole": "reviewer", "rateLimit": { "limit": 60, "windowSeconds": 60, "scope": "admin" } },
-    { "method": "PUT", "path": "/packaged/{id}", "auth": "admin", "rateLimit": { "limit": 60, "windowSeconds": 60, "scope": "admin" } },
-    { "method": "PATCH", "path": "/packaged/{id}", "auth": "admin", "rateLimit": { "limit": 60, "windowSeconds": 60, "scope": "admin" } },
-    { "method": "DELETE", "path": "/packaged/{id}", "auth": "admin", "rateLimit": { "limit": 60, "windowSeconds": 60, "scope": "admin" } },
-
-    { "method": "GET", "path": "/favorites", "auth": "public", "rateLimit": { "limit": 100, "windowSeconds": 60, "scope": "ip" }, "note": "No user-account system - user_id is a client-supplied identifier, same model as memory's session_id." },
-    { "method": "POST", "path": "/favorites", "auth": "public", "rateLimit": { "limit": 30, "windowSeconds": 60, "scope": "ip" }, "note": "Idempotent - favoriting an already-favorited item returns the existing row." },
-    { "method": "DELETE", "path": "/favorites", "auth": "public", "rateLimit": { "limit": 30, "windowSeconds": 60, "scope": "ip" } },
-
-    { "method": "GET", "path": "/history", "auth": "public", "rateLimit": { "limit": 100, "windowSeconds": 60, "scope": "ip" }, "note": "Recently viewed, most recent first." },
-    { "method": "POST", "path": "/history", "auth": "public", "rateLimit": { "limit": 30, "windowSeconds": 60, "scope": "ip" }, "note": "Opt-in - nothing is tracked automatically. Upserts viewed_at, no duplicate rows per resource." },
-
-    { "method": "GET", "path": "/log", "auth": "public", "rateLimit": { "limit": 100, "windowSeconds": 60, "scope": "ip" } },
-    { "method": "GET", "path": "/log/{id}", "auth": "public", "rateLimit": { "limit": 100, "windowSeconds": 60, "scope": "ip" } },
-    { "method": "GET", "path": "/log/summary", "auth": "public", "rateLimit": { "limit": 100, "windowSeconds": 60, "scope": "ip" } },
-    { "method": "POST", "path": "/log", "auth": "public", "rateLimit": { "limit": 30, "windowSeconds": 60, "scope": "ip" } },
-    { "method": "DELETE", "path": "/log/{id}", "auth": "public", "rateLimit": { "limit": 30, "windowSeconds": 60, "scope": "ip" }, "note": "Requires the same user_id the entry was logged under." },
-
-    { "method": "POST", "path": "/recipes/calculate", "auth": "public", "rateLimit": { "limit": 15, "windowSeconds": 60, "scope": "ip" }, "note": "No persistence, but fans out a DB lookup (and possibly an external cascade call) per ingredient." },
-    { "method": "POST", "path": "/meals/analyze", "auth": "public", "rateLimit": { "limit": 15, "windowSeconds": 60, "scope": "ip" }, "note": "Same cost class as /recipes/calculate - shares its ingredient resolution." },
-    { "method": "POST", "path": "/ingredients/parse", "auth": "public", "rateLimit": { "limit": 20, "windowSeconds": 60, "scope": "ip" }, "note": "Costs a Groq call per request." },
-
-    { "method": "GET", "path": "/dri", "auth": "public", "rateLimit": { "limit": 100, "windowSeconds": 60, "scope": "ip" } },
-    { "method": "GET", "path": "/dri/life-stages", "auth": "public", "rateLimit": { "limit": 100, "windowSeconds": 60, "scope": "ip" } },
-    { "method": "POST", "path": "/dri/compare", "auth": "public", "rateLimit": { "limit": 100, "windowSeconds": 60, "scope": "ip" }, "note": "Pure in-memory computation, no DB or LLM call, so it keeps the generous plain-read allowance even though it's a POST." },
-
-    { "method": "POST", "path": "/rag/retrieve", "auth": "public", "rateLimit": { "limit": 20, "windowSeconds": 60, "scope": "ip" }, "note": "Also has a separate KV response cache: 10 min TTL, keyed on context + top_k + normalized query." },
-    { "method": "POST", "path": "/rag/ingest", "auth": "admin", "rateLimit": { "limit": 300, "windowSeconds": 60, "scope": "admin" } },
-    { "method": "DELETE", "path": "/rag/source", "auth": "admin", "rateLimit": { "limit": 30, "windowSeconds": 60, "scope": "admin" }, "note": "Bulk-removes every chunk matching a citation string - needed before re-ingesting a document whose chunks were extracted badly, since /rag/ingest only ever inserts." },
-    { "method": "POST", "path": "/rag/ask", "auth": "public", "rateLimit": { "limit": 15, "windowSeconds": 60, "scope": "ip" }, "note": "Most expensive route in the API - intent detection + fan-out search + rerank + LLM answer. Whole answers cached 5 min (skipped when session_id is passed)." },
-
-    { "method": "POST", "path": "/memory/write", "auth": "public", "rateLimit": { "limit": 30, "windowSeconds": 60, "scope": "ip" } },
-    { "method": "POST", "path": "/memory/recall", "auth": "public", "rateLimit": { "limit": 30, "windowSeconds": 60, "scope": "ip" }, "note": "Preferred over the deprecated GET form. Separate KV response cache: 2 min TTL, keyed on session_id + top_k + normalized query." },
-    { "method": "GET", "path": "/memory/recall", "auth": "public", "rateLimit": { "limit": 30, "windowSeconds": 60, "scope": "ip" }, "note": "Deprecated - puts session_id and query text in the URL (access logs, browser history). Prefer POST." },
-    { "method": "POST", "path": "/memory/consolidate", "auth": "admin", "rateLimit": { "limit": 60, "windowSeconds": 60, "scope": "admin" }, "note": "Also runs automatically every hour via a cron trigger, bypassing HTTP auth entirely." }
+    {
+      "method": "GET",
+      "path": "/",
+      "auth": "public",
+      "rateLimit": null,
+      "note": "Not rate-limited or auth-gated - served before the router's policy gate."
+    },
+    {
+      "method": "GET",
+      "path": "/health",
+      "auth": "public",
+      "rateLimit": {
+        "limit": 20,
+        "windowSeconds": 60,
+        "scope": "ip"
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/batch",
+      "auth": "public",
+      "rateLimit": {
+        "limit": 10,
+        "windowSeconds": 60,
+        "scope": "ip"
+      },
+      "note": "Caps how many batches (i.e. total fan-out) one IP can trigger per minute - each sub-request still pays its own cost against its own resource's own rate-limit bucket, so batching cannot bypass per-resource auth or limits."
+    },
+    {
+      "method": "GET",
+      "path": "/admin/keys",
+      "auth": "admin",
+      "requiredRole": "root",
+      "rateLimit": {
+        "limit": 30,
+        "windowSeconds": 60,
+        "scope": "admin"
+      },
+      "note": "Root ADMIN_API_KEY only - a per-consumer key cannot manage other keys."
+    },
+    {
+      "method": "POST",
+      "path": "/admin/keys",
+      "auth": "admin",
+      "requiredRole": "root",
+      "rateLimit": {
+        "limit": 30,
+        "windowSeconds": 60,
+        "scope": "admin"
+      },
+      "note": "Root ADMIN_API_KEY only."
+    },
+    {
+      "method": "DELETE",
+      "path": "/admin/keys/{id}",
+      "auth": "admin",
+      "requiredRole": "root",
+      "rateLimit": {
+        "limit": 30,
+        "windowSeconds": 60,
+        "scope": "admin"
+      },
+      "note": "Root ADMIN_API_KEY only."
+    },
+    {
+      "method": "GET",
+      "path": "/foods",
+      "auth": "public",
+      "rateLimit": {
+        "limit": 100,
+        "windowSeconds": 60,
+        "scope": "ip"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/foods/{id}",
+      "auth": "public",
+      "rateLimit": {
+        "limit": 100,
+        "windowSeconds": 60,
+        "scope": "ip"
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/foods",
+      "auth": "admin",
+      "rateLimit": {
+        "limit": 60,
+        "windowSeconds": 60,
+        "scope": "admin"
+      }
+    },
+    {
+      "method": "PUT",
+      "path": "/foods/{id}",
+      "auth": "admin",
+      "rateLimit": {
+        "limit": 60,
+        "windowSeconds": 60,
+        "scope": "admin"
+      }
+    },
+    {
+      "method": "PATCH",
+      "path": "/foods/{id}",
+      "auth": "admin",
+      "rateLimit": {
+        "limit": 60,
+        "windowSeconds": 60,
+        "scope": "admin"
+      }
+    },
+    {
+      "method": "DELETE",
+      "path": "/foods/{id}",
+      "auth": "admin",
+      "rateLimit": {
+        "limit": 60,
+        "windowSeconds": 60,
+        "scope": "admin"
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/foods/bulk",
+      "auth": "admin",
+      "rateLimit": {
+        "limit": 10,
+        "windowSeconds": 60,
+        "scope": "admin"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/foods/lookup",
+      "auth": "public",
+      "rateLimit": {
+        "limit": 20,
+        "windowSeconds": 60,
+        "scope": "ip"
+      },
+      "note": "Can trigger external USDA FDC / Open Food Facts / FatSecret calls."
+    },
+    {
+      "method": "GET",
+      "path": "/foods/autocomplete",
+      "auth": "public",
+      "rateLimit": {
+        "limit": 60,
+        "windowSeconds": 60,
+        "scope": "ip"
+      },
+      "note": "Wraps FatSecret's Premier-exclusive foods.autocomplete.v2 - 503 if FatSecret credentials aren't configured."
+    },
+    {
+      "method": "GET",
+      "path": "/foods/categories",
+      "auth": "public",
+      "rateLimit": {
+        "limit": 30,
+        "windowSeconds": 60,
+        "scope": "ip"
+      },
+      "note": "Wraps FatSecret's Premier-exclusive food_categories.get.v2 - 503 if FatSecret credentials aren't configured."
+    },
+    {
+      "method": "GET",
+      "path": "/foods/search",
+      "auth": "public",
+      "rateLimit": {
+        "limit": 60,
+        "windowSeconds": 60,
+        "scope": "ip"
+      },
+      "note": "Typo-tolerant fuzzy search - a single indexed Postgres RPC call (pg_trgm + levenshtein), no external API cost."
+    },
+    {
+      "method": "GET",
+      "path": "/foods/substitutes",
+      "auth": "public",
+      "rateLimit": {
+        "limit": 30,
+        "windowSeconds": 60,
+        "scope": "ip"
+      },
+      "note": "Fans out one ilike query per keyword in the matched substitution group."
+    },
+    {
+      "method": "GET",
+      "path": "/foods/compare",
+      "auth": "public",
+      "rateLimit": {
+        "limit": 20,
+        "windowSeconds": 60,
+        "scope": "ip"
+      },
+      "note": "Resolves 2-6 foods per request, each potentially falling back to the external lookup cascade."
+    },
+    {
+      "method": "GET",
+      "path": "/foods/{id}/label",
+      "auth": "public",
+      "rateLimit": {
+        "limit": 100,
+        "windowSeconds": 60,
+        "scope": "ip"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/glycaemic-index",
+      "auth": "public",
+      "rateLimit": {
+        "limit": 100,
+        "windowSeconds": 60,
+        "scope": "ip"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/glycaemic-index/{id}",
+      "auth": "public",
+      "rateLimit": {
+        "limit": 100,
+        "windowSeconds": 60,
+        "scope": "ip"
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/glycaemic-index",
+      "auth": "admin",
+      "rateLimit": {
+        "limit": 60,
+        "windowSeconds": 60,
+        "scope": "admin"
+      }
+    },
+    {
+      "method": "PUT",
+      "path": "/glycaemic-index/{id}",
+      "auth": "admin",
+      "rateLimit": {
+        "limit": 60,
+        "windowSeconds": 60,
+        "scope": "admin"
+      }
+    },
+    {
+      "method": "PATCH",
+      "path": "/glycaemic-index/{id}",
+      "auth": "admin",
+      "rateLimit": {
+        "limit": 60,
+        "windowSeconds": 60,
+        "scope": "admin"
+      }
+    },
+    {
+      "method": "DELETE",
+      "path": "/glycaemic-index/{id}",
+      "auth": "admin",
+      "rateLimit": {
+        "limit": 60,
+        "windowSeconds": 60,
+        "scope": "admin"
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/glycaemic-index/bulk",
+      "auth": "admin",
+      "rateLimit": {
+        "limit": 10,
+        "windowSeconds": 60,
+        "scope": "admin"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/bmi-for-age/classify",
+      "auth": "public",
+      "rateLimit": {
+        "limit": 100,
+        "windowSeconds": 60,
+        "scope": "ip"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/bmi-for-age",
+      "auth": "public",
+      "rateLimit": {
+        "limit": 100,
+        "windowSeconds": 60,
+        "scope": "ip"
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/bmi-for-age/bulk",
+      "auth": "admin",
+      "rateLimit": {
+        "limit": 10,
+        "windowSeconds": 60,
+        "scope": "admin"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/fenton-preterm/classify",
+      "auth": "public",
+      "rateLimit": {
+        "limit": 100,
+        "windowSeconds": 60,
+        "scope": "ip"
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/fenton-preterm/profile",
+      "auth": "public",
+      "rateLimit": {
+        "limit": 100,
+        "windowSeconds": 60,
+        "scope": "ip"
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/fenton-preterm/growth",
+      "auth": "public",
+      "rateLimit": {
+        "limit": 100,
+        "windowSeconds": 60,
+        "scope": "ip"
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/fenton-preterm/velocity",
+      "auth": "public",
+      "rateLimit": {
+        "limit": 100,
+        "windowSeconds": 60,
+        "scope": "ip"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/fenton-preterm/chart",
+      "auth": "public",
+      "rateLimit": {
+        "limit": 60,
+        "windowSeconds": 60,
+        "scope": "ip"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/fenton-preterm/references",
+      "auth": "public",
+      "rateLimit": {
+        "limit": 100,
+        "windowSeconds": 60,
+        "scope": "ip"
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/fenton-preterm/bulk",
+      "auth": "admin",
+      "rateLimit": {
+        "limit": 10,
+        "windowSeconds": 60,
+        "scope": "admin"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/fhir/metadata",
+      "auth": "public",
+      "rateLimit": {
+        "limit": 100,
+        "windowSeconds": 60,
+        "scope": "ip"
+      },
+      "note": "FHIR facade, same public/cheap tier as the classify endpoints it wraps."
+    },
+    {
+      "method": "POST",
+      "path": "/fhir/Observation/$evaluate-growth",
+      "auth": "public",
+      "rateLimit": {
+        "limit": 100,
+        "windowSeconds": 60,
+        "scope": "ip"
+      },
+      "note": "FHIR facade, same public/cheap tier as the classify endpoints it wraps."
+    },
+    {
+      "method": "GET",
+      "path": "/exchange",
+      "auth": "public",
+      "rateLimit": {
+        "limit": 100,
+        "windowSeconds": 60,
+        "scope": "ip"
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/exchange",
+      "auth": "admin",
+      "rateLimit": {
+        "limit": 60,
+        "windowSeconds": 60,
+        "scope": "admin"
+      }
+    },
+    {
+      "method": "PUT",
+      "path": "/exchange/{id}",
+      "auth": "admin",
+      "rateLimit": {
+        "limit": 60,
+        "windowSeconds": 60,
+        "scope": "admin"
+      }
+    },
+    {
+      "method": "PATCH",
+      "path": "/exchange/{id}",
+      "auth": "admin",
+      "rateLimit": {
+        "limit": 60,
+        "windowSeconds": 60,
+        "scope": "admin"
+      }
+    },
+    {
+      "method": "DELETE",
+      "path": "/exchange/{id}",
+      "auth": "admin",
+      "rateLimit": {
+        "limit": 60,
+        "windowSeconds": 60,
+        "scope": "admin"
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/exchange/bulk",
+      "auth": "admin",
+      "rateLimit": {
+        "limit": 10,
+        "windowSeconds": 60,
+        "scope": "admin"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/renal",
+      "auth": "public",
+      "rateLimit": {
+        "limit": 100,
+        "windowSeconds": 60,
+        "scope": "ip"
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/renal",
+      "auth": "admin",
+      "rateLimit": {
+        "limit": 60,
+        "windowSeconds": 60,
+        "scope": "admin"
+      }
+    },
+    {
+      "method": "PUT",
+      "path": "/renal/{id}",
+      "auth": "admin",
+      "rateLimit": {
+        "limit": 60,
+        "windowSeconds": 60,
+        "scope": "admin"
+      }
+    },
+    {
+      "method": "PATCH",
+      "path": "/renal/{id}",
+      "auth": "admin",
+      "rateLimit": {
+        "limit": 60,
+        "windowSeconds": 60,
+        "scope": "admin"
+      }
+    },
+    {
+      "method": "DELETE",
+      "path": "/renal/{id}",
+      "auth": "admin",
+      "rateLimit": {
+        "limit": 60,
+        "windowSeconds": 60,
+        "scope": "admin"
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/renal/bulk",
+      "auth": "admin",
+      "rateLimit": {
+        "limit": 10,
+        "windowSeconds": 60,
+        "scope": "admin"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/formulas",
+      "auth": "public",
+      "rateLimit": {
+        "limit": 100,
+        "windowSeconds": 60,
+        "scope": "ip"
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/formulas",
+      "auth": "admin",
+      "rateLimit": {
+        "limit": 60,
+        "windowSeconds": 60,
+        "scope": "admin"
+      }
+    },
+    {
+      "method": "PUT",
+      "path": "/formulas/{id}",
+      "auth": "admin",
+      "rateLimit": {
+        "limit": 60,
+        "windowSeconds": 60,
+        "scope": "admin"
+      }
+    },
+    {
+      "method": "PATCH",
+      "path": "/formulas/{id}",
+      "auth": "admin",
+      "rateLimit": {
+        "limit": 60,
+        "windowSeconds": 60,
+        "scope": "admin"
+      }
+    },
+    {
+      "method": "DELETE",
+      "path": "/formulas/{id}",
+      "auth": "admin",
+      "rateLimit": {
+        "limit": 60,
+        "windowSeconds": 60,
+        "scope": "admin"
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/formulas/bulk",
+      "auth": "admin",
+      "rateLimit": {
+        "limit": 10,
+        "windowSeconds": 60,
+        "scope": "admin"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/drug-interactions",
+      "auth": "public",
+      "rateLimit": {
+        "limit": 100,
+        "windowSeconds": 60,
+        "scope": "ip"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/drug-interactions/{id}",
+      "auth": "public",
+      "rateLimit": {
+        "limit": 100,
+        "windowSeconds": 60,
+        "scope": "ip"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/drug-interactions/search",
+      "auth": "public",
+      "rateLimit": {
+        "limit": 30,
+        "windowSeconds": 60,
+        "scope": "ip"
+      },
+      "note": "Whole-row keyword scan capped by scan_limit, same cost class as the exchange/renal keyword scans /rag/ask runs internally."
+    },
+    {
+      "method": "POST",
+      "path": "/drug-interactions",
+      "auth": "admin",
+      "rateLimit": {
+        "limit": 60,
+        "windowSeconds": 60,
+        "scope": "admin"
+      }
+    },
+    {
+      "method": "PUT",
+      "path": "/drug-interactions/{id}",
+      "auth": "admin",
+      "rateLimit": {
+        "limit": 60,
+        "windowSeconds": 60,
+        "scope": "admin"
+      }
+    },
+    {
+      "method": "PATCH",
+      "path": "/drug-interactions/{id}",
+      "auth": "admin",
+      "rateLimit": {
+        "limit": 60,
+        "windowSeconds": 60,
+        "scope": "admin"
+      }
+    },
+    {
+      "method": "DELETE",
+      "path": "/drug-interactions/{id}",
+      "auth": "admin",
+      "rateLimit": {
+        "limit": 60,
+        "windowSeconds": 60,
+        "scope": "admin"
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/drug-interactions/bulk",
+      "auth": "admin",
+      "rateLimit": {
+        "limit": 10,
+        "windowSeconds": 60,
+        "scope": "admin"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/packaged",
+      "auth": "public",
+      "rateLimit": {
+        "limit": 100,
+        "windowSeconds": 60,
+        "scope": "ip"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/packaged/pending",
+      "auth": "admin",
+      "requiredRole": "reviewer",
+      "rateLimit": {
+        "limit": 60,
+        "windowSeconds": 60,
+        "scope": "admin"
+      },
+      "note": "Reviewer-role keys can reach this - it's the whole point of the reviewer role."
+    },
+    {
+      "method": "POST",
+      "path": "/packaged/submit",
+      "auth": "public",
+      "rateLimit": {
+        "limit": 10,
+        "windowSeconds": 60,
+        "scope": "ip"
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/packaged/scan",
+      "auth": "public",
+      "rateLimit": {
+        "limit": 5,
+        "windowSeconds": 60,
+        "scope": "ip"
+      },
+      "note": "Costs a Groq vision call per request."
+    },
+    {
+      "method": "POST",
+      "path": "/packaged/{id}/approve",
+      "auth": "admin",
+      "requiredRole": "reviewer",
+      "rateLimit": {
+        "limit": 60,
+        "windowSeconds": 60,
+        "scope": "admin"
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/packaged/{id}/reject",
+      "auth": "admin",
+      "requiredRole": "reviewer",
+      "rateLimit": {
+        "limit": 60,
+        "windowSeconds": 60,
+        "scope": "admin"
+      }
+    },
+    {
+      "method": "PUT",
+      "path": "/packaged/{id}",
+      "auth": "admin",
+      "rateLimit": {
+        "limit": 60,
+        "windowSeconds": 60,
+        "scope": "admin"
+      }
+    },
+    {
+      "method": "PATCH",
+      "path": "/packaged/{id}",
+      "auth": "admin",
+      "rateLimit": {
+        "limit": 60,
+        "windowSeconds": 60,
+        "scope": "admin"
+      }
+    },
+    {
+      "method": "DELETE",
+      "path": "/packaged/{id}",
+      "auth": "admin",
+      "rateLimit": {
+        "limit": 60,
+        "windowSeconds": 60,
+        "scope": "admin"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/favorites",
+      "auth": "public",
+      "rateLimit": {
+        "limit": 100,
+        "windowSeconds": 60,
+        "scope": "ip"
+      },
+      "note": "No user-account system - user_id is a client-supplied identifier, same model as memory's session_id."
+    },
+    {
+      "method": "POST",
+      "path": "/favorites",
+      "auth": "public",
+      "rateLimit": {
+        "limit": 30,
+        "windowSeconds": 60,
+        "scope": "ip"
+      },
+      "note": "Idempotent - favoriting an already-favorited item returns the existing row."
+    },
+    {
+      "method": "DELETE",
+      "path": "/favorites",
+      "auth": "public",
+      "rateLimit": {
+        "limit": 30,
+        "windowSeconds": 60,
+        "scope": "ip"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/history",
+      "auth": "public",
+      "rateLimit": {
+        "limit": 100,
+        "windowSeconds": 60,
+        "scope": "ip"
+      },
+      "note": "Recently viewed, most recent first."
+    },
+    {
+      "method": "POST",
+      "path": "/history",
+      "auth": "public",
+      "rateLimit": {
+        "limit": 30,
+        "windowSeconds": 60,
+        "scope": "ip"
+      },
+      "note": "Opt-in - nothing is tracked automatically. Upserts viewed_at, no duplicate rows per resource."
+    },
+    {
+      "method": "GET",
+      "path": "/log",
+      "auth": "public",
+      "rateLimit": {
+        "limit": 100,
+        "windowSeconds": 60,
+        "scope": "ip"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/log/{id}",
+      "auth": "public",
+      "rateLimit": {
+        "limit": 100,
+        "windowSeconds": 60,
+        "scope": "ip"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/log/summary",
+      "auth": "public",
+      "rateLimit": {
+        "limit": 100,
+        "windowSeconds": 60,
+        "scope": "ip"
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/log",
+      "auth": "public",
+      "rateLimit": {
+        "limit": 30,
+        "windowSeconds": 60,
+        "scope": "ip"
+      }
+    },
+    {
+      "method": "DELETE",
+      "path": "/log/{id}",
+      "auth": "public",
+      "rateLimit": {
+        "limit": 30,
+        "windowSeconds": 60,
+        "scope": "ip"
+      },
+      "note": "Requires the same user_id the entry was logged under."
+    },
+    {
+      "method": "POST",
+      "path": "/recipes/calculate",
+      "auth": "public",
+      "rateLimit": {
+        "limit": 15,
+        "windowSeconds": 60,
+        "scope": "ip"
+      },
+      "note": "No persistence, but fans out a DB lookup (and possibly an external cascade call) per ingredient."
+    },
+    {
+      "method": "POST",
+      "path": "/meals/analyze",
+      "auth": "public",
+      "rateLimit": {
+        "limit": 15,
+        "windowSeconds": 60,
+        "scope": "ip"
+      },
+      "note": "Same cost class as /recipes/calculate - shares its ingredient resolution."
+    },
+    {
+      "method": "POST",
+      "path": "/ingredients/parse",
+      "auth": "public",
+      "rateLimit": {
+        "limit": 20,
+        "windowSeconds": 60,
+        "scope": "ip"
+      },
+      "note": "Costs a Groq call per request."
+    },
+    {
+      "method": "GET",
+      "path": "/dri",
+      "auth": "public",
+      "rateLimit": {
+        "limit": 100,
+        "windowSeconds": 60,
+        "scope": "ip"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/dri/life-stages",
+      "auth": "public",
+      "rateLimit": {
+        "limit": 100,
+        "windowSeconds": 60,
+        "scope": "ip"
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/dri/compare",
+      "auth": "public",
+      "rateLimit": {
+        "limit": 100,
+        "windowSeconds": 60,
+        "scope": "ip"
+      },
+      "note": "Pure in-memory computation, no DB or LLM call, so it keeps the generous plain-read allowance even though it's a POST."
+    },
+    {
+      "method": "POST",
+      "path": "/rag/retrieve",
+      "auth": "public",
+      "rateLimit": {
+        "limit": 20,
+        "windowSeconds": 60,
+        "scope": "ip"
+      },
+      "note": "Also has a separate KV response cache: 10 min TTL, keyed on context + top_k + normalized query."
+    },
+    {
+      "method": "POST",
+      "path": "/rag/ingest",
+      "auth": "admin",
+      "rateLimit": {
+        "limit": 300,
+        "windowSeconds": 60,
+        "scope": "admin"
+      }
+    },
+    {
+      "method": "DELETE",
+      "path": "/rag/source",
+      "auth": "admin",
+      "rateLimit": {
+        "limit": 30,
+        "windowSeconds": 60,
+        "scope": "admin"
+      },
+      "note": "Bulk-removes every chunk matching a citation string - needed before re-ingesting a document whose chunks were extracted badly, since /rag/ingest only ever inserts."
+    },
+    {
+      "method": "POST",
+      "path": "/rag/ask",
+      "auth": "public",
+      "rateLimit": {
+        "limit": 15,
+        "windowSeconds": 60,
+        "scope": "ip"
+      },
+      "note": "Most expensive route in the API - intent detection + fan-out search + rerank + LLM answer. Whole answers cached 5 min (skipped when session_id is passed)."
+    },
+    {
+      "method": "POST",
+      "path": "/memory/write",
+      "auth": "public",
+      "rateLimit": {
+        "limit": 30,
+        "windowSeconds": 60,
+        "scope": "ip"
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/memory/recall",
+      "auth": "public",
+      "rateLimit": {
+        "limit": 30,
+        "windowSeconds": 60,
+        "scope": "ip"
+      },
+      "note": "Preferred over the deprecated GET form. Separate KV response cache: 2 min TTL, keyed on session_id + top_k + normalized query."
+    },
+    {
+      "method": "GET",
+      "path": "/memory/recall",
+      "auth": "public",
+      "rateLimit": {
+        "limit": 30,
+        "windowSeconds": 60,
+        "scope": "ip"
+      },
+      "note": "Deprecated - puts session_id and query text in the URL (access logs, browser history). Prefer POST."
+    },
+    {
+      "method": "POST",
+      "path": "/memory/consolidate",
+      "auth": "admin",
+      "rateLimit": {
+        "limit": 60,
+        "windowSeconds": 60,
+        "scope": "admin"
+      },
+      "note": "Also runs automatically every hour via a cron trigger, bypassing HTTP auth entirely."
+    }
   ]
 }

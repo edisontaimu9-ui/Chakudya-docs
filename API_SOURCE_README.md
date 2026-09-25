@@ -751,7 +751,7 @@ Cut-offs (strict inequalities, compared against the **unrounded** BMI, so a disp
 
 ### Fenton Preterm Growth Chart (`/fenton-preterm`)
 
-Weight, length, and head-circumference z-scores/percentiles for preterm infants, both the 2013 (Fenton & Kim, *BMC Pediatrics* 2013;13:59) and 2025 (Fenton, Elmrayed & Alshaikh, *Paediatric and Perinatal Epidemiology* 2025, PMID 40534585) references. LMS parameters provided directly by Dr. Tanis Fenton (University of Calgary) by email. Table: [`sql/013_add_fenton_preterm.sql`](sql/013_add_fenton_preterm.sql), 2284 rows (2013 + 2025, both sexes, all 3 metrics). Calculation logic: [`src/fentonPreterm.js`](src/fentonPreterm.js).
+Weight, length, and head-circumference z-scores/percentiles for preterm infants, both the 2013 (Fenton & Kim, *BMC Pediatrics* 2013;13:59) and 2025 (Fenton, Elmrayed & Alshaikh, *Paediatric and Perinatal Epidemiology* 2025, PMID 40534585) references. LMS parameters provided directly by Dr. Tanis Fenton (University of Calgary) by email. Table: [`sql/013_add_fenton_preterm.sql`](sql/013_add_fenton_preterm.sql), 2284 rows (2013 + 2025, both sexes, all 3 metrics). Calculation logic: [`src/fentonPreterm.js`](src/fentonPreterm.js). Source-data provenance and verification notes (the source file itself is intentionally *not* in this public repo): [`data-sources/fenton/README.md`](data-sources/fenton/README.md).
 
 **License — this is not open data like the rest of CNR.** Shared under [CC BY-NC-ND 4.0](https://creativecommons.org/licenses/by-nc-nd/4.0/) for non-commercial use in this app only, with two extra conditions from Dr. Fenton: the underlying L/M/S values must never be visible to end users, and must never be shared with other hospitals or organizations. So, unlike every other reference table in CNR:
 
@@ -834,6 +834,32 @@ Length and head-circumference reference data start partway through the 22-50 wee
 | hc | 23.5 wk | 22.5 wk |
 
 (An earlier version of this endpoint used a single hardcoded guess — `length` rejected anything before 30.6 weeks — which wrongly rejected valid length queries between 23.5 and 30.6 weeks. Fixed by keying the floor on the actual seeded data per `(reference_year, metric)` instead of approximating.)
+
+### FHIR facade (`/fhir`) — Phase 1 growth/anthropometry
+
+A stateless FHIR R4 translation layer over the classify endpoints above — groundwork for future EHR/HIE integration. **Not a FHIR server with storage** (Chakudya has never persisted patient records, and this doesn't change that — a real EHR is expected to store the returned `Observation` itself), and **not yet registered with any OpenHIM/HIE instance** — that's a separate, later step once there's a real instance to register with. See [`src/fhir.js`](src/fhir.js) for the full scope note.
+
+- `GET /fhir/metadata` *(public, rate-limited)* — FHIR `CapabilityStatement`.
+- `POST /fhir/Observation/$evaluate-growth` *(public, rate-limited)* — body is a FHIR `Parameters` resource:
+  ```json
+  {
+    "resourceType": "Parameters",
+    "parameter": [
+      { "name": "sex", "valueCode": "female" },
+      { "name": "gestationalAgeWeeks", "valueDecimal": 32 },
+      { "name": "gestationalAgeDays", "valueInteger": 0 },
+      { "name": "measurement", "part": [
+        { "name": "type", "valueCode": "weight" },
+        { "name": "value", "valueQuantity": { "value": 1500, "unit": "g" } }
+      ]}
+    ]
+  }
+  ```
+  Routes on age: `gestationalAgeWeeks` (22-50) → Fenton preterm; `birthDate` (+ optional `effectiveDateTime`, default now) resolving to 5y1m-19y0m postnatal → WHO BMI-for-age. **The WHO 0-59-month gap is honest, not silent** — that age range returns a FHIR `OperationOutcome`, because chakudya-api has no endpoint for it (yet). One `measurement` → a single `Observation`; more than one → a `Bundle` (type `collection`). BMI-for-age needs either a `bmi` measurement or `weight`+`length` together (computes BMI itself, same unrounded formula as `/bmi-for-age/classify`).
+
+  Units: weight accepts `g` or `kg`; length/hc accept `cm` or `m`; anything else is a 400, not a guess.
+
+  Each `Observation` carries `z-score`/`percentile`/`status` as `component`s (Chakudya-specific codes — there's no LOINC fit for "Fenton status: appropriate"), a best-effort standard `interpretation` (v3-ObservationInterpretation N/L/H/LL/HH) for FHIR clients that only read that field, the same screening-aid `note` text as the native endpoints, and an `extension` recording which reference was used. Weight/length/HC use LOINC 29463-7/8302-2/9843-4; BMI uses 39156-5.
 
 ### Recipes
 

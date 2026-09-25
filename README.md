@@ -161,7 +161,7 @@ of the OpenAPI document - they're read out of `routePolicy()` in
 
 ---
 
-## 6. Endpoints documented (96 of 96)
+## 6. Endpoints documented (98 of 98)
 
 Every route the Worker actually serves is documented - nothing was skipped.
 `/manufacturers`, `/products`, and `/nutrition` were removed from the API in
@@ -219,6 +219,10 @@ v1.15.0-v1.16.0 and no longer appear here.
 - `GET /fenton-preterm/chart` - Server-rendered SVG growth chart with reference curves + optional overlay points (public, rate-limited)
 - `GET /fenton-preterm/references` - Static metadata: years, sexes, metrics, valid age ranges, citations, license (public, rate-limited)
 - `POST /fenton-preterm/bulk` - Bulk-create reference rows (admin)
+
+**FHIR** (Phase 1 groundwork - stateless facade over the classify endpoints above, no storage, not yet registered with any OpenHIM/HIE instance)
+- `GET /fhir/metadata` - FHIR R4 CapabilityStatement (public, rate-limited)
+- `POST /fhir/Observation/$evaluate-growth` - Growth/anthropometry measurement in, FHIR Observation (or Bundle) out; wraps Fenton preterm and WHO BMI-for-age only (public, rate-limited)
 
 **Exchange**
 - `GET /exchange` - List diabetes/renal exchange list entries

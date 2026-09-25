@@ -10,7 +10,7 @@ info:
     as USDA FoodData Central, Open Food Facts, and FatSecret, and adds
     retrieval augmented question answering and session memory for AI
     assisted applications.
-  version: "1.29.0"
+  version: "1.30.0"
   contact:
     name: Edison Taimu
     x-location: Blantyre, Malawi
@@ -34,6 +34,7 @@ tags:
   - name: Glycaemic Index
   - name: BMI for age
   - name: Fenton Preterm
+  - name: FHIR
   - name: Exchange
   - name: Renal
   - name: Formulas
@@ -952,6 +953,224 @@ paths:
       responses:
         "200": { $ref: "#/components/responses/BulkSuccess" }
         "401": { $ref: "#/components/responses/Unauthorized" }
+
+  /fhir/metadata:
+    get:
+      tags: [FHIR]
+      summary: FHIR R4 CapabilityStatement for the growth/anthropometry facade
+      description: >
+        Phase 1 groundwork for future EHR/HIE integration - a stateless
+        translation layer, not a FHIR server with storage. Nothing here
+        talks to OpenHIM or any external HIE yet. Describes the one
+        operation this facade exposes ($evaluate-growth on Observation).
+      security: []
+      responses:
+        "200":
+          description: CapabilityStatement
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  resourceType: { type: string, enum: [CapabilityStatement] }
+                  status: { type: string, enum: [draft] }
+                  date: { type: string, format: date }
+                  kind: { type: string, enum: [instance] }
+                  software:
+                    type: object
+                    properties:
+                      name: { type: string, example: "Chakudya Nutrition Registry (CNR) FHIR facade" }
+                      version: { type: string, example: phase-1 }
+                  implementation:
+                    type: object
+                    properties:
+                      description: { type: string }
+                      url: { type: string, format: uri }
+                  fhirVersion: { type: string, example: "4.0.1" }
+                  format: { type: array, items: { type: string }, example: [json] }
+                  rest:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        mode: { type: string, enum: [server] }
+                        resource:
+                          type: array
+                          items:
+                            type: object
+                            properties:
+                              type: { type: string, example: Observation }
+                              operation:
+                                type: array
+                                items:
+                                  type: object
+                                  properties:
+                                    name: { type: string, example: evaluate-growth }
+                                    definition: { type: string, format: uri }
+                                    documentation: { type: string }
+        "429": { $ref: "#/components/responses/RateLimited" }
+
+  /fhir/Observation/$evaluate-growth:
+    post:
+      tags: [FHIR]
+      summary: Evaluate a growth/anthropometry measurement, FHIR-shaped
+      description: >
+        Reshapes a call to chakudya-api's existing classify endpoints
+        into/out of FHIR JSON - a stateless translation layer, not a FHIR
+        server with storage; no patient data is persisted here, an EHR
+        calling this is expected to store the returned Observation itself.
+        Routes purely on age/gestation: gestationalAgeWeeks (22-50, +
+        optional gestationalAgeDays) routes to Fenton preterm
+        (weight/length/hc only, no bmi); birthDate resolving to a postnatal
+        age of 5y1m-19y0m routes to WHO 2007 BMI-for-age (pass a bmi
+        measurement, or both weight and length together). Postnatal ages
+        under 61 months fall in the WHO 0-59-month child growth standards
+        gap chakudya-api has no endpoint for yet, and any other
+        out-of-range age - both return a FHIR OperationOutcome rather than
+        guessing or misrouting. One measurement produces a single
+        Observation; more than one produces a Bundle (type collection).
+        Every Observation carries the same screening-aid, not-a-diagnosis
+        language as the underlying classify endpoints.
+      security: []
+      requestBody:
+        required: true
+        description: A FHIR Parameters resource.
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [resourceType, parameter]
+              properties:
+                resourceType: { type: string, enum: [Parameters] }
+                parameter:
+                  type: array
+                  minItems: 1
+                  description: >
+                    Flat FHIR parameters. Required: sex (male|female), and
+                    either gestationalAgeWeeks (+ optional
+                    gestationalAgeDays) or birthDate. One or more
+                    `measurement` parts, each with a `type`
+                    (weight|length|hc|bmi) and a `value` Quantity (g/kg for
+                    weight, cm/m for length/hc, kg/m2 for bmi). Optional:
+                    effectiveDateTime, referenceYear (Fenton, default 2025).
+                  items:
+                    type: object
+                    properties:
+                      name: { type: string }
+                      valueString: { type: string }
+                      valueCode: { type: string }
+                      valueDecimal: { type: number }
+                      valueInteger: { type: integer }
+                      valueDate: { type: string, format: date }
+                      valueDateTime: { type: string, format: date-time }
+                      valueQuantity:
+                        type: object
+                        properties:
+                          value: { type: number }
+                          unit: { type: string }
+                          code: { type: string }
+                      part:
+                        type: array
+                        description: Used only for a "measurement" parameter's {type, value} pair.
+                        items: { type: object }
+            example:
+              resourceType: Parameters
+              parameter:
+                - name: sex
+                  valueCode: female
+                - name: birthDate
+                  valueDate: "2015-03-01"
+                - name: effectiveDateTime
+                  valueDateTime: "2026-09-20T00:00:00Z"
+                - name: measurement
+                  part:
+                    - name: type
+                      valueCode: bmi
+                    - name: value
+                      valueQuantity: { value: 15.8, unit: "kg/m2", code: "kg/m2" }
+      responses:
+        "200":
+          description: >
+            A growth-classification Observation (single measurement), or a
+            Bundle of them (more than one measurement in the same request).
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  resourceType: { type: string, enum: [Observation, Bundle] }
+                  status: { type: string, example: final }
+                  code:
+                    type: object
+                    description: LOINC code for the measured metric (body weight, height, head circumference, or BMI).
+                  valueQuantity:
+                    type: object
+                    properties:
+                      value: { type: number }
+                      unit: { type: string }
+                      system: { type: string, format: uri }
+                      code: { type: string }
+                  component:
+                    type: array
+                    description: z-score, percentile, and/or growth-status sub-observations from the wrapped classify endpoint.
+                    items: { type: object }
+                  interpretation:
+                    type: array
+                    description: Best-effort mapping onto the standard HL7 v3-ObservationInterpretation codes.
+                    items: { type: object }
+                  note:
+                    type: array
+                    items: { type: object }
+                    description: Carries the same screening-aid disclaimer as the wrapped classify endpoint.
+                  extension:
+                    type: array
+                    description: Which growth reference was used (fenton-preterm-<year> or who-2007-bmi-for-age), plus gestational/postnatal age.
+                    items: { type: object }
+              example:
+                resourceType: Observation
+                status: final
+                code:
+                  coding:
+                    - system: http://loinc.org
+                      code: "39156-5"
+                      display: Body mass index (BMI)
+                valueQuantity: { value: 15.8, unit: "kg/m2", system: "http://unitsofmeasure.org", code: "kg/m2" }
+                component:
+                  - code:
+                      coding:
+                        - system: https://chakudya-api.edisontaimu9.workers.dev/fhir/CodeSystem/growth-status
+                          code: normal
+                interpretation:
+                  - coding:
+                      - system: http://terminology.hl7.org/CodeSystem/v3-ObservationInterpretation
+                        code: N
+                note:
+                  - text: Screening aid only, not a diagnosis.
+                extension:
+                  - url: https://chakudya-api.edisontaimu9.workers.dev/fhir/StructureDefinition/growth-reference-used
+                    valueString: who-2007-bmi-for-age
+                  - url: https://chakudya-api.edisontaimu9.workers.dev/fhir/StructureDefinition/postnatal-age-months
+                    valueString: "138"
+        "400":
+          description: FHIR OperationOutcome - malformed input (bad JSON, missing/invalid sex, no measurement parts, unrecognized unit).
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/FhirOperationOutcome" }
+        "422":
+          description: >
+            FHIR OperationOutcome - valid input but an unsupported age/route,
+            most notably the WHO 0-59-month postnatal-age gap this facade
+            does not cover yet.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/FhirOperationOutcome" }
+              example:
+                resourceType: OperationOutcome
+                issue:
+                  - severity: error
+                    code: invalid
+                    diagnostics: "Postnatal age 34 months falls in the WHO 0-59-month child growth standards range, which chakudya-api does not yet expose an endpoint for. Not supported by this facade."
+        "429": { $ref: "#/components/responses/RateLimited" }
 
   /exchange:
     get:
@@ -2149,6 +2368,22 @@ components:
               additionalProperties: true
             - type: array
               items: { type: object, additionalProperties: true }
+
+    FhirOperationOutcome:
+      type: object
+      description: >
+        FHIR R4 OperationOutcome - the shape every /fhir/* error response
+        uses in place of the plain { status, message } Error schema.
+      properties:
+        resourceType: { type: string, enum: [OperationOutcome] }
+        issue:
+          type: array
+          items:
+            type: object
+            properties:
+              severity: { type: string, enum: [error, warning] }
+              code: { type: string, example: invalid }
+              diagnostics: { type: string }
 
     ListSuccess:
       type: object
