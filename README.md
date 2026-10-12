@@ -19,12 +19,12 @@ invented. Currently in line with API **v1.32.0**.
 
 ## Landing page
 
-`#/` is a consumer-friendly landing page (`js/render-landing.js`, `css/landing.css`).
+`#/` is a consumer-friendly landing page that presents CNR as a full nutrition platform (food data, growth assessment, clinical tools, FHIR care workflows, AI-ready knowledge) rather than just a food database (`js/render-landing.js`, `css/landing.css`).
 The original technical overview now lives at `#/reference` (unchanged). All endpoint
 and `#/account` routes are untouched.
 
-- Counts shown (foods, GI entries, exchange items, renal foods, formulas, drug
-  interactions) are read live from each list route's `count` via `GET /<resource>?limit=1`.
+- Counts shown (foods, WHO growth reference points summed over 10 tables, GI entries, exchange items, renal foods, formulas, drug
+  interactions, packaged products) are read live from each list route's `count` via `GET /<resource>?limit=1`.
   Endpoints, groups and version come from `openapi.json`. Nothing is hard-coded; a failed
   request just omits that tile.
 - Images live in `assets/images/` (all optional - a missing file falls back to a tinted

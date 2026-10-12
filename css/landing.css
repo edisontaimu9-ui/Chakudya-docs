@@ -217,3 +217,11 @@ body.is-landing .content { max-width: 1180px; padding: 24px 28px 0; }
   .lp-float, .lp-pill__dot.is-ok { animation: none; }
   .lp-tile img, .lp-feat, .lp-aud, .lp-card { transition: none; }
 }
+
+/* Platform pillars ("More than a food database") */
+.lp-pillars { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; counter-reset: none; }
+.lp-pillar { height: 100%; }
+.lp-pillar__top { display: flex; align-items: center; justify-content: space-between; }
+.lp-pillar__n { font-family: var(--font-mono); font-size: 13px; font-weight: 700; color: var(--text-tertiary); letter-spacing: 1px; }
+@media (max-width: 900px) { .lp-pillars { grid-template-columns: 1fr; } }
+@media (min-width: 901px) and (max-width: 1040px) { .lp-pillars { grid-template-columns: repeat(2, 1fr); } }

@@ -23,7 +23,10 @@ const RenderLanding = (() => {
     { key: "renal", path: "/renal", label: "Renal nutrition foods", note: "For renal dietary planning" },
     { key: "formulas", path: "/formulas", label: "Enteral formulas", note: "Clinical nutrition products" },
     { key: "drugs", path: "/drug-interactions", label: "Drug-nutrient interactions", note: "Known interactions" },
+    { key: "packaged", path: "/packaged", label: "Packaged products", note: "Barcode-linked foods" },
   ];
+  // WHO growth reference tables: summed into one tile, and only shown when every table answers (a partial sum would understate it).
+  const GROWTH_PATHS = ["/weight-for-age", "/length-height-for-age", "/weight-for-length-height", "/bmi-for-age", "/bmi-for-age-under-5", "/hc-for-age", "/muac-for-age", "/weight-velocity", "/length-velocity", "/hc-velocity"];
   let countsPromise = null;
 
   function esc(s) { return RenderEndpoint.escapeHtml(String(s)); }
@@ -46,19 +49,31 @@ const RenderLanding = (() => {
 
   /* ───────── live data ───────── */
 
+  async function countOf(path) {
+    try {
+      const url = ApiClient.buildUrl(AppState.state.baseUrl, path, {}, { limit: 1 });
+      const r = await ApiClient.execute({ url, method: "GET", headers: {} });
+      const n = r.ok && r.status === 200 ? r.bodyJson?.count : null;
+      return Number.isFinite(n) && n > 0 ? n : null;
+    } catch (_) { return null; }
+  }
+
   function fetchCounts() {
     if (countsPromise) return countsPromise;
-    const base = AppState.state.baseUrl;
-    countsPromise = Promise.all(
-      COUNT_SOURCES.map(async (src) => {
-        try {
-          const url = ApiClient.buildUrl(base, src.path, {}, { limit: 1 });
-          const r = await ApiClient.execute({ url, method: "GET", headers: {} });
-          const n = r.ok && r.status === 200 ? r.bodyJson?.count : null;
-          return Number.isFinite(n) && n > 0 ? { ...src, count: n } : null;
-        } catch (_) { return null; }
-      })
-    ).then((rows) => rows.filter(Boolean));
+    const growth = Promise.all(GROWTH_PATHS.map(countOf)).then((ns) =>
+      ns.every((n) => n !== null)
+        ? { key: "growth", label: "WHO growth reference points", note: `Across ${ns.length} reference tables`, count: ns.reduce((a, b) => a + b, 0) }
+        : null
+    );
+    const core = Promise.all(COUNT_SOURCES.map(async (src) => {
+      const n = await countOf(src.path);
+      return n ? { ...src, count: n } : null;
+    }));
+    countsPromise = Promise.all([core, growth]).then(([rows, g]) => {
+      const out = rows.filter(Boolean);
+      if (g) out.splice(1, 0, g); // right after "Foods", so food + growth lead
+      return out;
+    });
     return countsPromise;
   }
 
@@ -117,18 +132,18 @@ const RenderLanding = (() => {
       <section class="lp-hero" aria-labelledby="lp-title">
         <div class="lp-hero__glow" aria-hidden="true"></div>
         <div class="lp-hero__copy">
-          <p class="lp-pill"><span class="lp-pill__dot" id="lp-health-dot" aria-hidden="true"></span><span id="lp-health-text">Malawi's open food &amp; nutrition registry</span></p>
-          <h1 id="lp-title" class="lp-title">Know what's on <em>every</em> Malawian plate.</h1>
-          <p class="lp-lead">Chakudya is an open nutrition registry built around Malawian foods. It brings food composition, glycaemic index, child growth standards and clinical nutrition tools together in one place, so apps, clinics and researchers can all work from the same trustworthy data.</p>
+          <p class="lp-pill"><span class="lp-pill__dot" id="lp-health-dot" aria-hidden="true"></span><span id="lp-health-text">Malawi's open nutrition registry</span></p>
+          <h1 id="lp-title" class="lp-title">The nutrition <em>intelligence</em> layer for Malawi.</h1>
+          <p class="lp-lead">Chakudya is far more than a food database. It joins local food composition with WHO growth assessment, clinical nutrition tools, FHIR care workflows and AI-ready knowledge, so apps, clinics and researchers can build on one shared, trustworthy foundation.</p>
           <div class="lp-cta">
             <a class="btn btn--primary btn--lg" href="#lp-try" data-scroll="lp-try">Try a food lookup</a>
             <a class="btn btn--lg" href="#/reference">Explore the API</a>
             ${showKey ? `<a class="btn btn--lg btn--ghost" href="#/account">Get an API key</a>` : ""}
           </div>
           <ul class="lp-trust" aria-label="Highlights">
-            <li>Free public routes, no key needed</li>
-            <li>WHO growth standards</li>
+            <li>Food data + growth + clinical care</li>
             <li>FHIR R4 ready</li>
+            <li>Free public routes</li>
           </ul>
         </div>
         <div class="lp-hero__media">
@@ -136,8 +151,8 @@ const RenderLanding = (() => {
             ${img("hero-malawian-meal.webp", "A Malawian meal of nsima with fried fish, beans, greens and relish on a tray", 1000, 750, { eager: true })}
             <span class="lp-photo__ph" aria-hidden="true">${icon("plate", 64)}</span>
           </figure>
-          <div class="lp-float lp-float--a" aria-hidden="true">${icon("leaf", 18)}<span>Per-food nutrients</span></div>
-          <div class="lp-float lp-float--b" aria-hidden="true">${icon("child", 18)}<span>Growth z-scores</span></div>
+          <div class="lp-float lp-float--a" aria-hidden="true">${icon("leaf", 18)}<span>Food composition</span></div>
+          <div class="lp-float lp-float--b" aria-hidden="true">${icon("child", 18)}<span>Growth &amp; clinical tools</span></div>
         </div>
       </section>
     `);
@@ -149,7 +164,7 @@ const RenderLanding = (() => {
       <section class="lp-section lp-stats reveal" aria-labelledby="lp-stats-h">
         <div class="lp-head">
           <p class="lp-kicker">By the numbers</p>
-          <h2 id="lp-stats-h">The registry at a glance</h2>
+          <h2 id="lp-stats-h">The platform at a glance</h2>
           <p class="lp-sub">Counts below are read live from the Chakudya API the moment this page loads.</p>
         </div>
         <div class="lp-stat-grid" id="lp-stat-grid">
@@ -192,30 +207,31 @@ const RenderLanding = (() => {
   }
 
   function aboutSection() {
+    const pillars = [
+      ["leaf", "Food data", "Malawian food composition, glycaemic index, exchange lists, packaged and branded foods, plus USDA, Open Food Facts and FatSecret when a food isn't local.", epLink("GET", "/foods")],
+      ["child", "Growth assessment", "WHO child and adolescent standards from birth to 19 years, growth velocity, Fenton preterm charts and a one-call combined assessment.", epLink("POST", "/growth/assess")],
+      ["steth", "Clinical nutrition", "Renal foods, enteral formulas, drug-nutrient interactions, dietary reference intakes, and meal analysis with clinical screening flags.", epLink("GET", "/drug-interactions")],
+      ["fhir", "Care workflows", "A stateless FHIR R4 facade covering the Nutrition Care Process: screening, assessment, diagnosis, intervention, monitoring and ADIME documents.", epLink("GET", "/fhir/metadata")],
+      ["spark", "AI-ready knowledge", "Retrieval-augmented nutrition answers and session memory, so assistants can ground their replies in real nutrition data.", epLink("POST", "/rag/ask")],
+      ["code", "Developer platform", "Plain JSON, OpenAPI, open CORS, self-service keys, OAuth 2.0 client credentials and batched requests.", "#/account"],
+    ];
     return el(`
       <section class="lp-section reveal" id="lp-about" aria-labelledby="lp-about-h">
         <div class="lp-head">
           <p class="lp-kicker">What is Chakudya?</p>
-          <h2 id="lp-about-h">One registry for food, nutrition and growth data</h2>
-          <p class="lp-sub">"Chakudya" means food in Chichewa. The Chakudya Nutrition Registry (CNR) is a Malawi-focused nutrition data and intelligence API. It gives health applications, researchers, students and dietitians structured, searchable nutrition information, without everyone having to rebuild the same tables.</p>
+          <h2 id="lp-about-h">More than a food database</h2>
+          <p class="lp-sub">"Chakudya" means food in Chichewa, but the Chakudya Nutrition Registry (CNR) is a whole nutrition platform for Malawi. Food data is the foundation. On top of it sit growth assessment, clinical decision tools, care-record standards and AI, all behind one open API, so nobody has to rebuild the same tables or logic.</p>
         </div>
-        <div class="lp-cols">
-          <article class="lp-card">
-            <span class="lp-card__icon">${icon("map", 22)}</span>
-            <h3>Built around local food</h3>
-            <p>Malawian food composition data sits at the core, and is combined with USDA FoodData Central, Open Food Facts and FatSecret when a food isn't in the local database.</p>
-          </article>
-          <article class="lp-card">
-            <span class="lp-card__icon">${icon("steth", 22)}</span>
-            <h3>Clinically minded</h3>
-            <p>WHO child growth standards from birth to 19 years, Fenton preterm charts, renal data, enteral formulas, drug-nutrient interactions and a FHIR R4 Nutrition Care Process facade.</p>
-          </article>
-          <article class="lp-card">
-            <span class="lp-card__icon">${icon("code", 22)}</span>
-            <h3>Open and developer-ready</h3>
-            <p>Plain JSON, an OpenAPI spec, permissive CORS and public routes that need no key. Sign in for a self-service key with higher rate limits.</p>
-          </article>
-        </div>
+        <ol class="lp-pillars">
+          ${pillars.map(([ic, t, d, href], i) => `
+            <li>
+              <a class="lp-card lp-pillar" href="${href}">
+                <span class="lp-pillar__top"><span class="lp-card__icon">${icon(ic, 22)}</span><span class="lp-pillar__n" aria-hidden="true">0${i + 1}</span></span>
+                <h3>${t}</h3>
+                <p>${d}</p>
+              </a>
+            </li>`).join("")}
+        </ol>
       </section>
     `);
   }
@@ -306,7 +322,7 @@ const RenderLanding = (() => {
       <section class="lp-section reveal" id="lp-features" aria-labelledby="lp-feat-h">
         <div class="lp-head">
           <p class="lp-kicker">What you can do</p>
-          <h2 id="lp-feat-h">Everything nutrition software keeps needing</h2>
+          <h2 id="lp-feat-h">Everything nutrition software keeps needing, in one API</h2>
         </div>
         <div class="lp-feat-grid">
           ${f.map(([ic, t, d, href]) => `
@@ -403,7 +419,7 @@ const RenderLanding = (() => {
   function closingSection({ showKey }) {
     return el(`
       <section class="lp-closing reveal" aria-labelledby="lp-close-h">
-        <h2 id="lp-close-h">Better nutrition data starts with better food data.</h2>
+        <h2 id="lp-close-h">Better food data. Healthier Malawi.</h2>
         <div class="lp-cta lp-cta--center">
           <a class="btn btn--primary btn--lg" href="#/reference">Explore the API</a>
           ${showKey ? `<a class="btn btn--lg" href="#/account">Get an API key</a>` : ""}
@@ -483,7 +499,7 @@ const RenderLanding = (() => {
       const dot = root.querySelector("#lp-health-dot"), txt = root.querySelector("#lp-health-text");
       if (!dot || !dot.isConnected || !ok) return;
       dot.classList.add("is-ok");
-      txt.textContent = "API online · Malawi's open food & nutrition registry";
+      txt.textContent = "API online · Malawi's open nutrition registry";
     });
   }
 
