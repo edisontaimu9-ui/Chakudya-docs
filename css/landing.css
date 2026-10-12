@@ -185,6 +185,7 @@ body.is-landing .content { max-width: 1180px; padding: 24px 28px 0; }
 }
 .lp-closing h2 { font-size: clamp(26px, 4vw, 42px); max-width: 20ch; margin: 0 auto; letter-spacing: -.6px; line-height: 1.12; }
 .lp-footer { margin-top: 56px; padding: 28px 0 56px; border-top: 1px solid var(--border); color: var(--text-secondary); font-size: 13.5px; }
+.lp-footer__logo { display: block; width: 96px; height: auto; background: #fff; border-radius: 16px; padding: 8px; margin-bottom: 14px; border: 1px solid var(--border); }
 .lp-footer p { margin: 0 0 8px; }
 .lp-footer__note { color: var(--text-tertiary); }
 .lp-footer nav { display: flex; flex-wrap: wrap; gap: 8px 20px; margin-top: 14px; }

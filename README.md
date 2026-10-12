@@ -27,10 +27,10 @@ and `#/account` routes are untouched.
   interactions) are read live from each list route's `count` via `GET /<resource>?limit=1`.
   Endpoints, groups and version come from `openapi.json`. Nothing is hard-coded; a failed
   request just omits that tile.
-- Images live in `assets/images/` and are optional - if a file is missing the tile falls
-  back to a tinted placeholder. Expected files: `hero-malawian-meal.webp` (1600x1200),
-  `food-staples.webp`, `food-legumes-protein.webp`, `food-fruit-veg.webp`, `food-fish.webp`
-  (800x600 each), `og-chakudya.jpg` (1200x630).
+- Images live in `assets/images/` (all optional - a missing file falls back to a tinted
+  placeholder): `hero-malawian-meal.webp` (1000x750), `food-staples.webp`,
+  `food-legumes-protein.webp`, `food-fruit-veg.webp`, `food-fish.webp` (480x600 each),
+  `chakudya-logo.png` and `og-chakudya.jpg` (1200x630, social preview).
 
 ## 1. Run it locally
 

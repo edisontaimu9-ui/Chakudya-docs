@@ -133,7 +133,7 @@ const RenderLanding = (() => {
         </div>
         <div class="lp-hero__media">
           <figure class="lp-photo lp-photo--hero">
-            ${img("hero-malawian-meal.webp", "A traditional Malawian meal of nsima with beans and vegetables", 1600, 1200, { eager: true })}
+            ${img("hero-malawian-meal.webp", "A Malawian meal of nsima with fried fish, beans, greens and relish on a tray", 1000, 750, { eager: true })}
             <span class="lp-photo__ph" aria-hidden="true">${icon("plate", 64)}</span>
           </figure>
           <div class="lp-float lp-float--a" aria-hidden="true">${icon("leaf", 18)}<span>Per-food nutrients</span></div>
@@ -351,10 +351,10 @@ const RenderLanding = (() => {
 
   function usesSection() {
     const tiles = [
-      ["food-staples.webp", "Maize, rice and other staple foods", "Nutrition & dietetics apps"],
-      ["food-legumes-protein.webp", "Beans, groundnuts and other plant proteins", "Meal planning systems"],
-      ["food-fruit-veg.webp", "Fresh Malawian fruit and vegetables", "Health & fitness apps"],
-      ["food-fish.webp", "Fresh and dried fish at a market stall", "Food & barcode scanners"],
+      ["food-staples.webp", "Nsima served with a tomato stew and greens", "Nutrition & dietetics apps"],
+      ["food-legumes-protein.webp", "Bowls of beans, lentils and whole grains", "Meal planning systems"],
+      ["food-fruit-veg.webp", "Fresh fruit and vegetables", "Health & fitness apps"],
+      ["food-fish.webp", "Fresh whole fish and fish steaks on ice", "Food & barcode scanners"],
     ];
     const uses = ["Clinical decision support tools", "Nutrition research tools", "AI and RAG powered nutrition assistants", "Educational applications"];
     return el(`
@@ -366,7 +366,7 @@ const RenderLanding = (() => {
         <div class="lp-gallery">
           ${tiles.map(([file, alt, cap], i) => `
             <figure class="lp-tile lp-tile--${i + 1}">
-              ${img(file, alt, 800, 600)}
+              ${img(file, alt, 480, 600)}
               <figcaption>${cap}</figcaption>
             </figure>`).join("")}
         </div>
@@ -415,7 +415,8 @@ const RenderLanding = (() => {
   function footer() {
     return el(`
       <footer class="lp-footer">
-        <p><strong>Chakudya Nutrition Registry</strong> · Malawi's open food and nutrition data API.</p>
+        <img class="lp-footer__logo" src="assets/images/chakudya-logo.png" alt="Chakudya Nutrition Registry logo" width="120" height="120" loading="lazy" onerror="this.remove()" />
+        <p><strong>Chakudya Nutrition Registry</strong> · Better food data. Healthier Malawi.</p>
         <p class="lp-footer__note">Growth and clinical tools are screening aids, not diagnoses. Always confirm with a qualified health professional.</p>
         <nav aria-label="Footer"><a href="#/reference">API overview</a><a href="#/account">API keys</a><a href="openapi.json" download>openapi.json</a><a href="https://github.com/edisontaimu9-ui/chakudya-api" target="_blank" rel="noopener">GitHub</a></nav>
       </footer>
