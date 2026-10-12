@@ -4,7 +4,13 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 <title>Chakudya Nutrition Registry API - Developer Docs</title>
-<meta name="description" content="Interactive API reference for the Chakudya Nutrition Registry (CNR) - Malawi's open food, nutrition, growth and FHIR data API." />
+<meta name="description" content="Chakudya Nutrition Registry (CNR) - Malawi's open food, nutrition, growth and FHIR data API, with interactive developer docs." />
+<meta name="theme-color" content="#0e1210" />
+<meta property="og:type" content="website" />
+<meta property="og:title" content="Chakudya Nutrition Registry" />
+<meta property="og:description" content="Malawi's open food and nutrition registry: food composition, glycaemic index, WHO growth standards and FHIR-ready clinical tools." />
+<meta property="og:image" content="assets/images/og-chakudya.jpg" />
+<meta name="twitter:card" content="summary_large_image" />
 <link rel="icon" href="assets/favicon.svg" type="image/svg+xml" />
 
 <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -14,6 +20,7 @@
 <link rel="stylesheet" href="css/theme.css" />
 <link rel="stylesheet" href="css/layout.css" />
 <link rel="stylesheet" href="css/components.css" />
+<link rel="stylesheet" href="css/landing.css" />
 </head>
 <body>
 
@@ -39,6 +46,11 @@
         <span class="brand__sub">Nutrition Registry</span>
       </span>
     </a>
+
+    <nav class="header-nav" aria-label="Main">
+      <a href="#/" id="nav-home">Home</a>
+      <a href="#/reference" id="nav-reference">API reference</a>
+    </nav>
 
     <span class="version-chip" id="version-chip" title="API version">v-</span>
 
@@ -75,7 +87,7 @@
       <div class="sidebar__loading">Loading endpoints…</div>
     </div>
     <div class="sidebar__footer">
-      <a href="#/" class="sidebar__overview-link">Overview</a>
+      <a href="#/reference" class="sidebar__overview-link">API overview</a>
       <span class="sidebar__count" id="endpoint-count"></span>
     </div>
   </nav>
@@ -114,6 +126,7 @@
 <script src="js/render-endpoint.js"></script>
 <script src="js/demo-terminal.js"></script>
 <script src="js/render-overview.js"></script>
+<script src="js/render-landing.js"></script>
 <script src="js/auth.js"></script>
 <script src="js/render-account.js"></script>
 <script src="js/try-it.js"></script>

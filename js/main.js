@@ -92,12 +92,26 @@
   // ── Router ─────────────────────────────────────────────────
   function route() {
     const hash = location.hash.replace(/^#\/?/, "");
+    // The landing page is full-width with no endpoint sidebar.
+    document.body.classList.toggle("is-landing", !hash);
+    document.getElementById("nav-home")?.setAttribute("aria-current", !hash ? "page" : "false");
+    document.getElementById("nav-reference")?.setAttribute("aria-current", hash && hash !== "account" ? "page" : "false");
     if (!hash) {
+      RenderLanding.render(content);
+      Sidebar.setActive(null);
+      AppState.set({ activeId: null });
+      document.getElementById("main").focus({ preventScroll: true });
+      window.scrollTo(0, 0);
+      closeSidebar();
+      return;
+    }
+    if (hash === "reference") {
       RenderOverview.render(content);
       Sidebar.setActive(null);
       AppState.set({ activeId: null });
       document.getElementById("main").focus({ preventScroll: true });
       window.scrollTo(0, 0);
+      closeSidebar();
       return;
     }
     if (hash === "account") {

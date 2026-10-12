@@ -1,0 +1,490 @@
+/**
+ * Landing page (route "#/") - the consumer-friendly front door.
+ *
+ * The full technical overview that used to live at "#/" is still
+ * available, unchanged, at "#/reference" (see RenderOverview).
+ *
+ * Numbers shown here are never hard-coded:
+ *   - Endpoints / resource groups come from the loaded OpenAPI spec.
+ *   - Record counts come live from the API's own list responses
+ *     (`count` on GET /<resource>?limit=1). If a request fails, that
+ *     tile is simply left out - no placeholder or guessed figure.
+ *   - The API version comes from the spec's info.version.
+ */
+const RenderLanding = (() => {
+  const IMG = "assets/images/";
+  const reduceMotion = () => window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  // Live record counts. One request per resource per page load, cached in memory.
+  const COUNT_SOURCES = [
+    { key: "foods", path: "/foods", label: "Foods in the registry", note: "Local food composition records" },
+    { key: "gi", path: "/glycaemic-index", label: "Glycaemic index entries", note: "GI / GL reference values" },
+    { key: "exchange", path: "/exchange", label: "Exchange list items", note: "Standard & therapeutic lists" },
+    { key: "renal", path: "/renal", label: "Renal nutrition foods", note: "For renal dietary planning" },
+    { key: "formulas", path: "/formulas", label: "Enteral formulas", note: "Clinical nutrition products" },
+    { key: "drugs", path: "/drug-interactions", label: "Drug-nutrient interactions", note: "Known interactions" },
+  ];
+  let countsPromise = null;
+
+  function esc(s) { return RenderEndpoint.escapeHtml(String(s)); }
+  function el(html) {
+    const t = document.createElement("template");
+    t.innerHTML = html.trim();
+    return t.content.firstElementChild;
+  }
+  function fmt(n) { return Number(n).toLocaleString("en-US"); }
+
+  function epLink(method, path) {
+    const ep = AppState.state.endpoints.find((e) => e.method === method && e.path === path);
+    return ep ? `#/${ep.slug}` : "#/reference";
+  }
+
+  /** Image with a graceful fallback: if the file isn't uploaded yet the <img> removes itself and the tinted backdrop remains. */
+  function img(file, alt, w, h, { eager = false } = {}) {
+    return `<img src="${IMG}${file}" alt="${esc(alt)}" width="${w}" height="${h}" ${eager ? 'fetchpriority="high"' : 'loading="lazy"'} decoding="async" onerror="this.remove()" />`;
+  }
+
+  /* ───────── live data ───────── */
+
+  function fetchCounts() {
+    if (countsPromise) return countsPromise;
+    const base = AppState.state.baseUrl;
+    countsPromise = Promise.all(
+      COUNT_SOURCES.map(async (src) => {
+        try {
+          const url = ApiClient.buildUrl(base, src.path, {}, { limit: 1 });
+          const r = await ApiClient.execute({ url, method: "GET", headers: {} });
+          const n = r.ok && r.status === 200 ? r.bodyJson?.count : null;
+          return Number.isFinite(n) && n > 0 ? { ...src, count: n } : null;
+        } catch (_) { return null; }
+      })
+    ).then((rows) => rows.filter(Boolean));
+    return countsPromise;
+  }
+
+  async function checkHealth() {
+    try {
+      const url = ApiClient.buildUrl(AppState.state.baseUrl, "/health", {}, {});
+      const r = await ApiClient.execute({ url, method: "GET", headers: {} });
+      return r.ok && r.status === 200 && r.bodyJson?.status === "healthy";
+    } catch (_) { return false; }
+  }
+
+  /* ───────── motion helpers ───────── */
+
+  function animateCount(node, target) {
+    if (reduceMotion()) { node.textContent = fmt(target); return; }
+    const dur = 1400, start = performance.now();
+    function frame(now) {
+      const t = Math.min((now - start) / dur, 1);
+      const eased = 1 - Math.pow(1 - t, 3);
+      node.textContent = fmt(Math.round(target * eased));
+      if (t < 1) requestAnimationFrame(frame);
+    }
+    requestAnimationFrame(frame);
+  }
+
+  function observe(root) {
+    const reveals = root.querySelectorAll(".reveal");
+    const counters = root.querySelectorAll("[data-count]");
+    if (!("IntersectionObserver" in window) || reduceMotion()) {
+      reveals.forEach((n) => n.classList.add("is-in"));
+      counters.forEach((n) => { n.textContent = fmt(n.dataset.count); n.dataset.counted = "1"; });
+      return;
+    }
+    const io = new IntersectionObserver((entries) => {
+      entries.forEach((e) => {
+        if (!e.isIntersecting) return;
+        e.target.classList.add("is-in");
+        e.target.querySelectorAll("[data-count]").forEach(runCounter);
+        if (e.target.matches("[data-count]")) runCounter(e.target);
+        io.unobserve(e.target);
+      });
+    }, { threshold: 0.15 });
+    reveals.forEach((n) => io.observe(n));
+    root.__io = io;
+  }
+  function runCounter(n) {
+    if (n.dataset.counted) return;
+    n.dataset.counted = "1";
+    animateCount(n, Number(n.dataset.count));
+  }
+
+  /* ───────── sections ───────── */
+
+  function heroSection({ showKey }) {
+    return el(`
+      <section class="lp-hero" aria-labelledby="lp-title">
+        <div class="lp-hero__glow" aria-hidden="true"></div>
+        <div class="lp-hero__copy">
+          <p class="lp-pill"><span class="lp-pill__dot" id="lp-health-dot" aria-hidden="true"></span><span id="lp-health-text">Malawi's open food &amp; nutrition registry</span></p>
+          <h1 id="lp-title" class="lp-title">Know what's on <em>every</em> Malawian plate.</h1>
+          <p class="lp-lead">Chakudya is an open nutrition registry built around Malawian foods. It brings food composition, glycaemic index, child growth standards and clinical nutrition tools together in one place, so apps, clinics and researchers can all work from the same trustworthy data.</p>
+          <div class="lp-cta">
+            <a class="btn btn--primary btn--lg" href="#lp-try" data-scroll="lp-try">Try a food lookup</a>
+            <a class="btn btn--lg" href="#/reference">Explore the API</a>
+            ${showKey ? `<a class="btn btn--lg btn--ghost" href="#/account">Get an API key</a>` : ""}
+          </div>
+          <ul class="lp-trust" aria-label="Highlights">
+            <li>Free public routes, no key needed</li>
+            <li>WHO growth standards</li>
+            <li>FHIR R4 ready</li>
+          </ul>
+        </div>
+        <div class="lp-hero__media">
+          <figure class="lp-photo lp-photo--hero">
+            ${img("hero-malawian-meal.webp", "A traditional Malawian meal of nsima with beans and vegetables", 1600, 1200, { eager: true })}
+            <span class="lp-photo__ph" aria-hidden="true">${icon("plate", 64)}</span>
+          </figure>
+          <div class="lp-float lp-float--a" aria-hidden="true">${icon("leaf", 18)}<span>Per-food nutrients</span></div>
+          <div class="lp-float lp-float--b" aria-hidden="true">${icon("child", 18)}<span>Growth z-scores</span></div>
+        </div>
+      </section>
+    `);
+  }
+
+  function statsSection() {
+    const { endpoints, groups, spec } = AppState.state;
+    return el(`
+      <section class="lp-section lp-stats reveal" aria-labelledby="lp-stats-h">
+        <div class="lp-head">
+          <p class="lp-kicker">By the numbers</p>
+          <h2 id="lp-stats-h">The registry at a glance</h2>
+          <p class="lp-sub">Counts below are read live from the Chakudya API the moment this page loads.</p>
+        </div>
+        <div class="lp-stat-grid" id="lp-stat-grid">
+          <div class="lp-stat"><div class="lp-stat__num" data-count="${endpoints.length}">0</div><div class="lp-stat__label">Documented endpoints</div><div class="lp-stat__note">Public, ready to call</div></div>
+          <div class="lp-stat"><div class="lp-stat__num" data-count="${groups.length}">0</div><div class="lp-stat__label">Resource groups</div><div class="lp-stat__note">Foods to FHIR</div></div>
+          <div class="lp-stat lp-stat--text"><div class="lp-stat__num">v${esc(spec.info?.version || "?")}</div><div class="lp-stat__label">Current API version</div><div class="lp-stat__note">Per the OpenAPI spec</div></div>
+          <div class="lp-stat lp-stat--loading" id="lp-stat-loading"><div class="lp-stat__num" aria-hidden="true">…</div><div class="lp-stat__label">Loading live counts</div><div class="lp-stat__note">Fetching from the API</div></div>
+        </div>
+      </section>
+    `);
+  }
+
+  async function hydrateStats(root) {
+    const grid = root.querySelector("#lp-stat-grid");
+    if (!grid) return;
+    const rows = await fetchCounts();
+    if (!grid.isConnected) return; // navigated away
+    grid.querySelector("#lp-stat-loading")?.remove();
+    rows.forEach((r) => {
+      const card = el(`
+        <div class="lp-stat lp-stat--live">
+          <div class="lp-stat__num" data-count="${r.count}">0</div>
+          <div class="lp-stat__label">${esc(r.label)}</div>
+          <div class="lp-stat__note">${esc(r.note)}</div>
+        </div>`);
+      grid.appendChild(card);
+    });
+    if (!rows.length) {
+      grid.appendChild(el(`<p class="lp-stat__offline">Live record counts are unavailable right now. The documentation below still works.</p>`));
+    }
+    // Counters added after the observer ran: start the ones already on screen.
+    if (reduceMotion() || !("IntersectionObserver" in window)) {
+      grid.querySelectorAll("[data-count]").forEach(runCounter);
+    } else {
+      const io = new IntersectionObserver((es) => es.forEach((e) => {
+        if (e.isIntersecting) { runCounter(e.target); io.unobserve(e.target); }
+      }), { threshold: 0.4 });
+      grid.querySelectorAll("[data-count]").forEach((n) => io.observe(n));
+    }
+  }
+
+  function aboutSection() {
+    return el(`
+      <section class="lp-section reveal" id="lp-about" aria-labelledby="lp-about-h">
+        <div class="lp-head">
+          <p class="lp-kicker">What is Chakudya?</p>
+          <h2 id="lp-about-h">One registry for food, nutrition and growth data</h2>
+          <p class="lp-sub">"Chakudya" means food in Chichewa. The Chakudya Nutrition Registry (CNR) is a Malawi-focused nutrition data and intelligence API. It gives health applications, researchers, students and dietitians structured, searchable nutrition information, without everyone having to rebuild the same tables.</p>
+        </div>
+        <div class="lp-cols">
+          <article class="lp-card">
+            <span class="lp-card__icon">${icon("map", 22)}</span>
+            <h3>Built around local food</h3>
+            <p>Malawian food composition data sits at the core, and is combined with USDA FoodData Central, Open Food Facts and FatSecret when a food isn't in the local database.</p>
+          </article>
+          <article class="lp-card">
+            <span class="lp-card__icon">${icon("steth", 22)}</span>
+            <h3>Clinically minded</h3>
+            <p>WHO child growth standards from birth to 19 years, Fenton preterm charts, renal data, enteral formulas, drug-nutrient interactions and a FHIR R4 Nutrition Care Process facade.</p>
+          </article>
+          <article class="lp-card">
+            <span class="lp-card__icon">${icon("code", 22)}</span>
+            <h3>Open and developer-ready</h3>
+            <p>Plain JSON, an OpenAPI spec, permissive CORS and public routes that need no key. Sign in for a self-service key with higher rate limits.</p>
+          </article>
+        </div>
+      </section>
+    `);
+  }
+
+  function trySection() {
+    const picks = ["nsima", "beans", "tomato", "rice", "potatoes"];
+    const sec = el(`
+      <section class="lp-section lp-try reveal" id="lp-try" aria-labelledby="lp-try-h">
+        <div class="lp-try__panel">
+          <div class="lp-try__copy">
+            <p class="lp-kicker">Live demo</p>
+            <h2 id="lp-try-h">Look up a food, right now</h2>
+            <p class="lp-sub">This calls the real Chakudya API from your browser using <code>GET /foods/lookup</code>. Search a food and see the nutrients it returns.</p>
+          </div>
+          <form class="lp-search" role="search" aria-label="Food lookup">
+            <label class="sr-only" for="lp-food-q">Food name</label>
+            <input id="lp-food-q" type="search" placeholder="e.g. nsima, beans, tomato" autocomplete="off" value="nsima" />
+            <button class="btn btn--primary" type="submit">Look up</button>
+          </form>
+          <div class="lp-chips" role="group" aria-label="Quick picks">
+            ${picks.map((p) => `<button type="button" class="lp-chip" data-q="${p}">${p}</button>`).join("")}
+          </div>
+          <div class="lp-result" id="lp-result" aria-live="polite"></div>
+        </div>
+      </section>
+    `);
+    const form = sec.querySelector("form");
+    const input = sec.querySelector("#lp-food-q");
+    const out = sec.querySelector("#lp-result");
+
+    async function run(q) {
+      q = q.trim();
+      if (!q) return;
+      out.innerHTML = `<p class="lp-result__msg"><span class="spinner spinner--sm" aria-hidden="true"></span> Looking up “${esc(q)}”…</p>`;
+      const url = ApiClient.buildUrl(AppState.state.baseUrl, "/foods/lookup", {}, { q });
+      const r = await ApiClient.execute({ url, method: "GET", headers: {} });
+      if (!out.isConnected) return;
+      if (!r.ok || r.status >= 500) {
+        out.innerHTML = `<p class="lp-result__msg lp-result__msg--err">Couldn't reach the API just now. Please try again in a moment.</p>`;
+        return;
+      }
+      const d = r.bodyJson?.data;
+      const row = Array.isArray(d) ? d[0] : d;
+      if (!row || (!row.food_name && !row.name)) {
+        out.innerHTML = `<p class="lp-result__msg">No match for “${esc(q)}”. Try another food name.</p>`;
+        return;
+      }
+      const nutrients = [
+        ["Energy", row.kcal, "kcal"], ["Protein", row.protein_g, "g"], ["Carbs", row.carbs_g, "g"],
+        ["Fat", row.fat_g, "g"], ["Iron", row.iron_mg, "mg"], ["Calcium", row.calcium_mg, "mg"],
+      ].filter(([, v]) => v !== null && v !== undefined && v !== "");
+      out.innerHTML = `
+        <div class="lp-food">
+          <div class="lp-food__top">
+            <h3>${esc(row.food_name || row.name)}</h3>
+            ${row.category ? `<span class="lp-tag">${esc(row.category)}</span>` : ""}
+          </div>
+          ${row.measure ? `<p class="lp-food__measure">Per ${esc(row.measure)}</p>` : ""}
+          <dl class="lp-nutrients">
+            ${nutrients.map(([k, v, u]) => `<div><dt>${k}</dt><dd>${esc(v)}<small>${u}</small></dd></div>`).join("")}
+          </dl>
+          <p class="lp-food__src">Source: ${esc(r.bodyJson?.source || "Chakudya API")} · <a href="${epLink("GET", "/foods/lookup")}">See the endpoint docs</a></p>
+        </div>`;
+    }
+
+    form.addEventListener("submit", (e) => { e.preventDefault(); run(input.value); });
+    sec.querySelectorAll(".lp-chip").forEach((b) => b.addEventListener("click", () => { input.value = b.dataset.q; run(b.dataset.q); }));
+    // Auto-run once the section is first seen, so the page feels alive.
+    if ("IntersectionObserver" in window) {
+      const io = new IntersectionObserver((es) => { if (es[0].isIntersecting) { run(input.value); io.disconnect(); } }, { threshold: 0.3 });
+      io.observe(sec);
+    }
+    return sec;
+  }
+
+  function featuresSection() {
+    const f = [
+      ["leaf", "Food composition", "Search Malawian foods and their nutrient values, compare foods, find substitutes, and fall back to USDA, Open Food Facts or FatSecret.", epLink("GET", "/foods")],
+      ["scan", "Packaged foods and labels", "Barcode lookup, community submissions, OCR-assisted capture and Codex-oriented nutrition labels.", epLink("GET", "/packaged")],
+      ["utensils", "Meals and recipes", "Turn free text like “2 eggs, 1 cup rice, 100g chicken” into structured data, then total the nutrition per serving.", epLink("POST", "/meals/analyze")],
+      ["child", "WHO growth standards", "Z-scores, percentiles and status bands from birth to 19 years, plus a one-call combined assessment. Screening aids, not diagnoses.", epLink("POST", "/growth/assess")],
+      ["pulse", "Clinical nutrition", "Glycaemic index, exchange lists, renal foods, enteral formulas, drug-nutrient interactions and dietary reference intakes.", epLink("GET", "/glycaemic-index")],
+      ["fhir", "FHIR R4 facade", "Stateless growth evaluation and the full Nutrition Care Process: screening, assessment, diagnosis, intervention, monitoring and ADIME documents.", epLink("GET", "/fhir/metadata")],
+      ["spark", "AI-ready knowledge", "Retrieval-augmented nutrition answers and session memory for assistants and chatbots.", epLink("POST", "/rag/ask")],
+      ["key", "Keys, OAuth and batching", "Self-service consumer keys with three times the public rate limit, OAuth 2.0 client credentials, and batched requests.", "#/account"],
+    ];
+    return el(`
+      <section class="lp-section reveal" id="lp-features" aria-labelledby="lp-feat-h">
+        <div class="lp-head">
+          <p class="lp-kicker">What you can do</p>
+          <h2 id="lp-feat-h">Everything nutrition software keeps needing</h2>
+        </div>
+        <div class="lp-feat-grid">
+          ${f.map(([ic, t, d, href]) => `
+            <a class="lp-feat" href="${href}">
+              <span class="lp-card__icon">${icon(ic, 22)}</span>
+              <h3>${t}</h3>
+              <p>${d}</p>
+              <span class="lp-feat__more">Explore <span aria-hidden="true">→</span></span>
+            </a>`).join("")}
+        </div>
+      </section>
+    `);
+  }
+
+  function audienceSection() {
+    const a = [
+      ["Consumers", "heart", "Apps built on Chakudya can show what's really in everyday Malawian meals, from nsima to relish, in familiar portions.", "#lp-try", "Try a lookup"],
+      ["Students", "book", "Learn with real composition data, glycaemic index, exchange lists and WHO standards instead of textbook tables.", "#/reference", "Browse the data"],
+      ["Dietitians", "steth", "Support clinical decisions with growth assessment, renal, enteral and drug-interaction data, and FHIR-shaped output.", epLink("POST", "/growth/assess"), "See growth assessment"],
+      ["Researchers", "flask", "Pull consistent, citable food and growth reference data through a documented, versioned API.", "openapi.json", "Download the spec"],
+      ["Food businesses", "store", "Standardised labels, barcode lookup and recipe nutrition totals for products and menus.", epLink("GET", "/foods/{id}/label"), "See label data"],
+      ["Developers", "code", "Public routes, an OpenAPI spec, a live Try It console and self-service keys. Start building straight away.", "#/account", "Get an API key"],
+    ];
+    return el(`
+      <section class="lp-section reveal" id="lp-audience" aria-labelledby="lp-aud-h">
+        <div class="lp-head">
+          <p class="lp-kicker">Who it's for</p>
+          <h2 id="lp-aud-h">Made for people who work with food</h2>
+        </div>
+        <div class="lp-aud-grid">
+          ${a.map(([t, ic, d, href, cta]) => `
+            <article class="lp-aud">
+              <span class="lp-card__icon">${icon(ic, 22)}</span>
+              <h3>${t}</h3>
+              <p>${d}</p>
+              <a class="lp-link" ${href.endsWith(".json") ? `href="${href}" download` : `href="${href}"`}>${cta} <span aria-hidden="true">→</span></a>
+            </article>`).join("")}
+        </div>
+      </section>
+    `);
+  }
+
+  function usesSection() {
+    const tiles = [
+      ["food-staples.webp", "Maize, rice and other staple foods", "Nutrition & dietetics apps"],
+      ["food-legumes-protein.webp", "Beans, groundnuts and other plant proteins", "Meal planning systems"],
+      ["food-fruit-veg.webp", "Fresh Malawian fruit and vegetables", "Health & fitness apps"],
+      ["food-fish.webp", "Fresh and dried fish at a market stall", "Food & barcode scanners"],
+    ];
+    const uses = ["Clinical decision support tools", "Nutrition research tools", "AI and RAG powered nutrition assistants", "Educational applications"];
+    return el(`
+      <section class="lp-section reveal" id="lp-uses" aria-labelledby="lp-uses-h">
+        <div class="lp-head">
+          <p class="lp-kicker">Real-world uses</p>
+          <h2 id="lp-uses-h">What teams build with Chakudya</h2>
+        </div>
+        <div class="lp-gallery">
+          ${tiles.map(([file, alt, cap], i) => `
+            <figure class="lp-tile lp-tile--${i + 1}">
+              ${img(file, alt, 800, 600)}
+              <figcaption>${cap}</figcaption>
+            </figure>`).join("")}
+        </div>
+        <div class="lp-uses-more tag-list">${uses.map((u) => `<span>${u}</span>`).join("")}</div>
+      </section>
+    `);
+  }
+
+  function devSection() {
+    const base = AppState.state.baseUrl || "";
+    const curl = `curl "${base}/foods/lookup?q=nsima"`;
+    const sec = el(`
+      <section class="lp-section lp-dev reveal" id="lp-dev" aria-labelledby="lp-dev-h">
+        <div class="lp-dev__copy">
+          <p class="lp-kicker">For developers</p>
+          <h2 id="lp-dev-h">Your first call takes one line</h2>
+          <p class="lp-sub">Public routes need no key, and CORS is open, so you can call the API from a browser, a script or a phone terminal. Add a key later for higher limits and FHIR access.</p>
+          <div class="lp-cta">
+            <a class="btn btn--primary" href="#/reference">Read the API overview</a>
+            <a class="btn" href="openapi.yaml" download>Download openapi.yaml</a>
+          </div>
+        </div>
+        <div class="lp-code">
+          <div class="lp-code__bar"><span>Terminal</span><button type="button" class="btn btn--sm" id="lp-copy">Copy</button></div>
+          <pre><code></code></pre>
+        </div>
+      </section>
+    `);
+    sec.querySelector("code").textContent = curl;
+    CopyModule.bind(sec.querySelector("#lp-copy"), curl);
+    return sec;
+  }
+
+  function closingSection({ showKey }) {
+    return el(`
+      <section class="lp-closing reveal" aria-labelledby="lp-close-h">
+        <h2 id="lp-close-h">Better nutrition data starts with better food data.</h2>
+        <div class="lp-cta lp-cta--center">
+          <a class="btn btn--primary btn--lg" href="#/reference">Explore the API</a>
+          ${showKey ? `<a class="btn btn--lg" href="#/account">Get an API key</a>` : ""}
+        </div>
+      </section>
+    `);
+  }
+
+  function footer() {
+    return el(`
+      <footer class="lp-footer">
+        <p><strong>Chakudya Nutrition Registry</strong> · Malawi's open food and nutrition data API.</p>
+        <p class="lp-footer__note">Growth and clinical tools are screening aids, not diagnoses. Always confirm with a qualified health professional.</p>
+        <nav aria-label="Footer"><a href="#/reference">API overview</a><a href="#/account">API keys</a><a href="openapi.json" download>openapi.json</a><a href="https://github.com/edisontaimu9-ui/chakudya-api" target="_blank" rel="noopener">GitHub</a></nav>
+      </footer>
+    `);
+  }
+
+  /* ───────── icons (inline, currentColor) ───────── */
+  function icon(name, size = 20) {
+    const p = {
+      plate: '<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/>',
+      leaf: '<path d="M5 19c0-8 4-13 14-14 0 10-5 14-13 14"/><path d="M5 19c2-5 5-8 9-10"/>',
+      child: '<circle cx="12" cy="6" r="3"/><path d="M6 21v-5a6 6 0 0 1 12 0v5"/>',
+      map: '<path d="M12 21s7-6.2 7-12a7 7 0 0 0-14 0c0 5.8 7 12 7 12Z"/><circle cx="12" cy="9" r="2.5"/>',
+      steth: '<path d="M6 3v6a4 4 0 0 0 8 0V3"/><path d="M10 13v2a5 5 0 0 0 10 0v-2"/><circle cx="20" cy="11" r="2"/>',
+      code: '<path d="m8 8-5 4 5 4M16 8l5 4-5 4M14 5l-4 14"/>',
+      scan: '<path d="M4 8V5h3M20 8V5h-3M4 16v3h3M20 16v3h-3M7 12h10"/>',
+      utensils: '<path d="M6 3v8M9 3v8M6 7h3M7.5 11v10M17 3c-2 2-2.5 5-2 8h2v10"/>',
+      pulse: '<path d="M3 12h4l2-6 4 12 2-6h6"/>',
+      fhir: '<path d="M12 3 4 7v6c0 4 3.4 7 8 8 4.6-1 8-4 8-8V7l-8-4Z"/><path d="m9 12 2 2 4-4"/>',
+      spark: '<path d="M12 3v4M12 17v4M3 12h4M17 12h4M6 6l2.5 2.5M15.5 15.5 18 18M18 6l-2.5 2.5M8.5 15.5 6 18"/>',
+      key: '<circle cx="8" cy="15" r="4"/><path d="m11 12 9-9M16 7l3 3"/>',
+      heart: '<path d="M12 20s-7-4.4-7-10a4 4 0 0 1 7-2 4 4 0 0 1 7 2c0 5.6-7 10-7 10Z"/>',
+      book: '<path d="M4 5a2 2 0 0 1 2-2h13v16H6a2 2 0 0 0-2 2V5Z"/><path d="M4 19a2 2 0 0 1 2-2h13"/>',
+      flask: '<path d="M9 3h6M10 3v6l-5 9a2 2 0 0 0 1.8 3h10.4a2 2 0 0 0 1.8-3l-5-9V3"/>',
+      store: '<path d="M4 9 5.5 4h13L20 9M4 9v11h16V9M4 9h16M9 20v-6h6v6"/>',
+    }[name] || "";
+    return `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${p}</svg>`;
+  }
+
+  /* ───────── render ───────── */
+
+  function render(container) {
+    container.innerHTML = "";
+    const showKey = typeof DevAuth !== "undefined" && DevAuth.configured();
+    const root = el(`<div class="lp"></div>`);
+
+    root.append(
+      heroSection({ showKey }),
+      statsSection(),
+      aboutSection(),
+      trySection(),
+      featuresSection(),
+      audienceSection(),
+      usesSection(),
+      devSection(),
+      closingSection({ showKey }),
+      footer()
+    );
+    container.appendChild(root);
+
+    // In-page anchor (#lp-try) must not clobber the hash router.
+    root.querySelectorAll("[data-scroll]").forEach((a) => a.addEventListener("click", (e) => {
+      e.preventDefault();
+      document.getElementById(a.dataset.scroll)?.scrollIntoView({ behavior: reduceMotion() ? "auto" : "smooth", block: "start" });
+    }));
+    root.querySelectorAll('a[href^="#lp-"]').forEach((a) => a.addEventListener("click", (e) => {
+      e.preventDefault();
+      document.getElementById(a.getAttribute("href").slice(1))?.scrollIntoView({ behavior: reduceMotion() ? "auto" : "smooth", block: "start" });
+    }));
+
+    observe(root);
+    hydrateStats(root);
+    checkHealth().then((ok) => {
+      const dot = root.querySelector("#lp-health-dot"), txt = root.querySelector("#lp-health-text");
+      if (!dot || !dot.isConnected || !ok) return;
+      dot.classList.add("is-ok");
+      txt.textContent = "API online · Malawi's open food & nutrition registry";
+    });
+  }
+
+  return { render };
+})();

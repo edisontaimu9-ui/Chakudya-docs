@@ -17,6 +17,21 @@ invented. Currently in line with API **v1.32.0**.
 
 ---
 
+## Landing page
+
+`#/` is a consumer-friendly landing page (`js/render-landing.js`, `css/landing.css`).
+The original technical overview now lives at `#/reference` (unchanged). All endpoint
+and `#/account` routes are untouched.
+
+- Counts shown (foods, GI entries, exchange items, renal foods, formulas, drug
+  interactions) are read live from each list route's `count` via `GET /<resource>?limit=1`.
+  Endpoints, groups and version come from `openapi.json`. Nothing is hard-coded; a failed
+  request just omits that tile.
+- Images live in `assets/images/` and are optional - if a file is missing the tile falls
+  back to a tinted placeholder. Expected files: `hero-malawian-meal.webp` (1600x1200),
+  `food-staples.webp`, `food-legumes-protein.webp`, `food-fruit-veg.webp`, `food-fish.webp`
+  (800x600 each), `og-chakudya.jpg` (1200x630).
+
 ## 1. Run it locally
 
 No dependencies, no build step. Any static file server works, because the
