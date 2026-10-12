@@ -11,9 +11,9 @@ console. It does not modify or touch the Chakudya API project in any way;
 it's a separate, deployable-on-its-own frontend.
 
 Everything documented here was verified against the actual repository
-(`src/index.js`'s router and `routePolicy()`, `wrangler.toml`, and the
-existing `openapi.yaml`) before this site was built - nothing here was
-invented.
+(`src/index.js`'s router and `routePolicy()`, the `src/fhir*.js` modules,
+`src/ragPipeline.js`, `src/oauth.js` and `wrangler.toml`) - nothing here was
+invented. Currently in line with API **v1.31.0**.
 
 ---
 
@@ -126,7 +126,7 @@ would benefit from, and it's optional.
 ```
 chakudya-docs/
 ├── index.html                    # shell: header, sidebar, main containers
-├── openapi.yaml                  # spec, copied verbatim from the API repo
+├── openapi.yaml                  # spec, kept in line with the API source (src/index.js router + routePolicy)
 ├── openapi.json                  # same spec, JSON - what the UI actually fetches
 ├── data/
 │   └── endpoint-metadata.json    # rate limits + role requirements (from routePolicy()),
@@ -161,11 +161,16 @@ of the OpenAPI document - they're read out of `routePolicy()` in
 
 ---
 
-## 6. Endpoints documented (98 of 98)
+## 6. Endpoints documented (160 of 160)
 
 Every route the Worker actually serves is documented - nothing was skipped.
 `/manufacturers`, `/products`, and `/nutrition` were removed from the API in
-v1.15.0-v1.16.0 and no longer appear here.
+v1.15.0-v1.16.0 and no longer appear here. The list below matches API v1.31.0.
+
+This list covers the whole spec (`openapi.json`). The portal UI deliberately
+renders only public routes (see `js/spec-loader.js`), so admin-gated routes
+such as key management, bulk inserts and `/rag/ingest` are in the spec but
+not shown in the sidebar.
 
 **Meta**
 - `GET /` - API metadata
@@ -174,55 +179,45 @@ v1.15.0-v1.16.0 and no longer appear here.
 - `GET /health` - Upstream service health check
 
 **Batch**
-- `POST /batch` - Run up to 20 sub-requests in one round trip (public, rate-limited)
+- `POST /batch` - Run several sub-requests in one round trip
 
 **API Keys**
 - `GET /admin/keys` - List API keys (root key only)
 - `POST /admin/keys` - Create a new API key (root key only)
 - `DELETE /admin/keys/{id}` - Revoke an API key (root key only)
 
+**OAuth** (client_credentials for machine-to-machine callers; the client secret is exchanged for a 1-hour bearer token)
+- `POST /oauth/token` - OAuth 2.0 token endpoint (client_credentials)
+- `GET /.well-known/oauth-authorization-server` - OAuth 2.0 authorization server metadata (RFC 8414)
+- `GET /admin/oauth-clients` - List OAuth clients (root key only)
+- `POST /admin/oauth-clients` - Create an OAuth client (root key only)
+- `DELETE /admin/oauth-clients/{id}` - Revoke an OAuth client (root key only)
+
 **Foods**
 - `GET /foods` - List foods
 - `POST /foods` - Create a food (admin)
 - `POST /foods/bulk` - Bulk-create foods (admin)
 - `GET /foods/lookup` - External food lookup cascade (public, rate-limited)
-- `GET /foods/search` - Typo-tolerant fuzzy search (public, rate-limited)
-- `GET /foods/autocomplete` - Type-ahead search (public, rate-limited)
+- `GET /foods/autocomplete` - Search-as-you-type suggestions (public, rate-limited)
 - `GET /foods/categories` - Food category list (public, rate-limited, cached 24h)
+- `GET /foods/search` - Typo-tolerant fuzzy search over foods (public, rate-limited)
 - `GET /foods/substitutes` - Nutritionally close substitutes for a food (public, rate-limited)
 - `GET /foods/compare` - Side-by-side nutrient comparison of 2-6 foods (public, rate-limited)
+- `GET /foods/by-category` - Browse foods by category (public, rate-limited)
+- `GET /foods/{id}/label` - Codex-oriented nutrition label for one food
 - `GET /foods/{id}` - Get a food by id
-- `GET /foods/{id}/label` - Codex-style nutrition facts label
 - `PUT /foods/{id}` - Replace a food (admin)
 - `PATCH /foods/{id}` - Partially update a food (admin)
 - `DELETE /foods/{id}` - Delete a food (admin)
 
 **Glycaemic Index**
 - `GET /glycaemic-index` - List glycaemic index/load reference entries
-- `POST /glycaemic-index` - Create an entry (admin)
-- `POST /glycaemic-index/bulk` - Bulk-create entries (admin)
-- `GET /glycaemic-index/{id}` - Get an entry by id
-- `PUT /glycaemic-index/{id}` - Replace an entry (admin)
-- `PATCH /glycaemic-index/{id}` - Partially update an entry (admin)
-- `DELETE /glycaemic-index/{id}` - Delete an entry (admin)
-
-**BMI for age**
-- `GET /bmi-for-age/classify` - Classify BMI-for-age for a child/adolescent 5y 1m-19y 0m (public, rate-limited)
-- `GET /bmi-for-age` - List reference rows (-3SD to +3SD cut-offs)
-- `POST /bmi-for-age/bulk` - Bulk-create reference rows (admin)
-
-**Fenton Preterm** (licensed data — no list/dump route; every read returns a computed result, static metadata, or a rendered image, never raw L/M/S)
-- `GET /fenton-preterm/classify` - Weight/length/HC z-score, percentile, status for a preterm infant (public, rate-limited)
-- `POST /fenton-preterm/profile` - Classify weight+length+HC together at one timepoint (public, rate-limited)
-- `POST /fenton-preterm/growth` - Classify a series of same-metric measurements over time; chart-ready trajectory + trend (public, rate-limited)
-- `POST /fenton-preterm/velocity` - Growth velocity (g/kg/day weight, cm/week length/HC) between measurements (public, rate-limited)
-- `GET /fenton-preterm/chart` - Server-rendered SVG growth chart with reference curves + optional overlay points (public, rate-limited)
-- `GET /fenton-preterm/references` - Static metadata: years, sexes, metrics, valid age ranges, citations, license (public, rate-limited)
-- `POST /fenton-preterm/bulk` - Bulk-create reference rows (admin)
-
-**FHIR** (Phase 1 groundwork - stateless facade over the classify endpoints above, no storage, not yet registered with any OpenHIM/HIE instance)
-- `GET /fhir/metadata` - FHIR R4 CapabilityStatement (public, rate-limited)
-- `POST /fhir/Observation/$evaluate-growth` - Growth/anthropometry measurement in, FHIR Observation (or Bundle) out; wraps Fenton preterm and WHO BMI-for-age only (public, rate-limited)
+- `POST /glycaemic-index` - Create a glycaemic index entry (admin)
+- `POST /glycaemic-index/bulk` - Bulk-create glycaemic index entries (admin)
+- `GET /glycaemic-index/{id}` - Get a glycaemic index entry by id
+- `PUT /glycaemic-index/{id}` - Replace a glycaemic index entry (admin)
+- `PATCH /glycaemic-index/{id}` - Partially update a glycaemic index entry (admin)
+- `DELETE /glycaemic-index/{id}` - Delete a glycaemic index entry (admin)
 
 **Exchange**
 - `GET /exchange` - List diabetes/renal exchange list entries
@@ -250,24 +245,115 @@ v1.15.0-v1.16.0 and no longer appear here.
 
 **Drug Interactions**
 - `GET /drug-interactions` - List drug-nutrient interaction entries
-- `POST /drug-interactions` - Create an entry (admin)
-- `POST /drug-interactions/bulk` - Bulk-create entries (admin)
-- `GET /drug-interactions/search` - Keyword search (public, rate-limited)
-- `GET /drug-interactions/{id}` - Get an entry by id
-- `PUT /drug-interactions/{id}` - Replace an entry (admin)
-- `PATCH /drug-interactions/{id}` - Partially update an entry (admin)
-- `DELETE /drug-interactions/{id}` - Delete an entry (admin)
+- `POST /drug-interactions` - Create a drug-nutrient interaction entry (admin)
+- `POST /drug-interactions/bulk` - Bulk-create drug-nutrient interaction entries (admin)
+- `GET /drug-interactions/search` - Keyword search across drug-nutrient interactions
+- `GET /drug-interactions/{id}` - Get a drug-nutrient interaction entry by id
+- `PUT /drug-interactions/{id}` - Replace a drug-nutrient interaction entry (admin)
+- `PATCH /drug-interactions/{id}` - Partially update a drug-nutrient interaction entry (admin)
+- `DELETE /drug-interactions/{id}` - Delete a drug-nutrient interaction entry (admin)
+
+**BMI for age**
+- `GET /bmi-for-age/classify` - Classify BMI-for-age for a child or adolescent (5y 1m to 19y 0m)
+- `GET /bmi-for-age` - List BMI-for-age reference rows (-3SD to +3SD cut-offs)
+- `POST /bmi-for-age/bulk` - Bulk-create BMI-for-age rows (admin)
+
+**HC velocity**
+- `GET /hc-velocity/classify` - Classify a 6-month head circumference increment (birth to 24 months)
+- `GET /hc-velocity` - List WHO 6-month head circumference increment rows (-3SD to +3SD, cm)
+- `POST /hc-velocity/bulk` - Bulk-create HC velocity rows (admin)
+
+**Length velocity**
+- `GET /length-velocity/classify` - Classify a 6-month length increment (birth to 24 months)
+- `GET /length-velocity` - List WHO 6-month length increment rows (-3SD to +3SD, cm)
+- `POST /length-velocity/bulk` - Bulk-create Length velocity rows (admin)
+
+**Weight velocity**
+- `GET /weight-velocity/classify` - Classify a 6-month weight increment (birth to 24 months)
+- `GET /weight-velocity` - List WHO 6-month weight increment rows (grams, with L/M/S/Delta)
+- `POST /weight-velocity/bulk` - Bulk-create weight velocity rows (admin)
+
+**MUAC for age**
+- `GET /muac-for-age/classify` - Classify arm circumference (MUAC) for age, 3 to 60 months
+- `GET /muac-for-age` - List WHO arm circumference-for-age rows (cm, with L/M/S)
+- `POST /muac-for-age/bulk` - Bulk-create MUAC-for-age rows (admin)
+
+**MUAC fixed cut-offs**
+- `GET /muac/classify` - Classify MUAC with fixed age-group cut-offs (6 months to adult)
+
+**Length height for age**
+- `GET /length-height-for-age/classify` - Classify length/height-for-age (stunting), birth to 19 years
+- `GET /length-height-for-age` - List WHO length/height-for-age rows (cm, with L/M/S)
+- `POST /length-height-for-age/bulk` - Bulk-create length/height-for-age rows (admin)
+
+**Weight for age**
+- `GET /weight-for-age/classify` - Classify weight-for-age (underweight), birth to 10 years
+- `GET /weight-for-age` - List WHO weight-for-age rows (kg, with L/M/S)
+- `POST /weight-for-age/bulk` - Bulk-create weight-for-age rows (admin)
+
+**Weight for length height**
+- `GET /weight-for-length-height/classify` - Classify weight-for-length/height (wasting), birth to 5 years
+- `GET /weight-for-length-height` - List WHO weight-for-length/height rows (kg, with L/M/S)
+- `POST /weight-for-length-height/bulk` - Bulk-create weight-for-length/height rows (admin)
+
+**BMI for age under 5**
+- `GET /bmi-for-age-under-5/classify` - Classify BMI-for-age, birth to 5 years
+- `GET /bmi-for-age-under-5` - List WHO BMI-for-age rows, birth to 5 years (kg/m2, with L/M/S)
+- `POST /bmi-for-age-under-5/bulk` - Bulk-create BMI-for-age (under 5) rows (admin)
+
+**HC for age**
+- `GET /hc-for-age/classify` - Classify head circumference-for-age, birth to 5 years
+- `GET /hc-for-age` - List WHO head circumference-for-age rows (cm, with L/M/S)
+- `POST /hc-for-age/bulk` - Bulk-create head circumference-for-age rows (admin)
+
+**Growth assessment** (every applicable WHO indicator in one call)
+- `GET /growth/assess` - Combined WHO growth assessment (every applicable indicator in one call)
+
+**Fenton Preterm** (licensed data — no list/dump route; every read returns a computed result, static metadata, or a rendered image, never raw L/M/S)
+- `GET /fenton-preterm/classify` - Classify a preterm infant measurement (weight, length, or head circumference)
+- `POST /fenton-preterm/profile` - Classify weight, length, and head circumference together at one timepoint
+- `POST /fenton-preterm/growth` - Classify a series of same-metric measurements over time (trajectory + trend)
+- `POST /fenton-preterm/velocity` - Growth velocity between consecutive same-metric measurements
+- `GET /fenton-preterm/chart` - Server-rendered SVG growth chart (P3/P10/P50/P90/P97 curves)
+- `GET /fenton-preterm/references` - Static reference metadata (years, sexes, metrics, valid age ranges, citations, license)
+- `POST /fenton-preterm/bulk` - Bulk-create Fenton preterm reference rows (admin)
+
+**FHIR** (stateless facade over the growth endpoints and the Nutrition Care Process, no storage, not yet registered with any OpenHIM/HIE instance; the hosted API runs in enforce mode, so every operation except conformance reads and `ConceptMap/$translate` needs a Bearer credential with a FHIR scope, and `AuditEvent` reads always do)
+- `GET /fhir/metadata` - FHIR R4 CapabilityStatement
+- `POST /fhir/Observation/$evaluate-growth` - Evaluate a growth/anthropometry measurement, FHIR-shaped
+- `POST /fhir/Observation/$screen` - NCP screening (MUST, NRS-2002, MNA, SGA, PG-SGA or NACS classification)
+- `POST /fhir/Observation/$assess-nutrition` - NCP Step 1 — nutrition assessment (adults)
+- `POST /fhir/Condition/$diagnose` - NCP Step 2 — nutrition diagnosis (PES statement)
+- `POST /fhir/CarePlan/$intervene` - NCP Step 3 — nutrition intervention
+- `POST /fhir/CarePlan/$monitor` - NCP Step 4 - monitoring and evaluation of a follow-up visit
+- `POST /fhir/Goal/$evaluate` - NCP Step 4 — monitoring and evaluation
+- `POST /fhir/Bundle/$ncp-document` - NCP Step 5 - complete ADIME document Bundle
+- `POST /fhir/Bundle/$care-context` - NCP Step 6 - professional and institutional context
+- `POST /fhir/$validate` - Structural R4 check of one resource or Bundle
+- `POST /fhir/ConceptMap/$translate` - Translate a Chakudya code (LOINC, HL7 practitioner-role, v3 ObservationInterpretation)
+- `GET /fhir/ConceptMap/{id}` - Published terminology mapping
+- `GET /fhir/AuditEvent` - Search stored audit events (admin)
+- `GET /fhir/AuditEvent/{id}` - Read one stored audit event (admin)
+- `POST /fhir/Bundle/$validate-document` - Validate an ADIME document Bundle
+- `POST /fhir/Bundle/$nutrition-assessment` - Structured nutrition assessment (NCP step 1 foundation)
+- `POST /fhir/QuestionnaireResponse/$validate` - Validate a QuestionnaireResponse against a built-in form
+- `GET /fhir/Questionnaire` - List the built-in assessment forms
+- `GET /fhir/Questionnaire/{id}` - One built-in assessment form
+- `GET /fhir/CodeSystem/ncp-diagnosis` - NCP nutrition diagnostic terminology (2006 edition) as a FHIR CodeSystem
+- `GET /fhir/CodeSystem/{name}` - FHIR CodeSystem used by the facade
+- `GET /fhir/OperationDefinition/{id}` - FHIR OperationDefinition
+- `GET /fhir/StructureDefinition/{name}` - FHIR Extension StructureDefinition
 
 **Packaged**
 - `GET /packaged` - List packaged/branded foods
 - `GET /packaged/pending` - Admin review queue (admin)
-- `POST /packaged/scan` - Submit a packaged food via photo (public, rate-limited)
 - `POST /packaged/submit` - Submit a packaged food (public, rate-limited)
+- `POST /packaged/scan` - Submit a packaged food via photo (public, rate-limited)
+- `POST /packaged/{id}/approve` - Approve a pending packaged food (admin)
+- `POST /packaged/{id}/reject` - Reject a pending packaged food (admin)
 - `PUT /packaged/{id}` - Replace a packaged food (admin)
 - `PATCH /packaged/{id}` - Partially update a packaged food (admin)
 - `DELETE /packaged/{id}` - Delete a packaged food (admin)
-- `POST /packaged/{id}/approve` - Approve a pending packaged food (admin)
-- `POST /packaged/{id}/reject` - Reject a pending packaged food (admin)
 
 **Favorites**
 - `GET /favorites` - List a user's favorites (public, rate-limited)
@@ -279,37 +365,42 @@ v1.15.0-v1.16.0 and no longer appear here.
 - `POST /history` - Log a view (public, rate-limited, opt-in)
 
 **Food Log**
-- `GET /log` - List nutrition diary entries for a user_id
-- `POST /log` - Log a diary entry
-- `GET /log/{id}` - Get a log entry by id
-- `DELETE /log/{id}` - Delete a log entry
-- `GET /log/summary` - Daily or weekly calorie totals
+- `GET /log` - List nutrition diary entries (public, opt-in identity)
+- `POST /log` - Log a food diary entry
+- `GET /log/{id}` - Get a food log entry by id
+- `DELETE /log/{id}` - Delete a food log entry
+- `GET /log/summary` - Daily or weekly calorie totals for a user
 
 **Recipes**
-- `POST /recipes/calculate` - Total and per-serving nutrition for a recipe (public, rate-limited)
+- `POST /recipes/calculate` - Compute total and per-serving nutrition for a recipe (public, rate-limited)
 
 **Meals**
-- `POST /meals/analyze` - Macro split, food groups, and target comparison for a meal (public, rate-limited)
+- `POST /meals/analyze` - Analyze a meal's macro split, food groups, and (optionally) targets (public, rate-limited)
 
 **Ingredients**
 - `POST /ingredients/parse` - Parse free-text ingredients into structured items (public, rate-limited)
 
 **DRI**
-- `GET /dri` - Look up EAR/RDA/AI/UL by life stage or age+sex
 - `GET /dri/life-stages` - List every DRI life-stage group
-- `POST /dri/compare` - Compare a day's intake against a life stage's RDA/AI targets
+- `GET /dri` - Look up EAR/RDA/AI/UL by life stage or age+sex
+- `POST /dri/compare` - Compare an actual day's intake against a life stage's RDA/AI targets
 
 **RAG**
-- `POST /rag/ask` - RAG Search Orchestrator (public, rate-limited)
-- `POST /rag/ingest` - Ingest a document into the RAG knowledge base (admin)
 - `POST /rag/retrieve` - Raw semantic retrieval (public, rate-limited)
-- `DELETE /rag/source` - Bulk-remove chunks by citation (admin)
+- `DELETE /rag/source` - Bulk-remove RAG chunks by citation (admin)
+- `POST /rag/ingest` - Ingest a document into the RAG knowledge base (admin)
+- `POST /rag/ask` - RAG Search Orchestrator (public, rate-limited)
+- `POST /rag/upload` - Upload a document for automatic ingestion (admin)
+- `POST /rag/enqueue` - Queue an already-uploaded file, or retry a failed job (admin)
+- `GET /rag/jobs` - List recent ingestion jobs (admin)
+- `GET /rag/jobs/{id}` - Get one ingestion job (admin)
+- `POST /rag/webhook` - Storage trigger webhook (shared secret)
 
 **Memory**
-- `POST /memory/consolidate` - Manually trigger consolidation for one session (admin)
-- `GET /memory/recall` - Recall (deprecated - use POST, same params as query string)
-- `POST /memory/recall` - Recall top-K relevant memory rows for a session (public, rate-limited, preferred)
 - `POST /memory/write` - Write a raw memory fact (public, rate-limited)
+- `POST /memory/recall` - Recall top-K relevant memory rows for a session (public, rate-limited, preferred)
+- `GET /memory/recall` - Recall (deprecated - use POST, same params as query string)
+- `POST /memory/consolidate` - Manually trigger consolidation for one session (admin)
 
 ---
 
@@ -331,6 +422,17 @@ repo's README / `routePolicy()` instead of the route handlers themselves:
   Cron Trigger (`wrangler.toml`), bypassing HTTP auth entirely. That's noted
   in the endpoint's callout since it's real, useful context, but it isn't
   something Try It can exercise (there's no HTTP route for the cron path).
+- **FHIR access mode.** Which `/fhir` operations need a credential depends on
+  `FHIR_AUTH_MODE`, a deployment setting rather than something the route
+  handlers declare. The docs describe the hosted configuration (`enforce`):
+  conformance reads and `ConceptMap/$translate` are always open, `AuditEvent`
+  reads always need a credential, and every other operation needs a Bearer
+  token with a matching `system/<Resource>.<read|write>` scope. This was read
+  from `fhirGovernance.js` and `wrangler.toml`. In open mode the same
+  operations are public.
+- **RAG ingestion pipeline** (`/rag/upload`, `/rag/enqueue`, `/rag/jobs`,
+  `/rag/webhook`) is documented from `src/ragPipeline.js`; the webhook is
+  authenticated by an `x-webhook-secret` header rather than a bearer token.
 - **Row shapes for `foods`, `exchange`, `renal`, `formulas`, `packaged`,
   `glycaemic-index`, `drug-interactions`** are intentionally modeled loosely in the
   spec (`additionalProperties: true` plus a handful of illustrative

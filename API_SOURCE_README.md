@@ -173,6 +173,8 @@ Runs the full MISS→HIT / rate-limit / cascade verification pass in one command
   - `/packaged/:id`
 - `GET /packaged/pending`, `POST /packaged/:id/approve`, `POST /packaged/:id/reject`
 - `GET /admin/keys`, `POST /admin/keys`, `DELETE /admin/keys/:id` — **root key only**, see [API keys](#api-keys)
+- `POST /oauth/token` — OAuth 2.0 `client_credentials` token endpoint, see [OAuth 2.0](#oauth-20-machine-to-machine)
+- `GET /admin/oauth-clients`, `POST /admin/oauth-clients`, `DELETE /admin/oauth-clients/:id` — **root key only**
 - `POST /rag/ingest`
 - `POST /memory/consolidate` (also runs automatically via hourly cron, bypassing HTTP auth)
 
@@ -284,6 +286,74 @@ curl -X DELETE https://your-worker-url/admin/keys/1 -H "Authorization: Bearer <A
 
 ---
 
+## OAuth 2.0 (machine-to-machine)
+
+For services that call the API on their own behalf (MCP server, Thanzi Coach,
+apps) there's an OAuth 2.0 **client_credentials** flow, so a service holds a
+revocable client secret instead of a long-lived admin key. A client exchanges
+its credentials for a **1-hour bearer token**, then uses it exactly like an API
+key (`Authorization: Bearer <token>`) on any admin route, including `/batch`.
+Tokens carry the client's role (`admin` or `reviewer`), so role limits apply
+unchanged. Existing API keys keep working.
+
+**One-time setup**
+
+1. Run `sql/014_add_oauth_clients.sql` in the Supabase SQL editor.
+2. Add a Worker secret `OAUTH_SIGNING_SECRET` in the Cloudflare dashboard
+   (Workers & Pages → chakudya-api → Settings → Variables and Secrets).
+   Generate one with `openssl rand -hex 32`. Rotating it invalidates all
+   outstanding tokens (clients simply fetch a new one).
+
+**Create a client** (root key only; the secret is shown once):
+
+```bash
+curl -X POST https://your-worker-url/admin/oauth-clients \
+  -H "Authorization: Bearer <ADMIN_API_KEY>" -H "Content-Type: application/json" \
+  -d '{"label":"thanzi-coach","role":"admin"}'
+# -> client_id: cnr_client_..., client_secret: cnr_secret_...
+```
+
+**Get a token** (HTTP Basic, or `client_id`/`client_secret` form fields):
+
+```bash
+curl -X POST https://your-worker-url/oauth/token \
+  -u "$CLIENT_ID:$CLIENT_SECRET" -d "grant_type=client_credentials"
+# -> {"access_token":"eyJ...","token_type":"Bearer","expires_in":3600,"scope":"admin"}
+```
+
+Optional `scope=reviewer` requests a narrower token than the client's role;
+asking for more than the client's role returns `invalid_scope`.
+
+**Use it, caching until shortly before expiry:**
+
+```js
+let cached = { token: null, exp: 0 };
+async function getToken(env, base) {
+  if (cached.token && Date.now() < cached.exp - 60_000) return cached.token;
+  const res = await fetch(`${base}/oauth/token`, {
+    method: "POST",
+    headers: {
+      Authorization: "Basic " + btoa(`${env.CNR_CLIENT_ID}:${env.CNR_CLIENT_SECRET}`),
+      "Content-Type": "application/x-www-form-urlencoded",
+    },
+    body: "grant_type=client_credentials",
+  });
+  if (!res.ok) throw new Error(`token request failed: ${res.status}`);
+  const { access_token, expires_in } = await res.json();
+  cached = { token: access_token, exp: Date.now() + expires_in * 1000 };
+  return access_token;
+}
+```
+
+**Revoke:** `DELETE /admin/oauth-clients/:id` (root key). New tokens stop
+immediately and already-issued tokens are rejected too (KV denylist; if
+`RATE_LIMIT_KV` isn't bound they live out their hour). `GET /admin/oauth-clients`
+lists clients without secrets. Discovery metadata (RFC 8414):
+`GET /.well-known/oauth-authorization-server`. The token endpoint is limited
+to 10 requests/min per IP.
+
+---
+
 ## Rate Limits (from `index.js` policy)
 
 - **Standard reads (`GET`)**: `100/min` per IP per resource
@@ -308,7 +378,7 @@ GET responses for reference-style resources are cached at the Cloudflare edge, k
 
 | Resource | Cached? | TTL |
 |---|---|---|
-| `GET /foods`, `/exchange`, `/renal`, `/formulas`, `/glycaemic-index`, `/bmi-for-age` | ✅ | 1 hour |
+| `GET /foods`, `/exchange`, `/renal`, `/formulas`, `/glycaemic-index`, `/bmi-for-age`, `/hc-velocity`, `/length-velocity`, `/weight-velocity`, `/muac-for-age`, `/muac`, `/length-height-for-age`, `/weight-for-age`, `/weight-for-length-height`, `/bmi-for-age-under-5`, `/hc-for-age`, `/growth/assess` | ✅ | 1 hour |
 | `GET /foods/compare` | ✅ | 1 hour |
 | `GET /foods/lookup` | ✅ | 30 min |
 | `GET /foods/autocomplete` | ✅ | 1 hour |
@@ -546,7 +616,7 @@ curl ".../foods?category=fruit&cursor=187"            # next page (from next_cur
 ## Bulk insert
 
 `POST /foods/bulk`, `/exchange/bulk`, `/renal/bulk`, `/formulas/bulk`,
-`/drug-interactions/bulk`, `/glycaemic-index/bulk`, `/bmi-for-age/bulk`, and
+`/drug-interactions/bulk`, `/glycaemic-index/bulk`, `/bmi-for-age/bulk`, `/hc-velocity/bulk`, `/length-velocity/bulk`, `/weight-velocity/bulk`, `/muac-for-age/bulk`, `/length-height-for-age/bulk`, `/weight-for-age/bulk`, `/weight-for-length-height/bulk`, `/bmi-for-age-under-5/bulk`, `/hc-for-age/bulk`, and
 `/fenton-preterm/bulk` *(all admin)* accept a batch
 of rows in one request instead of one `POST` per row — useful for loading
 data from a spreadsheet or migration script.
@@ -749,6 +819,206 @@ GET /bmi-for-age/classify?sex=girls&age_months=95&weight_kg=26&height_cm=121.1
 
 Cut-offs (strict inequalities, compared against the **unrounded** BMI, so a displayed BMI of 17.7 can still be above a 17.7 cut-off): severe thinness < -3SD, thinness < -2SD, normal from -2SD to +1SD, overweight > +1SD, obesity > +2SD. The printed guide lists severe thinness as "< -1 SD", which looks like a typo, so the WHO -3SD cut-off is used. Ages outside 61 to 228 months return a 400: under-5s need the WHO child growth standards and adults use adult BMI cut-offs. This is a screening aid, not a diagnosis.
 
+### Head Circumference Velocity (`/hc-velocity`)
+
+WHO Child Growth Standards 6-month head circumference **increments** (simplified field tables), birth to 24 months, -3 SD to +3 SD, for girls and boys. Table: [`sql/018_add_who_hc_velocity.sql`](sql/018_add_who_hc_velocity.sql), 38 rows (19 girls + 19 boys), one per sex per 6-month window (0-6, 1-7, ... 18-24 months). Values are transcribed from the printed tables, not estimated. Logic: [`src/hcVelocity.js`](src/hcVelocity.js). This is how fast the head grew over a window, **not** head circumference for age.
+
+- `GET /hc-velocity/classify` *(public, rate-limited, cached 1h)* — `sex`, `start_age_months` (0-18, whole months at the first measurement; 3 means the 3-9 month window), and either `increment_cm` or both `hc_start_cm` and `hc_end_cm`. Optional `end_age_months` must equal start + 6. Returns `status`, `increment_cm`, `z_approx` (interpolated between the printed SDs, null beyond -3 or +3) and the `cutoffs` used.
+- `GET /hc-velocity` — the raw reference rows; optional `sex` and `start_age_months` filters, standard pagination.
+- `POST /hc-velocity/bulk` *(admin)* — see [Bulk insert](#bulk-insert); seed file: [`scripts/who_hc_velocity_seed.json`](scripts/who_hc_velocity_seed.json). A unique `(sex, interval_start_months)` constraint rejects a second seeding attempt.
+
+Bands (strict): very low < -3SD, low < -2SD, within expected range -2SD to +2SD, high > +2SD, very high > +3SD. Screening aid only, not a diagnosis; interpret with head circumference for age and clinical context.
+
+```
+GET /hc-velocity/classify?sex=girls&start_age_months=3&hc_start_cm=40.2&hc_end_cm=43.9
+```
+
+Setup: run `sql/018_add_who_hc_velocity.sql` in the Supabase SQL editor, then `POST /hc-velocity/bulk` once with the seed file.
+
+### Length Velocity (`/length-velocity`)
+
+WHO Child Growth Standards 6-month length **increments** (simplified field tables), birth to 24 months, -3 SD to +3 SD, for girls and boys. Table: [`sql/019_add_who_length_velocity.sql`](sql/019_add_who_length_velocity.sql), 38 rows (19 girls + 19 boys), one per sex per 6-month window (0-6, 1-7, ... 18-24 months). Values are transcribed from the printed tables, not estimated. Logic: [`src/lengthVelocity.js`](src/lengthVelocity.js) (classification shared with `src/hcVelocity.js`). This is how fast the child grew over a window, **not** length for age.
+
+- `GET /length-velocity/classify` *(public, rate-limited, cached 1h)* — `sex`, `start_age_months` (0-18, whole months at the first measurement; 3 means the 3-9 month window), and either `increment_cm` or both `length_start_cm` and `length_end_cm`. Optional `end_age_months` must equal start + 6. Returns `status`, `increment_cm`, `z_approx` (interpolated between the printed SDs, null beyond -3 or +3) and the `cutoffs` used.
+- `GET /length-velocity` — the raw reference rows; optional `sex` and `start_age_months` filters, standard pagination.
+- `POST /length-velocity/bulk` *(admin)* — see [Bulk insert](#bulk-insert); seed file: [`scripts/who_length_velocity_seed.json`](scripts/who_length_velocity_seed.json). A unique `(sex, interval_start_months)` constraint rejects a second seeding attempt.
+
+Bands (strict): very low < -3SD, low < -2SD, within expected range -2SD to +2SD, high > +2SD, very high > +3SD. Screening aid only, not a diagnosis; use recumbent length measured the same way at both visits, and interpret with length-for-age, weight-for-length and clinical context.
+
+```
+GET /length-velocity/classify?sex=girls&start_age_months=3&length_start_cm=61.0&length_end_cm=71.3
+```
+
+Setup: run `sql/019_add_who_length_velocity.sql` in the Supabase SQL editor, then `POST /length-velocity/bulk` once with the seed file.
+
+### Weight Velocity (`/weight-velocity`)
+
+WHO Child Growth Standards 6-month weight **increments in grams** (simplified field tables), birth to 24 months, for girls and boys. Table: [`sql/020_add_who_weight_velocity.sql`](sql/020_add_who_weight_velocity.sql), 38 rows (19 girls + 19 boys), one per sex per 6-month window (0-6, 1-7, ... 18-24 months). Logic: [`src/weightVelocity.js`](src/weightVelocity.js). This is how much weight the child gained over a window, **not** weight for age.
+
+**Where the numbers come from:** the -3 SD to +3 SD cut-offs for both sexes are transcribed from the printed WHO z-score tables. Each row also stores that table's L, M, S and Delta parameters, so the API returns an exact z-score and percentile (`z = (((x + Delta) / M)^L - 1) / (L*S)`) as well as the band. A unit test re-checks all 266 stored cut-offs against their own L, M, S and Delta within 1 g.
+
+- `GET /weight-velocity/classify` *(public, rate-limited, cached 1h)* — `sex`, `start_age_months` (0-18, whole months at the first weighing; 3 means the 3-9 month window), and either `increment_g` (grams) or both `weight_start_kg` and `weight_end_kg` (kilograms). Optional `end_age_months` must equal start + 6. Returns `status`, `increment_g`, `z_score`, `percentile` and the `cutoffs` (grams) used. `z_score` and `percentile` are `null` when the Delta-shifted increment is not positive.
+- `GET /weight-velocity` — the raw reference rows including L, M, S and Delta; optional `sex` and `start_age_months` filters, standard pagination.
+- `POST /weight-velocity/bulk` *(admin)* — see [Bulk insert](#bulk-insert); seed file: [`scripts/who_weight_velocity_seed.json`](scripts/who_weight_velocity_seed.json). A unique `(sex, interval_start_months)` constraint rejects a second seeding attempt.
+
+Bands (strict): very low < -3SD, low < -2SD, within expected range -2SD to +2SD, high > +2SD, very high > +3SD. Increments can legitimately be near zero or negative in the second year (the late-window -3 SD cut-offs are around 0 g or below). Screening aid only, not a diagnosis; weight gain varies with illness, feeding and scale error, so repeat on the same scale and interpret with weight-for-age and weight-for-length.
+
+```
+GET /weight-velocity/classify?sex=girls&start_age_months=3&weight_start_kg=5.8&weight_end_kg=8.2
+```
+
+Setup: run `sql/020_add_who_weight_velocity.sql` in the Supabase SQL editor, then `POST /weight-velocity/bulk` once with the seed file.
+
+### MUAC-for-age (`/muac-for-age`)
+
+WHO Child Growth Standards **arm circumference-for-age** (cm), 3 to 60 months, girls and boys. Table: [`sql/021_add_who_muac_for_age.sql`](sql/021_add_who_muac_for_age.sql), one row per sex per completed month, taken from WHO's expanded daily table at day = round(months x 30.4375). Logic: [`src/muacForAge.js`](src/muacForAge.js). This is MUAC as a **z-score for age**, not the fixed-cut-off MUAC tape used in community screening (115 mm / 125 mm).
+
+**Where the numbers come from:** the -3 SD to +3 SD cut-offs are transcribed from the WHO expanded z-score tables, and each row stores that table's L, M and S, so the API returns an exact z-score and percentile (`z = ((x / M)^L - 1) / (L*S)`; beyond +/-3 SD WHO's linear extension is used). A unit test re-checks every stored cut-off against its own L, M, S within 0.001 cm.
+
+- `GET /muac-for-age/classify` *(public, rate-limited, cached 1h)* — `sex`, `age_months` (3-60, whole months), and `muac_cm` or `muac_mm`. Returns `status`, `muac_cm`, `z_score`, `percentile` and the `cutoffs` (cm) used.
+- `GET /muac-for-age` — raw reference rows including L, M, S; optional `sex` and `age_months` filters, standard pagination.
+- `POST /muac-for-age/bulk` *(admin)* — see [Bulk insert](#bulk-insert); seed files: [`scripts/muac_for_age_seed.json`](scripts/muac_for_age_seed.json) (months 3-35) and [`scripts/muac_for_age_seed_36_60.json`](scripts/muac_for_age_seed_36_60.json) (months 36-60, from WHO's monthly 3-5 year tables, cut-offs recomputed from the printed L, M, S); post each once. A unique `(sex, age_months)` constraint rejects re-seeding of months already present, so the table can be loaded in more than one file. Regenerate or extend the seed with `node scripts/build_muac_seed.mjs <girls.txt> <boys.txt>` (months missing from the input are skipped and listed).
+
+Bands (strict): very low < -3SD, low < -2SD, within expected range -2SD to +2SD, high > +2SD, very high > +3SD. Screening aid only, not a diagnosis.
+
+```
+GET /muac-for-age/classify?sex=girls&age_months=12&muac_cm=13.5
+```
+
+Setup: run `sql/021_add_who_muac_for_age.sql` in the Supabase SQL editor, then `POST /muac-for-age/bulk` once with each seed file (116 rows in total).
+
+### MUAC fixed cut-offs (`/muac`)
+
+Severe / moderate / normal classification of mid-upper arm circumference by age group, 6 months to adult. Logic: [`src/muacFixed.js`](src/muacFixed.js). No database table and nothing to seed. Source: WHO, *Guideline for Integrated Approach to the National Care of HIV Infected Children (6 months - 14 years)*, 2008, as reproduced in the FANTA Ethiopia MUAC chart.
+
+| Age | Severe | Moderate | Normal |
+|---|---|---|---|
+| 6-11 months | < 11 cm | 11-12 cm | > 12 cm |
+| 12-59 months | < 11 cm | 11-13 cm | > 13 cm |
+| 5-9 years | < 13.5 cm | 13.5-14.5 cm | > 14.5 cm |
+| 10-14 years | < 16 cm | 16-18 cm | > 18 cm |
+| Adults (15 y+) | < 18 cm | 18-21 cm | > 21 cm |
+
+- `GET /muac/classify` *(public, rate-limited, cached 1h)* — `age_months` (6 or more, whole months), `muac_cm` or `muac_mm`, optional `scheme` (`who_hiv_2008` default, or `cmam`). Returns `age_group`, `status`, `muac_cm` and the `cutoffs_cm` used. Moderate includes both end values.
+
+**`scheme=cmam` (6-59 months only):** add `&scheme=cmam` for the WHO/UNICEF community screening cut-offs used by CMAM programmes: below 11.5 cm severe, 11.5 to below 12.5 cm moderate, 12.5 cm and above normal (note 12.5 itself is normal here, unlike the chart above where the upper end value is moderate). The default is `scheme=who_hiv_2008`, the chart above. The two differ for 6-59 months, so check which one your programme follows. For MUAC as a z-score for age see [`/muac-for-age`](#muac-for-age-muac-for-age).
+
+```
+GET /muac/classify?age_months=18&muac_cm=11.8
+```
+
+### Length/height-for-age (`/length-height-for-age`)
+
+WHO **length/height-for-age** (cm), birth to 19 years, girls and boys (the stunting indicator): the 2006 Child Growth Standards for 0-60 months and the 2007 growth reference for 61-228 months (5y 1m to 19y 0m). Table: [`sql/022_add_who_length_height_for_age.sql`](sql/022_add_who_length_height_for_age.sql), widened to 19 years by [`sql/023_extend_length_height_for_age_to_19y.sql`](sql/023_extend_length_height_for_age_to_19y.sql); 460 rows in total (124 + 336). Logic: [`src/lengthHeightForAge.js`](src/lengthHeightForAge.js). Source: WHO monthly z-score tables, length-for-age (birth to 2 years, lying down) and height-for-age (2 to 5 years, standing). Month 24 is in both tables, so it has a lying row and a standing row (they differ by about 0.7 cm).
+
+**Where the numbers come from:** each row stores the table's L, M, S, and the -3 SD to +3 SD cut-offs are recomputed from them to 3 decimals (the printed ones are rounded to 1 decimal). A unit test re-checks every row. L is 1 in these tables, so `z = (x - M) / (M*S)`. Rebuild the 0-5 year seed with `python3 scripts/build_lhfa_seed.py <girls_0_2.xlsx> <girls_2_5.xlsx> <boys_0_2.xlsx> <boys_2_5.xlsx>` and the 5-19 year seed with `python3 scripts/build_hfa_5_19_seed.py <girls.xlsx> <boys.xlsx>`. The 5-19 year cut-offs are the printed WHO 3-decimal values.
+
+- `GET /length-height-for-age/classify` *(public, rate-limited, cached 1h)* — `sex`, `age_months` (0-228), and `length_cm` or `height_cm` (or the `_mm` versions). Optional `measured=lying|standing`; the default is lying under 24 months and standing from 24. If the child was measured the other way, 0.7 cm is subtracted (lying value on a child 24 months or older) or added (standing value on a child under 24 months), and `position_adjustment` says so. Returns `status`, `reference`, `value_cm`, `z_score`, `percentile`, `implausible` and the `cutoffs` (cm).
+- `GET /length-height-for-age` — raw reference rows including L, M, S; optional `sex` and `age_months` filters, standard pagination.
+- `POST /length-height-for-age/bulk` *(admin)* — see [Bulk insert](#bulk-insert); seed files: [`scripts/length_height_for_age_seed.json`](scripts/length_height_for_age_seed.json) (0-60 months) and [`scripts/height_for_age_5_19_seed.json`](scripts/height_for_age_5_19_seed.json) (61-228 months; run `sql/023` first). A unique `(sex, age_months, measured)` constraint rejects re-seeding.
+
+Bands (strict): severely stunted < -3SD, stunted < -2SD, normal -2SD to +2SD, tall > +2SD, very tall > +3SD. `implausible` is true when |z| > 6 (usually a measuring or recording error). Screening aid only, not a diagnosis.  Note the small step at 60/61 months where WHO switches from the 2006 standards to the 2007 reference.
+
+```
+GET /length-height-for-age/classify?sex=girls&age_months=18&length_cm=78
+```
+
+Setup: run `sql/022_add_who_length_height_for_age.sql` then `sql/023_extend_length_height_for_age_to_19y.sql` in the Supabase SQL editor, then `POST /length-height-for-age/bulk` once with each seed file.
+
+### Weight-for-age (`/weight-for-age`)
+
+WHO **weight-for-age** (kg), birth to 10 years, girls and boys (the underweight indicator): the 2006 Child Growth Standards for 0-60 months and the 2007 growth reference for 61-120 months. WHO does not publish weight-for-age beyond 10 years; older children use [BMI-for-age](#bmi-for-age-bmi-for-age). Table: [`sql/024_add_who_weight_for_age.sql`](sql/024_add_who_weight_for_age.sql), 242 rows. Logic: [`src/weightForAge.js`](src/weightForAge.js).
+
+**Where the numbers come from:** each row stores the table's L, M, S. The 0-60 month cut-offs are recomputed from them to 3 decimals (the printed ones are rounded to 1 decimal); the 61-120 month cut-offs are WHO's printed 3-decimal values. A unit test re-checks every row. `z = ((x/M)^L - 1) / (L*S)`, and beyond +/-3 SD WHO's linear extension is used. Rebuild the seed with `python3 scripts/build_wfa_seed.py <girls_0_5.xlsx> <boys_0_5.xlsx> <girls_5_10.xlsx> <boys_5_10.xlsx>`.
+
+- `GET /weight-for-age/classify` *(public, rate-limited, cached 1h)* — `sex`, `age_months` (0-120), and `weight_kg` or `weight_g`. Returns `status`, `weight_kg`, `z_score`, `percentile`, `implausible` and the `cutoffs` (kg) used.
+- `GET /weight-for-age` — raw reference rows including L, M, S; optional `sex` and `age_months` filters, standard pagination.
+- `POST /weight-for-age/bulk` *(admin)* — see [Bulk insert](#bulk-insert); seed file: [`scripts/weight_for_age_seed.json`](scripts/weight_for_age_seed.json). A unique `(sex, age_months)` constraint rejects re-seeding.
+
+Bands (strict): severely underweight < -3SD, underweight < -2SD, normal -2SD to +2SD, high weight-for-age > +2SD, very high > +3SD. `implausible` is true when z < -6 or z > +5 (usually a measuring or recording error). Weight-for-age is **not** used to diagnose overweight or obesity (use weight-for-length/height under 5 years, BMI-for-age from 5 years), and it cannot tell wasting from stunting. There is a small step at 60/61 months where WHO switches from the 2006 standards to the 2007 reference. Screening aid only, not a diagnosis.
+
+```
+GET /weight-for-age/classify?sex=girls&age_months=12&weight_kg=8.5
+```
+
+Setup: run `sql/024_add_who_weight_for_age.sql` in the Supabase SQL editor, then `POST /weight-for-age/bulk` once with the seed file.
+
+### Weight-for-length/height (`/weight-for-length-height`)
+
+WHO Child Growth Standards **weight-for-length** (birth to 2 years, lying down, 45.0-110.0 cm) and **weight-for-height** (2 to 5 years, standing, 65.0-120.0 cm), girls and boys (the wasting indicator, central to acute malnutrition screening). Table: [`sql/025_add_who_weight_for_length_height.sql`](sql/025_add_who_weight_for_length_height.sql), 2404 rows in 0.1 cm steps. Logic: [`src/weightForLengthHeight.js`](src/weightForLengthHeight.js).
+
+**How it works:** the child's **age** picks the table (lying under 24 months, standing from 24), and the length/height, rounded to the nearest 0.1 cm, picks the row. If the child was measured the other way for their age, 0.7 cm is subtracted (lying value on a child 24 months or older) or added (standing value on a child under 24 months), and `position_adjustment` says so (same convention as `/length-height-for-age`). Each row stores the table's L, M, S and WHO's printed 3-decimal -3 SD to +3 SD cut-offs; a unit test re-checks all 2404 rows. `z = ((x/M)^L - 1) / (L*S)`, with WHO's linear extension beyond +/-3 SD. Rebuild the seed with `python3 scripts/build_wflh_seed.py <wfl_girls.xlsx> <wfh_girls.xlsx> <wfl_boys.xlsx> <wfh_boys.xlsx>`.
+
+- `GET /weight-for-length-height/classify` *(public, rate-limited, cached 1h)* — `sex`, `age_months` (0-60), `weight_kg` or `weight_g`, and `length_cm` or `height_cm` (or the `_mm` versions); optional `measured=lying|standing`. Returns `status`, `reference`, `weight_kg`, `z_score`, `percentile`, `implausible`, the `cutoffs` (kg) and the length/height actually used. A length/height outside the table (under 45 or over 110 cm lying; under 65 or over 120 cm standing) returns 422.
+- `GET /weight-for-length-height` — raw reference rows; optional `sex`, `measured` and `length_height_cm` filters, standard pagination.
+- `POST /weight-for-length-height/bulk` *(admin)* — see [Bulk insert](#bulk-insert); five seed parts of at most 500 rows: `scripts/weight_for_length_height_seed_1.json` to `_5.json`. A unique `(sex, measured, length_height_cm)` constraint rejects re-seeding.
+
+Bands (strict): severe wasting < -3SD, moderate wasting < -2SD, normal -2SD to +1SD, possible risk of overweight > +1SD, overweight > +2SD, obesity > +3SD. `implausible` is true when |z| > 5. Bilateral pitting oedema means severe acute malnutrition whatever the z-score, and MUAC and clinical signs decide in practice (see `/muac/classify`). Screening aid only, not a diagnosis.
+
+```
+GET /weight-for-length-height/classify?sex=girls&age_months=18&weight_kg=9.2&length_cm=78
+```
+
+Setup: run `sql/025_add_who_weight_for_length_height.sql` in the Supabase SQL editor, then `POST /weight-for-length-height/bulk` once for each of the five seed files.
+
+### BMI-for-age under 5 (`/bmi-for-age-under-5`)
+
+WHO Child Growth Standards **BMI-for-age** (kg/m2), birth to 5 years, girls and boys. The 5-19 year table is [`/bmi-for-age`](#bmi-for-age-bmi-for-age) (Malawi MoH guide), which is unchanged. Table: [`sql/026_add_who_bmi_for_age_under_5.sql`](sql/026_add_who_bmi_for_age_under_5.sql), 124 rows (birth to 2 years, lying length; 2 to 5 years, standing height; month 24 has both). Logic: [`src/bmiForAgeUnder5.js`](src/bmiForAgeUnder5.js).
+
+**How it works:** the child's **age** picks the table (lying under 24 months, standing from 24). Pass `weight_kg` (or `weight_g`) with `length_cm` or `height_cm` and the API computes BMI, or pass `bmi` directly. If the child was measured the other way for their age, 0.7 cm is subtracted (lying value, 24 months or older) or added (standing value, under 24 months) **before** BMI is computed, and `position_adjustment` says so (as in WHO Anthro; a BMI passed directly cannot be adjusted). Each row stores the table's L, M, S; the cut-offs are recomputed from them to 3 decimals (the printed ones are rounded to 1 decimal) and a unit test re-checks every row. Rebuild the seed with `python3 scripts/build_bmi_under5_seed.py <girls_0_2.xlsx> <girls_2_5.xlsx> <boys_0_2.xlsx> <boys_2_5.xlsx>`.
+
+- `GET /bmi-for-age-under-5/classify` *(public, rate-limited, cached 1h)* — `sex`, `age_months` (0-60), and either `bmi`, or `weight_kg`/`weight_g` with `length_cm`/`height_cm` (or `_mm`); optional `measured=lying|standing`. Returns `status`, `reference`, `bmi`, `z_score`, `percentile`, `implausible` and the `cutoffs` (kg/m2).
+- `GET /bmi-for-age-under-5` — raw reference rows including L, M, S; optional `sex` and `age_months` filters, standard pagination.
+- `POST /bmi-for-age-under-5/bulk` *(admin)* — see [Bulk insert](#bulk-insert); seed file: [`scripts/bmi_for_age_under5_seed.json`](scripts/bmi_for_age_under5_seed.json). A unique `(sex, age_months, measured)` constraint rejects re-seeding.
+
+Bands (strict), same wording as weight-for-length/height: severe wasting < -3SD, moderate wasting < -2SD, normal -2SD to +1SD, possible risk of overweight > +1SD, overweight > +2SD, obesity > +3SD. `implausible` is true when |z| > 5. For acute malnutrition screening use it together with `/weight-for-length-height`, MUAC (`/muac/classify`) and clinical signs. Screening aid only, not a diagnosis.
+
+```
+GET /bmi-for-age-under-5/classify?sex=girls&age_months=18&weight_kg=9.2&length_cm=78
+```
+
+Setup: run `sql/026_add_who_bmi_for_age_under_5.sql` in the Supabase SQL editor, then `POST /bmi-for-age-under-5/bulk` once with the seed file.
+
+### Head circumference-for-age (`/hc-for-age`)
+
+WHO Child Growth Standards **head circumference-for-age** (cm), birth to 5 years, girls and boys. Table: [`sql/027_add_who_hc_for_age.sql`](sql/027_add_who_hc_for_age.sql), 122 rows (months 0-60). Logic: [`src/hcForAge.js`](src/hcForAge.js). This is the head size for the child's age; the 6-month **increment** is [`/hc-velocity`](#head-circumference-velocity-hc-velocity).
+
+**Where the numbers come from:** each row stores the table's L, M, S (L is 1, so `z = (x - M) / (M*S)`), and the -3 SD to +3 SD cut-offs are recomputed from them to 3 decimals (the printed ones are rounded to 1 decimal). A unit test re-checks every row. Head circumference is not weight-based, so there is no extension beyond +/-3 SD. Rebuild the seed with `python3 scripts/build_hcfa_seed.py <girls_0_5.xlsx> <boys_0_5.xlsx>`.
+
+- `GET /hc-for-age/classify` *(public, rate-limited, cached 1h)* — `sex`, `age_months` (0-60), and `hc_cm` or `hc_mm`. Returns `status`, `hc_cm`, `z_score`, `percentile`, `implausible` and the `cutoffs` (cm).
+- `GET /hc-for-age` — raw reference rows including L, M, S; optional `sex` and `age_months` filters, standard pagination.
+- `POST /hc-for-age/bulk` *(admin)* — see [Bulk insert](#bulk-insert); seed file: [`scripts/hc_for_age_seed.json`](scripts/hc_for_age_seed.json). A unique `(sex, age_months)` constraint rejects re-seeding.
+
+Bands (strict): severe microcephaly < -3SD, microcephaly < -2SD, normal -2SD to +2SD, macrocephaly > +2SD, severe macrocephaly > +3SD. `implausible` is true when |z| > 5. A single value outside the range is a reason to examine the child and track the trend, not a diagnosis. Screening aid only.
+
+```
+GET /hc-for-age/classify?sex=girls&age_months=6&hc_cm=42
+```
+
+Setup: run `sql/027_add_who_hc_for_age.sql` in the Supabase SQL editor, then `POST /hc-for-age/bulk` once with the seed file.
+
+### Combined growth assessment (`/growth/assess`)
+
+One call, every applicable WHO indicator for the measurements you give. It only orchestrates the single-indicator modules ([`src/growthAssess.js`](src/growthAssess.js)), so each number is identical to what that indicator's own endpoint returns. Needs no new table: it reads the tables from sql/012 and sql/021 to sql/027.
+
+- `GET /growth/assess` *(public, rate-limited, cached 1h)* — `sex`, `age_months` (0-228) and **at least one** measurement: `weight_kg`/`weight_g`, `length_cm`/`height_cm` (or `_mm`), `hc_cm`/`hc_mm`, `muac_cm`/`muac_mm`. Optional `measured=lying|standing` (default lying under 24 months, standing from 24; a mismatch converts by 0.7 cm and is reported) and `muac_scheme=who_hiv_2008|cmam` (for the fixed MUAC result; default `cmam` for 6-59 months so it agrees with `acute_malnutrition_signals`, `who_hiv_2008` for older children).
+
+| Indicator in the response | Needs | Ages |
+|---|---|---|
+| `length_height_for_age` | length/height | 0-228 months |
+| `weight_for_age` | weight | 0-120 months |
+| `weight_for_length_height` | weight + length/height | 0-60 months |
+| `bmi_for_age` | weight + length/height | 0-60 months (WHO 2006), 61-228 months (WHO 2007 / Malawi guide) |
+| `hc_for_age` | head circumference | 0-60 months |
+| `muac_for_age` | MUAC | 3-60 months |
+| `muac_fixed` | MUAC | 6 months and over (`cmam`: 6-59 months) |
+
+The response has `indicators` (one entry per indicator that could be calculated), `not_assessed` (each skipped indicator with its reason: missing measurement or outside the WHO age range), `attention` (everything outside the normal range, most serious first, with `severity` severe / concern / watch), and `acute_malnutrition_signals` (combines weight-for-length/height wasting with MUAC 115/125 mm; `oedema_assessed` is always `false`, because bilateral pitting oedema must be checked by a person). A bad value in one measurement (say MUAC in mm) only errors that indicator; the others still return. Tallness and a high weight-for-age are only ever "watch". Screening aid only, not a diagnosis.
+
+```
+GET /growth/assess?sex=girls&age_months=18&weight_kg=9.2&length_cm=78&hc_cm=45&muac_cm=13.5
+```
+
 ### Fenton Preterm Growth Chart (`/fenton-preterm`)
 
 Weight, length, and head-circumference z-scores/percentiles for preterm infants, both the 2013 (Fenton & Kim, *BMC Pediatrics* 2013;13:59) and 2025 (Fenton, Elmrayed & Alshaikh, *Paediatric and Perinatal Epidemiology* 2025, PMID 40534585) references. LMS parameters provided directly by Dr. Tanis Fenton (University of Calgary) by email. Table: [`sql/013_add_fenton_preterm.sql`](sql/013_add_fenton_preterm.sql), 2284 rows (2013 + 2025, both sexes, all 3 metrics). Calculation logic: [`src/fentonPreterm.js`](src/fentonPreterm.js). Source-data provenance and verification notes (the source file itself is intentionally *not* in this public repo): [`data-sources/fenton/README.md`](data-sources/fenton/README.md).
@@ -835,9 +1105,9 @@ Length and head-circumference reference data start partway through the 22-50 wee
 
 (An earlier version of this endpoint used a single hardcoded guess — `length` rejected anything before 30.6 weeks — which wrongly rejected valid length queries between 23.5 and 30.6 weeks. Fixed by keying the floor on the actual seeded data per `(reference_year, metric)` instead of approximating.)
 
-### FHIR facade (`/fhir`) — Phase 1 growth/anthropometry
+### FHIR facade (`/fhir`) — growth + full Nutrition Care Process
 
-A stateless FHIR R4 translation layer over the classify endpoints above — groundwork for future EHR/HIE integration. **Not a FHIR server with storage** (Chakudya has never persisted patient records, and this doesn't change that — a real EHR is expected to store the returned `Observation` itself), and **not yet registered with any OpenHIM/HIE instance** — that's a separate, later step once there's a real instance to register with. See [`src/fhir.js`](src/fhir.js) for the full scope note.
+Phase 1 (below) is a stateless FHIR R4 translation layer over the classify endpoints above. **Phase 2 adds the whole Nutrition Care Process** — see [NCP operations](#ncp-operations-fhir-phase-2). Groundwork for future EHR/HIE integration. **Not a FHIR server with storage** (Chakudya has never persisted patient records, and this doesn't change that — a real EHR is expected to store the returned `Observation` itself), and **not yet registered with any OpenHIM/HIE instance** — that's a separate, later step once there's a real instance to register with. See [`src/fhir.js`](src/fhir.js) for the full scope note.
 
 - `GET /fhir/metadata` *(public, rate-limited)* — FHIR `CapabilityStatement`.
 - `POST /fhir/Observation/$evaluate-growth` *(public, rate-limited)* — body is a FHIR `Parameters` resource:
@@ -855,11 +1125,209 @@ A stateless FHIR R4 translation layer over the classify endpoints above — grou
     ]
   }
   ```
-  Routes on age: `gestationalAgeWeeks` (22-50) → Fenton preterm; `birthDate` (+ optional `effectiveDateTime`, default now) resolving to 5y1m-19y0m postnatal → WHO BMI-for-age. **The WHO 0-59-month gap is honest, not silent** — that age range returns a FHIR `OperationOutcome`, because chakudya-api has no endpoint for it (yet). One `measurement` → a single `Observation`; more than one → a `Bundle` (type `collection`). BMI-for-age needs either a `bmi` measurement or `weight`+`length` together (computes BMI itself, same unrounded formula as `/bmi-for-age/classify`).
+  Routes on age: `gestationalAgeWeeks` (22-50) → Fenton preterm; `birthDate` (+ optional `effectiveDateTime`, default now) resolving to **0-19 years postnatal → every WHO indicator the measurements allow**, the same calculations as `/growth/assess`: length/height-for-age, weight-for-age, weight-for-length/height, BMI-for-age (under 5 or 5-19), head circumference-for-age, MUAC-for-age, fixed MUAC cut-offs, plus an `acute-malnutrition-signals` Observation. Fenton with one `measurement` → a single `Observation`; otherwise a `Bundle` (type `collection`) with one `Observation` per indicator. Indicators that don't apply (wrong age range, measurement not supplied) are listed as `information` issues in an `OperationOutcome` entry at the end of the Bundle, and a bad value in one measurement only errors that indicator. A lone `bmi` measurement above 5 years keeps the original single BMI-for-age Observation.
 
-  Units: weight accepts `g` or `kg`; length/hc accept `cm` or `m`; anything else is a 400, not a guess.
+  Measurement `type`: `weight` (kg|g), `length` (cm|m; lying under 24 months, standing from 24, override with the optional `measured` parameter `lying|standing`), `hc` (cm|m), `muac` (cm|mm), `bmi`. Each type at most once. Optional `muacScheme` (`who_hiv_2008|cmam`; default `cmam` for 6-59 months). A BMI is computed from `weight` + `length`.
 
-  Each `Observation` carries `z-score`/`percentile`/`status` as `component`s (Chakudya-specific codes — there's no LOINC fit for "Fenton status: appropriate"), a best-effort standard `interpretation` (v3-ObservationInterpretation N/L/H/LL/HH) for FHIR clients that only read that field, the same screening-aid `note` text as the native endpoints, and an `extension` recording which reference was used. Weight/length/HC use LOINC 29463-7/8302-2/9843-4; BMI uses 39156-5.
+  Example (12-month girl, `birthDate` one year before `effectiveDateTime`):
+  ```json
+  { "resourceType": "Parameters", "parameter": [
+    { "name": "sex", "valueCode": "female" },
+    { "name": "birthDate", "valueDate": "2025-10-11" },
+    { "name": "effectiveDateTime", "valueString": "2026-10-11T08:00:00Z" },
+    { "name": "measurement", "part": [{ "name": "type", "valueCode": "weight" }, { "name": "value", "valueQuantity": { "value": 6, "unit": "kg", "code": "kg" } }] },
+    { "name": "measurement", "part": [{ "name": "type", "valueCode": "length" }, { "name": "value", "valueQuantity": { "value": 74, "unit": "cm", "code": "cm" } }] },
+    { "name": "measurement", "part": [{ "name": "type", "valueCode": "muac" }, { "name": "value", "valueQuantity": { "value": 11, "unit": "cm", "code": "cm" } }] }
+  ] }
+  ```
+
+  Each `Observation` carries `z-score`/`percentile`/`status` as `component`s (Chakudya-specific codes — there's no LOINC fit for "Fenton status: appropriate"), a best-effort standard `interpretation` (v3-ObservationInterpretation N/L/H/LL/HH) for FHIR clients that only read that field, the same screening-aid `note` text as the native endpoints, and an `extension` recording which reference was used. Weight/length/HC use LOINC 29463-7/8302-2/9843-4; BMI uses 39156-5; MUAC uses 56072-2. WHO-indicator Observations also carry an `indicator` component (code system `growth-indicator`: `length-height-for-age`, `weight-for-age`, …) because several indicators share one LOINC code (weight-for-age and weight-for-length/height are both body weight), and a `growth-reference-used` extension such as `who-2006-weight-for-age`. The new code systems resolve at `/fhir/CodeSystem/growth-indicator`, `/growth-status` and `/acute-malnutrition-level`.
+
+#### Assessment foundation (FHIR Phase 4, NCP step 1)
+
+Stateless like the rest of `/fhir`: nothing is stored. Source: [`src/fhirAssessment.js`](src/fhirAssessment.js), tests in `test/fhirAssessment.test.js`.
+
+| Operation | What it does |
+|---|---|
+| `POST /fhir/Bundle/$nutrition-assessment` | Validates a Patient + Encounter and assessment data; returns one `collection` Bundle of linked `Patient`, `Encounter`, `QuestionnaireResponse` and `Observation` resources |
+| `POST /fhir/QuestionnaireResponse/$validate` | Checks a QuestionnaireResponse against a built-in form; returns an `OperationOutcome` (200) |
+| `GET /fhir/Questionnaire[/{id}]` | The built-in forms: `nutrition-screening` (MUST inputs), `nfpe`, `diet-history` |
+
+**Linking.** Pass `patient` (a Patient resource) or `subject` (`"Patient/123"`), and `encounter` (an Encounter resource, required, or `"Encounter/456"`). Resources created here get `urn:uuid` fullUrls and every Observation/QuestionnaireResponse points at the Patient and Encounter by them; with reference strings no Patient/Encounter entry is emitted. Patient keeps identifier, name, gender, birthDate only (telecom, address etc. are dropped and the response says so).
+
+**Observations** are repeatable `observation` parts: `code` + `value` (+ `effectiveDateTime`, `referenceLow`/`referenceHigh`, `interpretation`, `dataAbsentReason`, `note`). Registered codes: anthropometry `weight height length hc muac waist` (normalised to kg/cm; BMI + WHO adult class computed from one weight and one height); biochemical `hemoglobin hematocrit albumin total-protein glucose glucose-fasting hba1c creatinine sodium potassium ferritin crp cholesterol-total ldl hdl triglycerides vitamin-b12 folate`; clinical `systolic-bp diastolic-bp heart-rate respiratory-rate temperature spo2 nausea vomiting diarrhoea constipation dysphagia`; dietary `energy-intake-kcal protein-intake-g fat-intake-g carbohydrate-intake-g fluid-intake meals-per-day food-group-count appetite dietary-notes`; NFPE `temple-muscle clavicle-muscle shoulder-muscle scapula-muscle interosseous-muscle thigh-muscle calf-muscle orbital-fat triceps-fat rib-fat oedema ascites pallor angular-stomatitis glossitis bitot-spots hair-changes skin-changes goitre`. Anything else: `system` + `code` + `display` + `domain`. Items without a LOINC code are in `GET /fhir/CodeSystem/assessment-item`.
+
+**Validation** (all problems reported at once, 400): units are never guessed (a Quantity needs a recognised unit; kg/g/lb, cm/m/in, g/dL vs g/L, mg/dL vs mmol/L etc.); values outside plausibility limits (data-entry sanity limits, not clinical reference ranges) are rejected; timestamps must be valid FHIR dates/dateTimes (a time of day needs a timezone), not in the future, not before birth; results outside the encounter period are allowed but flagged. Missing data: give a value or a `dataAbsentReason`; areas with no data are listed in a trailing `OperationOutcome` entry. An interpretation flag is computed only from a reference range you supply (same unit); NFPE severities are recorded, never graded.
+
+**Forms.** A QuestionnaireResponse for a built-in form is validated item by item (linkIds, types, units, options, required items; `completed` needs all required items) and its answers become Observations (`derivedFrom` the response; `preliminary` while in progress). Submitting `nutrition-screening` also computes the MUST score, identical to `$screen`. Other forms are checked structurally and carried without extraction. Limits: 100 observations, 10 responses per request.
+
+**Into the ADIME note.** Pass the returned Bundle to `POST /fhir/Bundle/$ncp-document` as a `resource` (with `author`): `subject` and `encounter` default to the Bundle's Patient and Encounter, observations land in their NCP sections, and Patient/Encounter/QuestionnaireResponse are carried as supporting entries.
+
+#### NCP operations (FHIR Phase 2)
+
+The Academy of Nutrition and Dietetics Nutrition Care Process, end to end, as stateless FHIR R4 operations. Same contract as Phase 1: **nothing is stored or logged beyond method/path/status** — the caller's EHR persists what comes back. All are `POST`, public, rate-limited (100/min/IP), body is a FHIR `Parameters` resource, success is a `Bundle`, failure is an `OperationOutcome` (400 malformed, 422 valid-but-unsupported). Source: [`src/fhirNcp.js`](src/fhirNcp.js) (pure functions, tests in `test/fhirNcp.test.js`).
+
+| NCP step | Operation | FHIR output |
+|---|---|---|
+| Screening | `POST /fhir/Observation/$screen` | MUST (default), NRS-2002 (`tool=nrs-2002`), MNA (`tool=mna`), SGA (`tool=sga`), PG-SGA (`tool=pg-sga`) or NACS classification (`tool=nacs`), adults (NACS also children) → `Observation` (score, sub-scores, risk category, management note) |
+| 1. Assessment | `POST /fhir/Observation/$assess-nutrition` | `Observation`s: weight/height/BMI (+WHO adult class), % weight change (+ standard-interval significance), Mifflin-St Jeor BEE → energy requirement, protein requirement, intake adequacy, GLIM criteria, and any FH/AD/BD/PD/CH `indicator` you pass |
+| 2. Diagnosis | `POST /fhir/Condition/$diagnose` | PES statement → `Condition` (problem, etiology, signs/symptoms, severity, evidence refs) |
+| 3. Intervention | `POST /fhir/CarePlan/$intervene` | `CarePlan` + `Goal`s + `NutritionOrder`s (oral diet / supplement / enteral formula) + `ServiceRequest`s (education / counseling / coordination of care) |
+| 4. Monitoring & evaluation | `POST /fhir/Goal/$evaluate` | `Goal` with `achievementStatus` (achieved / improving / no-change / worsening / sustaining / not-achieved / in-progress) + outcome `Observation` |
+| 4. Monitoring & evaluation (follow-up visit) | `POST /fhir/CarePlan/$monitor` | follow-up `Observation`s / `QuestionnaireResponse`s linked to patient, encounter and plan, change from baseline, updated `Goal`s, plan-review `Task`s and a draft successor `CarePlan` |
+| Terminology | `GET /fhir/CodeSystem/ncp-diagnosis` | the NI/NC/NB diagnostic terms as a FHIR `CodeSystem` (public, from Supabase) |
+| Conformance | `GET /fhir/CodeSystem/{name}`, `/fhir/OperationDefinition/{id}`, `/fhir/StructureDefinition/{name}` | static definitions behind every URL the facade emits |
+| 5. Documentation | `POST /fhir/Bundle/$ncp-document` | one complete ADIME `Composition` **document Bundle** assembled from the Bundles above, identified and validated (structure, references, links) |
+| 6. Professional and institutional context | `POST /fhir/Bundle/$care-context` | linked `Organization`, `Practitioner`, `PractitionerRole` and `CareTeam` resources (author, role, facility, multidisciplinary team) |
+| 7. Interoperability and governance | `POST /fhir/$validate`, `POST /fhir/ConceptMap/$translate`, `GET /fhir/AuditEvent`, `GET /fhir/ConceptMap/{id}` | R4 structural check, terminology mappings, audit trail; scopes + `FHIR_AUTH_MODE`; profiles and Provenance on the document |
+| Documentation (check) | `POST /fhir/Bundle/$validate-document` | `OperationOutcome` with errors and warnings for any document Bundle |
+
+**What Chakudya computes vs. what the clinician supplies.** Chakudya computes the deterministic parts (BMI, % weight change, MUST score, Mifflin-St Jeor BEE, GLIM criteria logic, goal progress). It does **not** choose the nutrition diagnosis, goals or orders — the PES statement, targets, diet prescription etc. are inputs it validates and shapes into FHIR. Energy/protein requirements are only produced when you pass `energyFactor` / `proteinGPerKg`; the factor is your clinical call, not a default. Everything carries the screening-aid disclaimer.
+
+**Conventions**
+- Every operation that FHIR requires a patient for (`$diagnose`, `$intervene`, `$evaluate`, `$ncp-document`) needs `subject` (`valueString: "Patient/123"`). It is optional for `$screen` / `$assess-nutrition`.
+- Units are never guessed: weight `kg|g`, height `cm|m`; goal quantities must share one unit (mismatch → 400, no silent conversion).
+- Intervention defaults are conservative: `status: draft`, `intent: proposal` (Goals → `proposed`). Pass `status` (`draft|active`) and `intent` (`proposal|plan|order`) to change.
+- Resources inside a returned Bundle cross-reference each other by `urn:uuid` `fullUrl`. Pass whole Bundles into `$ncp-document` (as `resource` parameters) to keep those links valid.
+- Each Observation is tagged with an NCP step (`category` → `…/CodeSystem/ncp-step`). In `$ncp-document`, untagged Observations are filed under Assessment; a `Goal` with an `achievementStatus` goes under Monitoring & evaluation, otherwise under Intervention. Empty ADIME sections get `emptyReason: notstarted`; Screening is only included if present.
+- Diagnosis terminology: the NCP nutrition diagnostic terms (2006 edition — Intake `NI`, Clinical `NC`, Behavioral-Environmental `NB`, 62 terms) live in Supabase table `ncp_diagnosis_terms` ([`sql/017_add_ncp_diagnosis_terms.sql`](sql/017_add_ncp_diagnosis_terms.sql), run once in the SQL editor; re-running upserts). Pass `problemCode: "NI-5.2"` and `$diagnose` fills in the term text, domain and a coding on `…/fhir/CodeSystem/ncp-diagnosis`; terms marked "(specify)" need `problemSpecify` (e.g. `NI-55.1` + `Iron`), "(use with caution)" terms add a note. Unknown codes are a 400; if the table hasn't been created, `$diagnose` returns 503 naming the migration. You can still pass your own coding (`problemSystem` + `problemCode`), a public shortcut (`malnutrition`, `underweight`, `obesity`, …), or free text with `domain` + `problem`. A PES statement needs problem + ≥1 etiology + ≥1 signs/symptoms. The terminology belongs to the Academy of Nutrition and Dietetics — it's reference data here, not Chakudya's own content.
+
+**Parameters by operation** (`valueX` types as in FHIR; `part` = nested parts)
+
+- `$screen` — `tool`: `must` (default), `nrs-2002`, `mna`, `sga`, `pg-sga` or `nacs`.
+  - **MUST**: `bmi` *or* `weight`+`height`; `weightLossPercent3to6Months` *or* `usualWeight`+`weight`; `acuteDiseaseNoIntake` (boolean, required).
+  - **NRS-2002** (as printed in the supplied appendix; two stages): `ageYears` *or* `birthDate`; `bmi` *or* `weight`+`height`; `weightLossPercent` (0 if none) + `weightLossPeriodMonths` (when > 0); `intakePercentOfRequirement` (preceding week); `impairedGeneralCondition` (required when BMI ≤ 20.5); `diseaseSeverityScore` (0–3, **your clinical call**: 0 absent, 1 mild, 2 moderate, 3 severe — required once initial screening is positive); optional `severelyIll` / `reducedIntakeLastWeek` to override initial questions 4 / 3 (defaults: `diseaseSeverityScore = 3` / intake < 100%).
+    - Initial screening (BMI < 20.5; weight loss in the last 3 months; reduced intake in the last week; severely ill): all NO → no final score, result `final-screening-not-required` (re-screen weekly). Any YES → final screening.
+    - Final: nutritional-status score (weight loss > 5% in 3 / 2 / 1 months → 1 / 2 / 3, or > 15% in 3 months → 3; BMI 18.5–20.5 / < 18.5 *with* impaired general condition → 2 / 3; intake 50–75 / 20–60 / 0–25% of requirement → 1 / 2 / 3) + disease severity + 1 if age ≥ 70. Total ≥ 3 = `at-risk` (initiate a nutritional care plan), otherwise `not-at-risk` (re-screen weekly).
+    - The appendix's intake bands overlap (e.g. 55% is in both 50–75 and 20–60): the **highest applicable score is used and the overlap is stated in the note**. The appendix text reads "age ≥ 7- years" (garbled); the standard threshold of 70 is implemented.
+    - Optional both: `subject`, `effectiveDateTime`.
+  - **MNA** (full Mini Nutritional Assessment, as printed on the supplied Nestlé form, revision 2009; two stages):
+    - Screening (always): `foodIntakeDeclineScore` (A, 0–2), `weightLossKg3Months` (B; 0 or negative if none) *or* `weightLossUnknown: true`, `mobilityScore` (C, 0–2), `psychologicalStressOrAcuteDisease` (D, boolean), `neuropsychologicalScore` (E, 0–2), and `bmi` *or* `weight`+`height` (F). Optional `ageYears` / `birthDate`.
+    - Screening score 12–14 → `normal`, and the form stops there: no assessment items, no total (the Observation carries `mna-screening-score` only). 11 or less → assessment items G–R are required too: `livesIndependently`, `moreThan3PrescriptionDrugs`, `pressureSoresOrUlcers`, `fullMealsPerDay`, `dairyDaily` + `legumesOrEggsTwiceWeekly` + `meatFishPoultryDaily` (K), `fruitOrVegetablesTwoPlusServings`, `fluidCupsPerDay`, `modeOfFeedingScore` (0–2), `selfViewNutritionScore` (0–2), `selfViewHealthScore` (0, 0.5, 1 or 2), `midArmCircumferenceCm`, `calfCircumferenceCm`. A missing item is a 400 that names it.
+    - Measured items (weight loss, BMI, meals, protein markers, fluid, MAC, CC) are scored here from the raw value; judgement items (A, C, E, N, O, P) are sent as the printed option score, never guessed. Total = screening + assessment (max 30): 24–30 `normal`, 17–23.5 `at-risk`, below 17 `malnourished`. The total is a `valueQuantity` in `{score}` units because half points are possible (FHIR `Observation.value[x]` has no decimal).
+    - The form has no band for a weight loss under 1 kg: it is scored as no weight loss (3) and the note says so. The MNA was developed for older adults; if `ageYears` is under 65 the note says to interpret with care, and under 18 is a 422. The MNA-SF "calf circumference instead of BMI" substitution is not on this form and is not implemented.
+  - **SGA** (Subjective Global Assessment, as printed on the supplied NEMO / Queensland Health form, May 2009, adapted from Detsky 1994):
+    - **The overall rating is yours.** The form lists descriptors under columns A, B and C and then an overall A / B / C, but gives no rule for combining them, so `overallRating` (`A`|`B`|`C`) is required and is never computed or suggested. It comes back as the Observation value. The labels (A well nourished, B moderately malnourished or suspected malnutrition, C severely malnourished) are Detsky's standard wording, not printed on the form.
+    - History (all required): `weightLossPercent6Months` *or* `usualWeight`+`weight` (0–<5% loss = A, 5–10% = B, >10% = C; no change or a gain = A); `weightChange2Weeks` (`no-change-normal-weight`, `increase-within-5-percent`, `increase-1-level-above`, `no-change-below-usual-weight`, `increase-within-5-10-percent`, `decrease`); `dietaryIntake` (`no-change-adequate`, `no-change-inadequate`, `suboptimal-diet`, `full-liquid`, `hypocaloric-liquid`, `starvation`, `borderline-increasing`, `borderline-decreasing`, `poor-no-change`, `poor-increasing`, `poor-decreasing`); `nauseaDailyOver2Weeks`, `vomitingDailyOver2Weeks`, `diarrhoeaDailyOver2Weeks`, `anorexiaDailyOver2Weeks` (booleans); `functionalCapacity` (`no-dysfunction`, `difficulty-with-activities`, `bed-chair-ridden`); `functionalChange2Weeks` (`improved`, `no-change`, `regressed`). Each maps to the column(s) the form prints it in; every item is reported as its own grade component and the items are **not** merged into a domain score.
+    - Two descriptors are printed in two columns: `increase-1-level-above` (A and B) and `poor-no-change` (B and C). You say which with `weightChange2WeeksGrade` / `dietaryIntakeGrade`; omitting it is a 400.
+    - GI symptoms: the form's "none; intermittent / some / all (daily > 2 weeks)" is read from the four symptom booleans: none = A, one to three = B, all four = C.
+    - Physical examination (optional, per site, grade `A`/`B`/`C`): `underEyesFat`, `tricepsFat`, `bicepsFat`, `temple`, `clavicle`, `shoulder`, `scapulaRibs`, `quadriceps`, `calf`, `knee`, `interosseousMuscle`, `oedema`, `ascites`. The form prints no column B for under-eyes, triceps, biceps, calf, knee and interosseous muscle, so a B there is a 400. The note states how many of the 13 sites were graded.
+    - Adults only (under 18 is a 422); there is no age adjustment.
+  - **PG-SGA** (Scored Patient-Generated SGA, as printed on the supplied form, FD Ottery v3.22.15, metric): a scored tool, unlike the plain SGA. `valueInteger` is the total A + B + C + D, triaged as printed: 0-1 `no-intervention`, 2-3 `education-and-symptom-management`, 4-8 `dietitian-intervention`, 9 or more `critical-need`.
+    - **A, boxes 1-4** (all required except where noted). Box 1: `weightLossPercent1Month` *or* `weightOneMonthAgo`+`weight`; 6-month data (`weightLossPercent6Months` *or* `weightSixMonthsAgo`+`weight`) are used only when there is no 1-month data, as Worksheet 1 says. Points from the printed tables (1 month: 2-2.9% = 1, 3-4.9% = 2, 5-9.9% = 3, 10% or more = 4; 6 months: 2-5.9% = 1, 6-9.9% = 2, 10-19.9% = 3, 20% or more = 4), plus 1 when `pgsgaWeightChange2Weeks` is `decreased`. Box 2: `pgsgaIntakeVsUsual` (`unchanged`, `more-than-usual`, `less-than-usual`) and optionally `pgsgaCurrentIntake` (`normal-food-less-than-normal-amount`, `little-solid-food`, `only-liquids`, `only-nutritional-supplements`, `very-little-of-anything`, `only-tube-feeding-or-parenteral`). Box 3: repeatable `pgsgaSymptom` (`no-problems-eating`, `no-appetite`, `nausea`, `vomiting`, `constipation`, `diarrhoea`, `dry-mouth`, `mouth-sores`, `smells-bother-me`, `taste-changes`, `feel-full-quickly`, `problems-swallowing`, `fatigue`, `pain`, `other`), at least one. Box 4: `pgsgaActivity` (`normal`, `fairly-normal-activities`, `in-bed-or-chair-less-than-half-day`, `little-activity-most-of-day-in-bed-or-chair`, `bed-ridden`). The form's item weights are used as printed. `A` is also the PG-SGA short form score.
+    - **B, Worksheet 2:** 1 point each for the optional booleans `cancer`, `aids`, `pulmonaryOrCardiacCachexia`, `chronicRenalInsufficiency`, `decubitusOpenWoundOrFistula`, `trauma`, plus 1 when age is greater than 65 (`ageYears` *or* `birthDate`, required). A condition you do not send is taken as absent, and the note says so.
+    - **C, Worksheet 3:** optional `feverTemperatureC` (above 37.2 = 1, 38.3 or more = 2, 38.8 or more = 3), `feverDurationHours` (required with a fever: under 72 = 1, exactly 72 = 2, over 72 = 3; the form scores intensity or duration, whichever is greater) and `corticosteroidPrednisoneEquivalentMgPerDay` (under 10 = 1, 10 to under 30 = 2, 30 or more = 3). Nothing sent means none.
+    - **D, Worksheet 4:** `physicalExamDeficit` (`none`, `mild`, `moderate`, `severe` = 0-3) is the clinician's overall rating of total body deficit and is required; it is never computed. Optional `muscleStatusRating`, `fatStoresRating`, `fluidStatusRating` (0-3) are recorded and do not change the score.
+    - Optional `pgsgaGlobalCategory` (`A`, `B`, `C`, Worksheet 5) is carried as entered, never computed: the form lists descriptors per stage but no combining rule.
+    - **Assumptions the supplied pages do not settle** (each is stated in the Observation note): Box 2 takes the higher of its two answers; Box 3 symptoms are added (the form says check all that apply); the "other relevant diagnoses" line scores nothing because it has no tick box. The PG-SGA SF is boxes 1-4 only. Adults only (under 18 is a 422). The per-site Worksheet 4 ratings (temples, clavicles and so on) are not implemented.
+  - **NACS classification** (FANTA NACS User's Guide, Module 2, May 2016; children and adults). The guide's cutoffs are its "recommended standards" and countries may use different ones. Nothing is required except what you want classified; each indicator that is sent is classified on its own:
+    - **MUAC** (`muacMm`, millimetres): children 6-59 months (under 115 SAM, 115 to under 125 MAM, 125 or more normal), 5-9 years (135 / 145), 10-14 years (160 / 185); adults not pregnant or postpartum (under 185 SAM, 185 to under 220 moderate malnutrition, 220 or more normal); pregnant or up to 6 months postpartum (`pregnantOrPostpartum: true`: 190 / 230). Age comes from `ageMonths` (needed under 5 years), `birthDate` (completed months) or `ageYears` (5 or over). Refused with a 422 where the guide gives no cutoffs: infants under 6 months, 15-17 year-olds, and pregnant or postpartum females under 18.
+    - **Adult BMI** (`bmi`, or `weight`+`height`; 18 and over): under 16 severe, 16 to under 17 moderate, 17 to under 18.5 mild, 18.5 to under 25 normal, 25 to under 30 overweight, 30 or more obesity. BMI is rounded to 1 decimal before banding. Refused (422) for pregnant or postpartum women, as the guide says to use MUAC.
+    - **BMI-for-age** (`bmiForAgeZScore`, 5-17 years): under -3 severe, -3 to under -2 moderate, -2 to +1 normal, over +1 to +2 overweight, over +2 obesity. You supply the z-score (`Observation/$evaluate-growth` computes it from the WHO 5-19 year tables); a plain `bmi` under 18 is a 400 because the guide uses the z-score there.
+    - **Pre-pregnancy BMI** (`prePregnancyBmi`): under 18.5 underweight, 18.5-24.9 normal weight, 25.0-29.9 overweight, 30 or more obese. Reported as its own category, not as a status.
+    - **Bilateral pitting edema** (`edemaGrade` 0-3 for +, ++, +++, with `edemaBothFeetOrLegs`, required above 0): in both feet or legs it is severe acute malnutrition on its own, regardless of anthropometry, so no other indicator is classified. Grade +++ is admitted for inpatient management; grades + and ++ are treated as outpatients only with appetite and no medical complications (`hasAppetite` and `hasMedicalComplications` are required for those grades). Any other combination returns `not-stated-by-guide` because the guide says nothing about it. Edema in one foot only is not counted.
+    - **No combined status.** The guide gives no rule for combining indicators, so when more than one is classified each is a separate component and there is no top-level value (a single value is set only when exactly one indicator, or the edema rule, applies).
+    - **Not implemented because the guide does not print them:** weight-for-height z-score cutoffs, and MUAC cutoffs for 15-17 year-olds. Also not built from this module: birth-weight and newborn weight-loss checks, the priority-client list, assessment frequency, and the biochemical, dietary and food-security assessments.
+- `$assess-nutrition` (adults 18+; children → `$evaluate-growth`): `sex`, `ageYears` *or* `birthDate`, `weight`, `height`, `usualWeight` + `usualWeightPeriodDays`, `requirementWeight`, `energyFactor`, `proteinGPerKg`, `energyIntakeKcalPerDay`, `proteinIntakeGPerDay`; GLIM: `screeningPositive`, `muscleMass` (`none|mild-moderate|severe`), `inflammation` (`none|acute-disease-or-injury|chronic-disease`), `intakePercentOfRequirement`, `intakeReductionDays`, `malabsorption`, `glimBmiCutoffSet` (`default|asian`); repeatable `indicator` part: `domain` (`FH|AD|BD|PD|CH`), `display`, `code`, `system`, `value`.
+  - Weight-change significance uses the standard Blackburn intervals (1 wk, 1 mo, 3 mo, 6 mo) and is only graded when `usualWeightPeriodDays` matches one; otherwise it reports `no-standard-threshold` rather than extrapolating.
+  - GLIM follows Cederholm 2019 (≥1 phenotypic + ≥1 etiologic criterion after a positive screen; severity from the worst phenotypic criterion). Missing inputs are listed as "not assessed" rather than assumed. Weight loss uses strict `>5%` (≤6 mo) / `>10%` (>6 mo).
+- `$diagnose`: `subject`; repeatable `diagnosis` part: `problemCode` (e.g. `NI-5.2`, resolves `problem` + `domain` for you) and `problemSpecify` for "(specify)" terms — or `domain` + `problem` for free text — repeatable `etiology`, repeatable `signsSymptoms`, optional `problemSystem`/`problemDisplay` (your own coding), `severity` (`mild|moderate|severe`), `verificationStatus` (`provisional` default | `confirmed`), `evidence` (repeatable reference string, e.g. an Observation `urn:uuid`), `recordedDate`.
+
+  **Structured diagnosis (Phase 4).** The PES statement is stored as components, not only as text, and the operation now also builds the evidence and provenance around it (source: [`src/fhirDiagnosis.js`](src/fhirDiagnosis.js), tests in `test/fhirDiagnosis.test.js`). Everything above still works unchanged.
+  - **Components.** Alongside the plain `etiology` / `signsSymptoms` strings, each diagnosis can carry `etiologyItem` parts (`text`, optional `system` + `code` + `display`) and `signItem` parts (`text`, optional coding, optional `evidence` Observation references, optional inline `observation`). The Condition gets a `pes-statement` extension holding `statement` (the readable sentence, also still in `Condition.note[0]`), `problem` (the coded diagnosis), one `etiology` CodeableConcept per cause, and one `signSymptom` per sign with `evidence` references. The legacy `pes-etiology` / `pes-signs-symptoms` extensions are kept.
+  - **Evidence as Observations.** An inline `observation` inside a `signItem` takes the same parts as `$nutrition-assessment` (`code`, `value`, `effectiveDateTime`, ...; e.g. `weight-change-percent` (positive = loss), `intake-percent-of-requirement`, `energy-intake-kcal`, `weight`, `hemoglobin`), is validated the same way (units never guessed, plausibility, timestamps), is returned in the Bundle, and is linked from `Condition.evidence` (the sign's text defaults to a description of the measurement). To cite an Observation you already have (for example one from `$nutrition-assessment`), use `evidence` with its `Observation/123` or `urn:uuid`.
+  - **Coding.** The NCP term (NI/NC/NB) stays the primary coding; add `additionalCoding` (`system`, `code`, `display`) for ICD-10 or SNOMED CT. Added codes are carried as given and are not checked against their code system.
+  - **Provenance.** Pass `author` (a `Practitioner/…` reference or a name) to set `Condition.recorder` and get one `Provenance` per diagnosis (target: the Condition and its evidence Observations; agent: the author; `entity`: each cited Observation and each `source` string, e.g. "patient interview"). `asserter` sets `Condition.asserter`; `encounter` links the Condition and inline evidence to an encounter. No author, no Provenance; `source` without `author` is a 400.
+  - Validation reports every problem at once (400). `recordedDate` must be a valid FHIR date/dateTime and not in the future. A whole diagnosis Bundle can go straight into `$ncp-document` (Condition in the diagnosis section, evidence in assessment, Provenance as a supporting entry).
+- `$intervene`: `subject`, `addresses` (Condition refs), `title`, `status`, `intent`; repeatable parts `goal` (`description`, `measure`, `measureCode`, `direction`, `baseline`, `target`, `dueDate`, `priority`), `nutritionOrder` (`kind` = `oral-diet` → `type`, repeatable `nutrient` part {`name`,`amount`}, `texture`, `fluidConsistency`, `instruction`; `supplement` → `type`, `productName`, `quantity`, `instruction`; `enteral-formula` → `baseFormulaType`, `productName`, `route`, `rate`, `maxVolume`, `instruction`), `education` (`topic`, `audience`, `method`), `counseling` (`topic`, `approach`), `coordination` (`reason`, `with`).
+
+  **Structured intervention (Phase 4).** The plan is now trackable and linked to the diagnosis (source: [`src/fhirIntervention.js`](src/fhirIntervention.js), tests in `test/fhirIntervention.test.js`). Everything above still works unchanged.
+  - **Linked to the diagnosis.** Pass the `$diagnose` Bundle as `resource`: `subject` defaults to its patient, and the CarePlan, every Goal, NutritionOrder (extension), ServiceRequest and Task address its Condition(s) (`addresses`, `reasonReference`). Explicit `addresses` must be Condition references that resolve in that Bundle and belong to the same patient; a refuted or entered-in-error Condition is refused and a resolved one is flagged. A plan with no diagnosis is allowed but says so.
+  - **Measurable goals with target dates.** `dueDate` and `startDate` must be valid and in order (due not before start, not in the past); a `target` needs a unit; `baseline` and `target` must share a unit and agree with `direction` (increase: target above baseline; decrease: below). A goal with no `dueDate`, a target with no `measure` or `direction`, or a `measure` with no target is flagged in the trailing OperationOutcome entry. These goals run directly through `Goal/$evaluate`.
+  - **Orders.** Same three kinds. Nutrient amounts need a recognised unit, a supplement `quantity` needs a unit, enteral `rate` is mL/h and `maxVolume` mL or L (stored in mL), with plausibility limits. New optional parts: `timesPerDay`, `startDate`, `endDate` (a Timing schedule), `foodPreference`, `excludeFood`, `allergyIntolerance` references; `orderer` is set when `author` is a Practitioner reference.
+  - **Tasks.** `education`, `counseling` and `coordination` accept `assignedTo`, `dueDate` and `priority` (routine | urgent | asap | stat). An activity with an owner or a due date gets a `Task` (`basedOn` the CarePlan, `focus` the ServiceRequest, `owner`, `restriction.period.end`, status `draft` for a draft plan or `requested` for an active one). The ServiceRequest carries performer, occurrence, priority, requester and encounter.
+  - **Follow-up and referral.** `followUp` (`reason`, `dueDate` required; `assignedTo`, `method`, repeatable `monitor`, `priority`, `note`) and `referral` (`to`, `reason` required; `performer`, `priority`, `dueDate`, `note`) each create a ServiceRequest (domain `follow-up` / `referral`; referrals also carry SNOMED CT 3457005 Patient referral) and always a Task, owned by the receiving performer for a referral. A plan with only a follow-up or referral is valid. Chakudya does not send referrals or notify anyone: the Tasks are for your system to carry out.
+  - **Provenance and plan links.** `author` sets `CarePlan.author`, requester on requests and tasks, and creates one `Provenance` covering the CarePlan, goals, orders, requests and tasks (entity `derivation`: each addressed Condition; `source` strings). `encounter` links the plan; `endDate` sets `CarePlan.period.end`. All problems are reported together (400). The Bundle goes straight into `$ncp-document` (Task counts in the intervention section).
+- `$evaluate`: `subject`, repeatable `goal` part: `description`, `direction` (`increase|decrease|maintain`), `current` (Quantity, required), `target`, `baseline`, `lowerBound`/`upperBound` (for `maintain`), `measure`, `measureCode`, `noChangeTolerance` (default `0.02` = ±2% of the baseline→target gap counts as no change). Without a `baseline` the direction of change is **not guessed** (`in-progress`).
+- `$monitor` (NCP step 4, a follow-up visit against a plan): `subject` (defaults to the plan's patient), `encounter` (required, e.g. `Encounter/456`), `resource` (the `$intervene` Bundle), `baseline` (the `$nutrition-assessment` Bundle or Observations), `previous` (Bundles from earlier `$monitor` calls), `effectiveDateTime`, `author`, `source`, `ageYears`, `reviewDueDate`, repeatable `observation` and `questionnaireResponse` parts (exactly the `$nutrition-assessment` shapes and validation, so anthropometry, dietary intake, laboratory results, clinical findings and NFPE are all covered, and a repeated MUST, NFPE or diet-history form is accepted), and repeatable `goal` parts.
+  - **Linked and traceable.** Every follow-up Observation is tagged `nutrition-monitoring`, points at the patient and encounter, and is `basedOn` the CarePlan. A numeric value is compared with the earliest matching `baseline` value (same code, same unit) and with the latest earlier value: extensions `change-from-baseline`, `percent-change-from-baseline`, `baseline-observation`, `change-from-previous` and `previous-observation` carry the result and the Observations compared. Units are never converted; a mismatch is a warning and nothing is compared.
+  - **Goals.** Each Goal in the plan is matched to the follow-up value of its measure (`measureCode` as a registered code or LOINC code, else the `measure` text) or to an explicit `current`, then judged by the same rules as `$evaluate`. It comes back with the same identity plus `achievementStatus`, `statusDate`, an `outcomeReference`, a note with the progress, and `goal-progress-fraction`; `achieved` also sets `lifecycleStatus` to `completed`. A `goal` part with `reference` (a Goal in the plan) adds `current`, `response` (the patient's response, recorded as a Goal note), `lowerBound`/`upperBound` (for `maintain`), `baseline` or `noChangeTolerance`. A `goal` part without `reference` evaluates a goal that is not in a plan. A goal with no matching value is reported, never guessed.
+  - **Updating the plan.** A goal that is `worsening`, `no-change`, `not-achieved`, or past its due date and not achieved gets a `plan-review` `Task` (due `reviewDueDate`), and the plan is carried forward as a **draft** successor `CarePlan` (`replaces` the current one, follow-up evidence in `supportingInfo`, a note listing the goals to review). The original plan and goals' targets are never edited, and Chakudya does not choose the revised interventions: edit the draft, then record it with `$intervene`. When every goal is achieved or sustained the response says so and changes nothing.
+  - **Provenance.** With `author` one `Provenance` covers everything recorded (entity `derivation`: the plan; `source`: the baseline Observations used and any `source` strings). The Bundle goes straight into `$ncp-document` (follow-up Observations and evaluated Goals land in the monitoring section). Stateless: nothing is stored, so your system keeps the Bundles and passes them back as `resource`, `baseline` and `previous` at the next visit.
+- `$ncp-document` (NCP step 5, the complete ADIME note): `subject`, `author` (`Practitioner/…` reference or a name), repeatable `resource` (single resources or whole Bundles from the operations above, including a `$care-context` Bundle), optional `title`, `date`, `encounter`, `custodian`, `status` (`preliminary`, `final` default, `amended`). Source: [`src/fhirDocument.js`](src/fhirDocument.js), tests in `test/fhirDocument.test.js`.
+  - **One document.** A `Composition` plus the resources it cites, as a `document` Bundle with a Bundle and Composition `identifier` (new `urn:uuid`) and a narrative. Sections: Nutrition assessment, Nutrition diagnosis (PES), Nutrition intervention, Nutrition monitoring and evaluation (and Nutrition screening when present). A section with nothing in it gets `emptyReason: notstarted`.
+  - **Pass the steps in order.** If the same resource arrives twice (`$monitor` returns each evaluated Goal under the plan's own `fullUrl`), the later one replaces the earlier one, so send the `$intervene` Bundle before the `$monitor` Bundle.
+  - **Validated before it is returned.** Structure (Composition first and complete, the four ADIME sections each with entries or an `emptyReason`, narrative on sections with entries, unique `fullUrl`s), references (every `urn:uuid` that should point inside the Bundle must resolve), one patient throughout, and each resource in the section its step says. These are errors: **422** with every problem listed. Warnings (a care plan with no diagnosis, a diagnosis no plan addresses, a Goal not listed in the plan, results with no goals, an entry nothing links to, a baseline Observation that is not in the Bundle) do not stop the document; check them with `$validate-document`.
+  - **Not signed.** Chakudya assembles and checks; it does not write clinical content, sign or attest the note, and stores nothing.
+- `$care-context` (NCP step 6, professional and institutional context): who did the work, in what role, at which facility, and with which team. Source: [`src/fhirContext.js`](src/fhirContext.js), tests in `test/fhirContext.test.js`. Body is a `Parameters` resource with repeatable `organization`, `practitioner`, `role` and `careTeam` parts; success is a `collection` Bundle of linked `Organization`, `Practitioner`, `PractitionerRole` and `CareTeam` resources (`urn:uuid` links).
+  - **Local ids.** Parts point at each other with a short `id` you choose (`"hosp"`, `"rd"`, `"rd1"`); anywhere a link is expected you can instead give a reference to a resource your own system already holds (`Practitioner/123`).
+  - **Organization:** `name` and/or `identifier` (+ `identifierSystem`), `type` (`prov`, `dept`, `team`, … from the HL7 organization-type list, else kept as text), `partOf` (a department inside a hospital), `address`/`city`/`district`/`country`, `phone`, `email`.
+  - **Practitioner:** `name` (last word = family name) or `family` + `given`, `identifier` (registration or licence number, **not verified**), repeatable `qualification` (`code`, `identifier`, `issuer`, period), `phone`, `email`.
+  - **PractitionerRole:** `practitioner` (required), `organization`, `role` (required: `dietitian`, `nutritionist`, `nutrition-assistant`, `physician`, `clinical-officer`, `nurse`, `pharmacist`, `speech-language-therapist`, `physiotherapist`, `occupational-therapist`, `psychologist`, `social-worker`, `diabetes-educator`, `community-health-worker`, `other` on `…/CodeSystem/ncp-care-role`; any other text is kept as text, never guessed into a code), `specialty`, `location`, period.
+  - **CareTeam:** `subject` is required (the patient); `encounter`, `name`, `status` (`active` default), `managingOrganization`, `reason`, period, and repeatable `member` (a `role`, or a `practitioner` with `memberRole`; optional `onBehalfOf`). A team whose members cover fewer than two disciplines is accepted with a note.
+  - Every problem is reported at once (400): duplicate or unknown ids, a role with no practitioner, `partOf` loops, bad dates or emails, a team with no members or no subject.
+  - **Into the ADIME note.** Pass the Bundle to `$ncp-document` as a `resource`. The Practitioner, PractitionerRole, Organization and CareTeam entries are carried as supporting entries (never section content), and: an `author` given as a name that matches one Practitioner becomes a reference to that practitioner's role (display kept); `Composition.custodian` is the `custodian` parameter, else the top-level organization of the author's role (a department resolves to its hospital), else the only top-level organization; each CarePlan without a care team gets `careTeam` pointing at the document's team(s). `$validate-document` then also checks names/identifiers, role links, care team subject (must be the document patient) and participants, and warns about a name-only author, a missing custodian, an author with no recorded qualification, and a team not linked from a plan.
+  - **Honest limits.** Nothing is looked up or verified (registration numbers, licences, whether someone really belongs on a team). Patient-side members (family, caregivers via `RelatedPerson`) are not supported yet. Earlier steps still take `author` as a reference or a name; `$care-context` does not rewrite their `performer` fields. Practitioner phone and email are personal data: send only what the receiving system needs. Stateless: nothing is stored.
+- `$validate-document`: one `resource` parameter, a document Bundle (from `$ncp-document` or from another system). Returns **200** with an `OperationOutcome` listing errors, warnings and, when valid, one information issue. Same checks as above; the Bundle is not stored.
+
+**Worked example** — a minimal ADIME loop:
+```bash
+# 1. Assess
+curl -s -X POST "$BASE/fhir/Observation/\$assess-nutrition" -H 'content-type: application/json' -d '{
+  "resourceType":"Parameters","parameter":[
+    {"name":"subject","valueString":"Patient/42"},
+    {"name":"sex","valueCode":"male"},{"name":"ageYears","valueInteger":40},
+    {"name":"weight","valueQuantity":{"value":60,"unit":"kg"}},
+    {"name":"height","valueQuantity":{"value":175,"unit":"cm"}},
+    {"name":"usualWeight","valueQuantity":{"value":70,"unit":"kg"}},
+    {"name":"usualWeightPeriodDays","valueInteger":91},
+    {"name":"screeningPositive","valueBoolean":true},
+    {"name":"inflammation","valueCode":"chronic-disease"}]}'
+# 2. Diagnose  → POST /fhir/Condition/$diagnose   (PES parts)
+# 3. Intervene → POST /fhir/CarePlan/$intervene   (goals + orders)
+# 4. Monitor   → POST /fhir/CarePlan/$monitor     (follow-up vs baseline, goal status, plan review)
+#                POST /fhir/Goal/$evaluate        (just compare current values to targets)
+# 5. Document  → POST /fhir/Bundle/$ncp-document  (each Bundle above as a "resource" parameter)
+```
+
+**Honest limits.** Screening covers MUST, NRS-2002, MNA, SGA, PG-SGA and the NACS classification (no paediatric screening tools such as STRONGkids or PYMS yet, and no WHZ cutoffs — the MCP server has more). `$assess-nutrition` is adult-only; WHO 0–59-month growth is still unsupported (as in Phase 1). No `Patient`/`Encounter` resources are created — you pass references. Every canonical URL the facade emits now resolves: `GET /fhir/CodeSystem/{name}` (the code lists — `ncp-step`, `ncp-assessment-domain`, `glim`, `growth-status`, … — plus `ncp-diagnosis` from Supabase), `GET /fhir/OperationDefinition/{id}` (one per operation in `/fhir/metadata`, id = `<Resource>-<operation>`, e.g. `Observation-screen`) and `GET /fhir/StructureDefinition/{name}` (the Extensions, e.g. `pes-specify`). They are static definitions in [`src/fhirTerminology.js`](src/fhirTerminology.js); a test walks real operation output and fails if any emitted code system, code, extension or operation link lacks a definition, so add the definition when you add a field. These are conformance descriptions, not validated profiles. Not registered with any OpenHIM/HIE instance.
+
+#### Interoperability and governance (FHIR Phase 4, NCP step 7)
+
+Source: [`src/fhirGovernance.js`](src/fhirGovernance.js) (pure functions), wiring in `src/index.js`, tests in `test/fhirGovernance.test.js`, migration `sql/028_add_fhir_governance.sql`.
+
+**Authentication and access control.** Credentials are the ones that already exist: the root key, a per-consumer API key, or an OAuth 2.0 access token (`POST /oauth/token`, client_credentials), sent as `Authorization: Bearer`.
+
+| `FHIR_AUTH_MODE` | Behaviour |
+|---|---|
+| unset / `open` (default, unchanged) | Clinical operations stay public, as before. A valid token is still recognised, so the audit trail can name the caller. |
+| `enforce` | Every operation needs a credential **with the scope**. Always open: `GET /fhir/metadata`, `CodeSystem`, `OperationDefinition`, `StructureDefinition`, `ConceptMap`, `Questionnaire` and `POST /fhir/ConceptMap/$translate`. |
+
+*Use `enforce` in production.* `open` exists so existing integrations keep working until they hold credentials; it is not a safe setting for real patient data.
+
+Scopes are `system/<ResourceType|*>.<read|write|*>`. An operation that produces clinical content needs `write` on its resource type (`Condition/$diagnose` needs `system/Condition.write`, `Bundle/$ncp-document` needs `system/Bundle.write`); checking and translating (`$validate`, `Bundle/$validate-document`, `QuestionnaireResponse/$validate`) need `read`. With no explicit scopes, the role decides: `admin` and the root key carry `system/*.*`, `reviewer` carries `system/*.read` (so a reviewer key can validate but not generate). To narrow a credential, give it `fhir_scopes` when you create it: `POST /admin/keys` or `POST /admin/oauth-clients` with `{"label": "...", "role": "reviewer", "fhir_scopes": "system/Condition.write system/CarePlan.write"}` (run `sql/028` first). Failures: **401** (`issue.code: login`, with `WWW-Authenticate: Bearer`) with no or a bad credential; **403** (`forbidden`) when the scope is missing. `AuditEvent` is never covered by a wildcard type scope.
+
+**OperationOutcome everywhere.** Every error under `/fhir` (including auth failures, rate limits, 404 and 405) is an `OperationOutcome` with a proper `issue.code`, served as `application/fhir+json`. POST responses and AuditEvent reads carry `Cache-Control: no-store`; all carry `X-Content-Type-Options: nosniff` and `X-Request-Id`.
+
+**Audit.** Every non-conformance request under `/fhir`, and every failure, produces one `AuditEvent` (profile `ncp-audit-event`): `type` rest, subtype operation/read/search-type, action `E`/`R`, `recorded`, `outcome` (`0` success, `4` 4xx, `8` 5xx), the agent (API-key or OAuth-client label, or `anonymous`), the route (`POST /fhir/Condition/$diagnose`), the source and the request id as `AuditEvent.id` (= `X-Request-Id`). **Never recorded:** the request or response body, the query string, the token, the full IP (IPv4 is truncated to `a.b.c.0`, IPv6 to its first three groups) and, unless the operator opts in, the patient.
+
+| Variable | Effect |
+|---|---|
+| `FHIR_AUDIT_LOG=off` | Stop writing the audit line to the Worker logs (on by default: one `{"level":"audit","type":"fhir_audit_event",...}` JSON line per audited request). |
+| `FHIR_AUDIT_STORE=true` | Also store each event in `fhir_audit_events` (run `sql/028`), written after the response (`ctx.waitUntil`), so a slow or failed audit write never fails a request. |
+| `FHIR_AUDIT_INCLUDE_PATIENT=true` | Add the patient reference (`Patient/123`, from the `subject` parameter) as an audit entity. Off by default because the reference is personal data. |
+
+`GET /fhir/AuditEvent?date=ge2026-10-01&date=le2026-10-31&outcome=4&agent-name=<label>&_count=50` and `GET /fhir/AuditEvent/{id}` read the stored events (root/admin, or a credential with an explicit `system/AuditEvent.read`). They are read-only and immutable through the API: other methods are 405. Without `FHIR_AUDIT_STORE` the route answers 501 (still behind the credential check). Retention is yours to set (see the comment in `sql/028`). Requests made inside `POST /batch` are not audited by this layer.
+
+**Provenance and document governance.** `$ncp-document` now adds a `Provenance` (profile `ncp-document-provenance`): target = the Composition, agents author, assembler (this facade) and, when known, custodian, with the earlier steps' Provenance resources as `source` entities. It also sets `Composition.confidentiality` and `meta.security` from the optional `confidentiality` parameter (`U`, `L`, `M`, `N` default, `R`, `V`; HL7 v3-Confidentiality). Chakudya applies the label; enforcing it is the receiving EHR's job.
+
+**Profiles.** Five constraint profiles on R4 base resources are published at `GET /fhir/StructureDefinition/{name}` and listed as `supportedProfile` in the CapabilityStatement: `adime-document-bundle`, `adime-composition`, `ncp-document-provenance`, `ncp-care-team`, `ncp-audit-event`. The published definition and the check that enforces it come from one table, so they cannot drift. Outputs claim a profile in `meta.profile` only where they always satisfy it. Condition, CarePlan and Goal outputs do not claim a profile.
+
+**Terminology mappings.** `GET /fhir/ConceptMap/{id}`: `assessment-item-to-loinc`, `growth-metric-to-loinc`, `ncp-care-role-to-practitioner-role`, `growth-status-to-interpretation`. `POST /fhir/ConceptMap/$translate` (`system`, `code`, optional `url`, `targetSystem`) returns `result` and one `match` per mapping. A code with no true mapping is an explicit negative (`result=false`, or `unmatched` in the map), never a guess. For instance `dietitian` has no HL7 `practitioner-role` equivalent, and only `physician`, `nurse` and `pharmacist` are mapped. The growth-status map is `relatedto`, not `equivalent`.
+
+**R4 validation.** `POST /fhir/$validate` (one `resource` parameter; any resource or Bundle) returns an `OperationOutcome`; `$validate-document` and `$ncp-document` run the same check on every resource in the Bundle (an R4 error stops `$ncp-document` with a 422). It checks element names (unknown ones are warnings), required elements, array/single cardinality, required code bindings, primitive formats (instant, dateTime, date, code, uri, id), references, extensions, narrative XHTML, empty arrays/objects/nulls, and the main invariants (cmp-1, cmp-2, bdl-7/9/10/11, obs-6, gol-1, cpl-3, org-1) for 19 resource types, plus the minimum cardinality of any Chakudya profile named in `meta.profile`. **It is not the HL7 FHIR Validator.** It loads no StructureDefinitions and does not check terminology beyond required bindings. It does not validate against any implementation guide: this facade claims R4 base conformance and its own five profiles only, not IPS, SMART App Launch (OAuth here is client_credentials only), US Core or any national IG. Run the HL7 validator in your pipeline for those. While building this step the checker found and fixed three real defects in earlier steps: empty `entity`/`activity` arrays and Step 5 sections marked empty with no text.
+
+**CapabilityStatement.** `rest.security` (OAuth service, token URL, scope model, the current mode), system-level `validate`, `supportedProfile`s, and the `AuditEvent`, `ConceptMap`, `Composition`, `Provenance`, `CareTeam`, `StructureDefinition`, `CodeSystem`, `OperationDefinition` and `Questionnaire` resources.
 
 ### Recipes
 

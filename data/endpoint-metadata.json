@@ -74,18 +74,66 @@
       "note": "Root ADMIN_API_KEY only."
     },
     {
-      "method": "GET",
-      "path": "/foods",
+      "method": "POST",
+      "path": "/oauth/token",
       "auth": "public",
       "rateLimit": {
-        "limit": 100,
+        "limit": 10,
         "windowSeconds": 60,
         "scope": "ip"
-      }
+      },
+      "note": "Public because the client secret IS the credential; capped tightly per IP to blunt secret-guessing. client_credentials grant, 1-hour HS256 JWT carrying the client's role."
     },
     {
       "method": "GET",
-      "path": "/foods/{id}",
+      "path": "/.well-known/oauth-authorization-server",
+      "auth": "public",
+      "rateLimit": {
+        "limit": 60,
+        "windowSeconds": 60,
+        "scope": "ip"
+      },
+      "note": "RFC 8414 discovery metadata."
+    },
+    {
+      "method": "GET",
+      "path": "/admin/oauth-clients",
+      "auth": "admin",
+      "requiredRole": "root",
+      "rateLimit": {
+        "limit": 30,
+        "windowSeconds": 60,
+        "scope": "admin"
+      },
+      "note": "Root ADMIN_API_KEY only. The client_secret is shown once; revoking also blocks already-issued tokens (KV denylist)."
+    },
+    {
+      "method": "POST",
+      "path": "/admin/oauth-clients",
+      "auth": "admin",
+      "requiredRole": "root",
+      "rateLimit": {
+        "limit": 30,
+        "windowSeconds": 60,
+        "scope": "admin"
+      },
+      "note": "Root ADMIN_API_KEY only. The client_secret is shown once; revoking also blocks already-issued tokens (KV denylist)."
+    },
+    {
+      "method": "DELETE",
+      "path": "/admin/oauth-clients/{id}",
+      "auth": "admin",
+      "requiredRole": "root",
+      "rateLimit": {
+        "limit": 30,
+        "windowSeconds": 60,
+        "scope": "admin"
+      },
+      "note": "Root ADMIN_API_KEY only. The client_secret is shown once; revoking also blocks already-issued tokens (KV denylist)."
+    },
+    {
+      "method": "GET",
+      "path": "/foods",
       "auth": "public",
       "rateLimit": {
         "limit": 100,
@@ -96,36 +144,6 @@
     {
       "method": "POST",
       "path": "/foods",
-      "auth": "admin",
-      "rateLimit": {
-        "limit": 60,
-        "windowSeconds": 60,
-        "scope": "admin"
-      }
-    },
-    {
-      "method": "PUT",
-      "path": "/foods/{id}",
-      "auth": "admin",
-      "rateLimit": {
-        "limit": 60,
-        "windowSeconds": 60,
-        "scope": "admin"
-      }
-    },
-    {
-      "method": "PATCH",
-      "path": "/foods/{id}",
-      "auth": "admin",
-      "rateLimit": {
-        "limit": 60,
-        "windowSeconds": 60,
-        "scope": "admin"
-      }
-    },
-    {
-      "method": "DELETE",
-      "path": "/foods/{id}",
       "auth": "admin",
       "rateLimit": {
         "limit": 60,
@@ -211,6 +229,17 @@
     },
     {
       "method": "GET",
+      "path": "/foods/by-category",
+      "auth": "public",
+      "rateLimit": {
+        "limit": 60,
+        "windowSeconds": 60,
+        "scope": "ip"
+      },
+      "note": "One local RPC call, same tier as /foods/search."
+    },
+    {
+      "method": "GET",
       "path": "/foods/{id}/label",
       "auth": "public",
       "rateLimit": {
@@ -221,7 +250,7 @@
     },
     {
       "method": "GET",
-      "path": "/glycaemic-index",
+      "path": "/foods/{id}",
       "auth": "public",
       "rateLimit": {
         "limit": 100,
@@ -230,8 +259,38 @@
       }
     },
     {
+      "method": "PUT",
+      "path": "/foods/{id}",
+      "auth": "admin",
+      "rateLimit": {
+        "limit": 60,
+        "windowSeconds": 60,
+        "scope": "admin"
+      }
+    },
+    {
+      "method": "PATCH",
+      "path": "/foods/{id}",
+      "auth": "admin",
+      "rateLimit": {
+        "limit": 60,
+        "windowSeconds": 60,
+        "scope": "admin"
+      }
+    },
+    {
+      "method": "DELETE",
+      "path": "/foods/{id}",
+      "auth": "admin",
+      "rateLimit": {
+        "limit": 60,
+        "windowSeconds": 60,
+        "scope": "admin"
+      }
+    },
+    {
       "method": "GET",
-      "path": "/glycaemic-index/{id}",
+      "path": "/glycaemic-index",
       "auth": "public",
       "rateLimit": {
         "limit": 100,
@@ -247,6 +306,26 @@
         "limit": 60,
         "windowSeconds": 60,
         "scope": "admin"
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/glycaemic-index/bulk",
+      "auth": "admin",
+      "rateLimit": {
+        "limit": 10,
+        "windowSeconds": 60,
+        "scope": "admin"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/glycaemic-index/{id}",
+      "auth": "public",
+      "rateLimit": {
+        "limit": 100,
+        "windowSeconds": 60,
+        "scope": "ip"
       }
     },
     {
@@ -280,11 +359,262 @@
       }
     },
     {
+      "method": "GET",
+      "path": "/exchange",
+      "auth": "public",
+      "rateLimit": {
+        "limit": 100,
+        "windowSeconds": 60,
+        "scope": "ip"
+      }
+    },
+    {
       "method": "POST",
-      "path": "/glycaemic-index/bulk",
+      "path": "/exchange",
+      "auth": "admin",
+      "rateLimit": {
+        "limit": 60,
+        "windowSeconds": 60,
+        "scope": "admin"
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/exchange/bulk",
       "auth": "admin",
       "rateLimit": {
         "limit": 10,
+        "windowSeconds": 60,
+        "scope": "admin"
+      }
+    },
+    {
+      "method": "PUT",
+      "path": "/exchange/{id}",
+      "auth": "admin",
+      "rateLimit": {
+        "limit": 60,
+        "windowSeconds": 60,
+        "scope": "admin"
+      }
+    },
+    {
+      "method": "PATCH",
+      "path": "/exchange/{id}",
+      "auth": "admin",
+      "rateLimit": {
+        "limit": 60,
+        "windowSeconds": 60,
+        "scope": "admin"
+      }
+    },
+    {
+      "method": "DELETE",
+      "path": "/exchange/{id}",
+      "auth": "admin",
+      "rateLimit": {
+        "limit": 60,
+        "windowSeconds": 60,
+        "scope": "admin"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/renal",
+      "auth": "public",
+      "rateLimit": {
+        "limit": 100,
+        "windowSeconds": 60,
+        "scope": "ip"
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/renal",
+      "auth": "admin",
+      "rateLimit": {
+        "limit": 60,
+        "windowSeconds": 60,
+        "scope": "admin"
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/renal/bulk",
+      "auth": "admin",
+      "rateLimit": {
+        "limit": 10,
+        "windowSeconds": 60,
+        "scope": "admin"
+      }
+    },
+    {
+      "method": "PUT",
+      "path": "/renal/{id}",
+      "auth": "admin",
+      "rateLimit": {
+        "limit": 60,
+        "windowSeconds": 60,
+        "scope": "admin"
+      }
+    },
+    {
+      "method": "PATCH",
+      "path": "/renal/{id}",
+      "auth": "admin",
+      "rateLimit": {
+        "limit": 60,
+        "windowSeconds": 60,
+        "scope": "admin"
+      }
+    },
+    {
+      "method": "DELETE",
+      "path": "/renal/{id}",
+      "auth": "admin",
+      "rateLimit": {
+        "limit": 60,
+        "windowSeconds": 60,
+        "scope": "admin"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/formulas",
+      "auth": "public",
+      "rateLimit": {
+        "limit": 100,
+        "windowSeconds": 60,
+        "scope": "ip"
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/formulas",
+      "auth": "admin",
+      "rateLimit": {
+        "limit": 60,
+        "windowSeconds": 60,
+        "scope": "admin"
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/formulas/bulk",
+      "auth": "admin",
+      "rateLimit": {
+        "limit": 10,
+        "windowSeconds": 60,
+        "scope": "admin"
+      }
+    },
+    {
+      "method": "PUT",
+      "path": "/formulas/{id}",
+      "auth": "admin",
+      "rateLimit": {
+        "limit": 60,
+        "windowSeconds": 60,
+        "scope": "admin"
+      }
+    },
+    {
+      "method": "PATCH",
+      "path": "/formulas/{id}",
+      "auth": "admin",
+      "rateLimit": {
+        "limit": 60,
+        "windowSeconds": 60,
+        "scope": "admin"
+      }
+    },
+    {
+      "method": "DELETE",
+      "path": "/formulas/{id}",
+      "auth": "admin",
+      "rateLimit": {
+        "limit": 60,
+        "windowSeconds": 60,
+        "scope": "admin"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/drug-interactions",
+      "auth": "public",
+      "rateLimit": {
+        "limit": 100,
+        "windowSeconds": 60,
+        "scope": "ip"
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/drug-interactions",
+      "auth": "admin",
+      "rateLimit": {
+        "limit": 60,
+        "windowSeconds": 60,
+        "scope": "admin"
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/drug-interactions/bulk",
+      "auth": "admin",
+      "rateLimit": {
+        "limit": 10,
+        "windowSeconds": 60,
+        "scope": "admin"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/drug-interactions/search",
+      "auth": "public",
+      "rateLimit": {
+        "limit": 30,
+        "windowSeconds": 60,
+        "scope": "ip"
+      },
+      "note": "Whole-row keyword scan capped by scan_limit, same cost class as the exchange/renal keyword scans /rag/ask runs internally."
+    },
+    {
+      "method": "GET",
+      "path": "/drug-interactions/{id}",
+      "auth": "public",
+      "rateLimit": {
+        "limit": 100,
+        "windowSeconds": 60,
+        "scope": "ip"
+      }
+    },
+    {
+      "method": "PUT",
+      "path": "/drug-interactions/{id}",
+      "auth": "admin",
+      "rateLimit": {
+        "limit": 60,
+        "windowSeconds": 60,
+        "scope": "admin"
+      }
+    },
+    {
+      "method": "PATCH",
+      "path": "/drug-interactions/{id}",
+      "auth": "admin",
+      "rateLimit": {
+        "limit": 60,
+        "windowSeconds": 60,
+        "scope": "admin"
+      }
+    },
+    {
+      "method": "DELETE",
+      "path": "/drug-interactions/{id}",
+      "auth": "admin",
+      "rateLimit": {
+        "limit": 60,
         "windowSeconds": 60,
         "scope": "admin"
       }
@@ -318,6 +648,297 @@
         "windowSeconds": 60,
         "scope": "admin"
       }
+    },
+    {
+      "method": "GET",
+      "path": "/hc-velocity/classify",
+      "auth": "public",
+      "rateLimit": {
+        "limit": 100,
+        "windowSeconds": 60,
+        "scope": "ip"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/hc-velocity",
+      "auth": "public",
+      "rateLimit": {
+        "limit": 100,
+        "windowSeconds": 60,
+        "scope": "ip"
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/hc-velocity/bulk",
+      "auth": "admin",
+      "rateLimit": {
+        "limit": 10,
+        "windowSeconds": 60,
+        "scope": "admin"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/length-velocity/classify",
+      "auth": "public",
+      "rateLimit": {
+        "limit": 100,
+        "windowSeconds": 60,
+        "scope": "ip"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/length-velocity",
+      "auth": "public",
+      "rateLimit": {
+        "limit": 100,
+        "windowSeconds": 60,
+        "scope": "ip"
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/length-velocity/bulk",
+      "auth": "admin",
+      "rateLimit": {
+        "limit": 10,
+        "windowSeconds": 60,
+        "scope": "admin"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/weight-velocity/classify",
+      "auth": "public",
+      "rateLimit": {
+        "limit": 100,
+        "windowSeconds": 60,
+        "scope": "ip"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/weight-velocity",
+      "auth": "public",
+      "rateLimit": {
+        "limit": 100,
+        "windowSeconds": 60,
+        "scope": "ip"
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/weight-velocity/bulk",
+      "auth": "admin",
+      "rateLimit": {
+        "limit": 10,
+        "windowSeconds": 60,
+        "scope": "admin"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/muac-for-age/classify",
+      "auth": "public",
+      "rateLimit": {
+        "limit": 100,
+        "windowSeconds": 60,
+        "scope": "ip"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/muac-for-age",
+      "auth": "public",
+      "rateLimit": {
+        "limit": 100,
+        "windowSeconds": 60,
+        "scope": "ip"
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/muac-for-age/bulk",
+      "auth": "admin",
+      "rateLimit": {
+        "limit": 10,
+        "windowSeconds": 60,
+        "scope": "admin"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/muac/classify",
+      "auth": "public",
+      "rateLimit": {
+        "limit": 100,
+        "windowSeconds": 60,
+        "scope": "ip"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/length-height-for-age/classify",
+      "auth": "public",
+      "rateLimit": {
+        "limit": 100,
+        "windowSeconds": 60,
+        "scope": "ip"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/length-height-for-age",
+      "auth": "public",
+      "rateLimit": {
+        "limit": 100,
+        "windowSeconds": 60,
+        "scope": "ip"
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/length-height-for-age/bulk",
+      "auth": "admin",
+      "rateLimit": {
+        "limit": 10,
+        "windowSeconds": 60,
+        "scope": "admin"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/weight-for-age/classify",
+      "auth": "public",
+      "rateLimit": {
+        "limit": 100,
+        "windowSeconds": 60,
+        "scope": "ip"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/weight-for-age",
+      "auth": "public",
+      "rateLimit": {
+        "limit": 100,
+        "windowSeconds": 60,
+        "scope": "ip"
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/weight-for-age/bulk",
+      "auth": "admin",
+      "rateLimit": {
+        "limit": 10,
+        "windowSeconds": 60,
+        "scope": "admin"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/weight-for-length-height/classify",
+      "auth": "public",
+      "rateLimit": {
+        "limit": 100,
+        "windowSeconds": 60,
+        "scope": "ip"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/weight-for-length-height",
+      "auth": "public",
+      "rateLimit": {
+        "limit": 100,
+        "windowSeconds": 60,
+        "scope": "ip"
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/weight-for-length-height/bulk",
+      "auth": "admin",
+      "rateLimit": {
+        "limit": 10,
+        "windowSeconds": 60,
+        "scope": "admin"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/bmi-for-age-under-5/classify",
+      "auth": "public",
+      "rateLimit": {
+        "limit": 100,
+        "windowSeconds": 60,
+        "scope": "ip"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/bmi-for-age-under-5",
+      "auth": "public",
+      "rateLimit": {
+        "limit": 100,
+        "windowSeconds": 60,
+        "scope": "ip"
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/bmi-for-age-under-5/bulk",
+      "auth": "admin",
+      "rateLimit": {
+        "limit": 10,
+        "windowSeconds": 60,
+        "scope": "admin"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/hc-for-age/classify",
+      "auth": "public",
+      "rateLimit": {
+        "limit": 100,
+        "windowSeconds": 60,
+        "scope": "ip"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/hc-for-age",
+      "auth": "public",
+      "rateLimit": {
+        "limit": 100,
+        "windowSeconds": 60,
+        "scope": "ip"
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/hc-for-age/bulk",
+      "auth": "admin",
+      "rateLimit": {
+        "limit": 10,
+        "windowSeconds": 60,
+        "scope": "admin"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/growth/assess",
+      "auth": "public",
+      "rateLimit": {
+        "limit": 60,
+        "windowSeconds": 60,
+        "scope": "ip"
+      },
+      "note": "Fans out up to seven local reference lookups per request, no external API cost."
     },
     {
       "method": "GET",
@@ -398,7 +1019,7 @@
         "windowSeconds": 60,
         "scope": "ip"
       },
-      "note": "FHIR facade, same public/cheap tier as the classify endpoints it wraps."
+      "note": "Always open. Reports the deployment's access mode (open vs enforce) in the CapabilityStatement."
     },
     {
       "method": "POST",
@@ -409,268 +1030,249 @@
         "windowSeconds": 60,
         "scope": "ip"
       },
-      "note": "FHIR facade, same public/cheap tier as the classify endpoints it wraps."
+      "note": "FHIR facade. Rate limit is the public tier, but in enforce mode (FHIR_AUTH_MODE=enforce, the hosted default) a Bearer credential with scope system/Observation.write is required (401/403 otherwise); in open mode it is public."
     },
     {
-      "method": "GET",
-      "path": "/exchange",
+      "method": "POST",
+      "path": "/fhir/Observation/$screen",
       "auth": "public",
       "rateLimit": {
         "limit": 100,
-        "windowSeconds": 60,
-        "scope": "ip"
-      }
-    },
-    {
-      "method": "POST",
-      "path": "/exchange",
-      "auth": "admin",
-      "rateLimit": {
-        "limit": 60,
-        "windowSeconds": 60,
-        "scope": "admin"
-      }
-    },
-    {
-      "method": "PUT",
-      "path": "/exchange/{id}",
-      "auth": "admin",
-      "rateLimit": {
-        "limit": 60,
-        "windowSeconds": 60,
-        "scope": "admin"
-      }
-    },
-    {
-      "method": "PATCH",
-      "path": "/exchange/{id}",
-      "auth": "admin",
-      "rateLimit": {
-        "limit": 60,
-        "windowSeconds": 60,
-        "scope": "admin"
-      }
-    },
-    {
-      "method": "DELETE",
-      "path": "/exchange/{id}",
-      "auth": "admin",
-      "rateLimit": {
-        "limit": 60,
-        "windowSeconds": 60,
-        "scope": "admin"
-      }
-    },
-    {
-      "method": "POST",
-      "path": "/exchange/bulk",
-      "auth": "admin",
-      "rateLimit": {
-        "limit": 10,
-        "windowSeconds": 60,
-        "scope": "admin"
-      }
-    },
-    {
-      "method": "GET",
-      "path": "/renal",
-      "auth": "public",
-      "rateLimit": {
-        "limit": 100,
-        "windowSeconds": 60,
-        "scope": "ip"
-      }
-    },
-    {
-      "method": "POST",
-      "path": "/renal",
-      "auth": "admin",
-      "rateLimit": {
-        "limit": 60,
-        "windowSeconds": 60,
-        "scope": "admin"
-      }
-    },
-    {
-      "method": "PUT",
-      "path": "/renal/{id}",
-      "auth": "admin",
-      "rateLimit": {
-        "limit": 60,
-        "windowSeconds": 60,
-        "scope": "admin"
-      }
-    },
-    {
-      "method": "PATCH",
-      "path": "/renal/{id}",
-      "auth": "admin",
-      "rateLimit": {
-        "limit": 60,
-        "windowSeconds": 60,
-        "scope": "admin"
-      }
-    },
-    {
-      "method": "DELETE",
-      "path": "/renal/{id}",
-      "auth": "admin",
-      "rateLimit": {
-        "limit": 60,
-        "windowSeconds": 60,
-        "scope": "admin"
-      }
-    },
-    {
-      "method": "POST",
-      "path": "/renal/bulk",
-      "auth": "admin",
-      "rateLimit": {
-        "limit": 10,
-        "windowSeconds": 60,
-        "scope": "admin"
-      }
-    },
-    {
-      "method": "GET",
-      "path": "/formulas",
-      "auth": "public",
-      "rateLimit": {
-        "limit": 100,
-        "windowSeconds": 60,
-        "scope": "ip"
-      }
-    },
-    {
-      "method": "POST",
-      "path": "/formulas",
-      "auth": "admin",
-      "rateLimit": {
-        "limit": 60,
-        "windowSeconds": 60,
-        "scope": "admin"
-      }
-    },
-    {
-      "method": "PUT",
-      "path": "/formulas/{id}",
-      "auth": "admin",
-      "rateLimit": {
-        "limit": 60,
-        "windowSeconds": 60,
-        "scope": "admin"
-      }
-    },
-    {
-      "method": "PATCH",
-      "path": "/formulas/{id}",
-      "auth": "admin",
-      "rateLimit": {
-        "limit": 60,
-        "windowSeconds": 60,
-        "scope": "admin"
-      }
-    },
-    {
-      "method": "DELETE",
-      "path": "/formulas/{id}",
-      "auth": "admin",
-      "rateLimit": {
-        "limit": 60,
-        "windowSeconds": 60,
-        "scope": "admin"
-      }
-    },
-    {
-      "method": "POST",
-      "path": "/formulas/bulk",
-      "auth": "admin",
-      "rateLimit": {
-        "limit": 10,
-        "windowSeconds": 60,
-        "scope": "admin"
-      }
-    },
-    {
-      "method": "GET",
-      "path": "/drug-interactions",
-      "auth": "public",
-      "rateLimit": {
-        "limit": 100,
-        "windowSeconds": 60,
-        "scope": "ip"
-      }
-    },
-    {
-      "method": "GET",
-      "path": "/drug-interactions/{id}",
-      "auth": "public",
-      "rateLimit": {
-        "limit": 100,
-        "windowSeconds": 60,
-        "scope": "ip"
-      }
-    },
-    {
-      "method": "GET",
-      "path": "/drug-interactions/search",
-      "auth": "public",
-      "rateLimit": {
-        "limit": 30,
         "windowSeconds": 60,
         "scope": "ip"
       },
-      "note": "Whole-row keyword scan capped by scan_limit, same cost class as the exchange/renal keyword scans /rag/ask runs internally."
+      "note": "FHIR facade. Rate limit is the public tier, but in enforce mode (FHIR_AUTH_MODE=enforce, the hosted default) a Bearer credential with scope system/Observation.write is required (401/403 otherwise); in open mode it is public."
     },
     {
       "method": "POST",
-      "path": "/drug-interactions",
-      "auth": "admin",
+      "path": "/fhir/Observation/$assess-nutrition",
+      "auth": "public",
       "rateLimit": {
-        "limit": 60,
+        "limit": 100,
         "windowSeconds": 60,
-        "scope": "admin"
-      }
-    },
-    {
-      "method": "PUT",
-      "path": "/drug-interactions/{id}",
-      "auth": "admin",
-      "rateLimit": {
-        "limit": 60,
-        "windowSeconds": 60,
-        "scope": "admin"
-      }
-    },
-    {
-      "method": "PATCH",
-      "path": "/drug-interactions/{id}",
-      "auth": "admin",
-      "rateLimit": {
-        "limit": 60,
-        "windowSeconds": 60,
-        "scope": "admin"
-      }
-    },
-    {
-      "method": "DELETE",
-      "path": "/drug-interactions/{id}",
-      "auth": "admin",
-      "rateLimit": {
-        "limit": 60,
-        "windowSeconds": 60,
-        "scope": "admin"
-      }
+        "scope": "ip"
+      },
+      "note": "FHIR facade. Rate limit is the public tier, but in enforce mode (FHIR_AUTH_MODE=enforce, the hosted default) a Bearer credential with scope system/Observation.write is required (401/403 otherwise); in open mode it is public."
     },
     {
       "method": "POST",
-      "path": "/drug-interactions/bulk",
+      "path": "/fhir/Condition/$diagnose",
+      "auth": "public",
+      "rateLimit": {
+        "limit": 100,
+        "windowSeconds": 60,
+        "scope": "ip"
+      },
+      "note": "FHIR facade. Rate limit is the public tier, but in enforce mode (FHIR_AUTH_MODE=enforce, the hosted default) a Bearer credential with scope system/Condition.write is required (401/403 otherwise); in open mode it is public."
+    },
+    {
+      "method": "POST",
+      "path": "/fhir/CarePlan/$intervene",
+      "auth": "public",
+      "rateLimit": {
+        "limit": 100,
+        "windowSeconds": 60,
+        "scope": "ip"
+      },
+      "note": "FHIR facade. Rate limit is the public tier, but in enforce mode (FHIR_AUTH_MODE=enforce, the hosted default) a Bearer credential with scope system/CarePlan.write is required (401/403 otherwise); in open mode it is public."
+    },
+    {
+      "method": "POST",
+      "path": "/fhir/CarePlan/$monitor",
+      "auth": "public",
+      "rateLimit": {
+        "limit": 100,
+        "windowSeconds": 60,
+        "scope": "ip"
+      },
+      "note": "FHIR facade. Rate limit is the public tier, but in enforce mode (FHIR_AUTH_MODE=enforce, the hosted default) a Bearer credential with scope system/CarePlan.write is required (401/403 otherwise); in open mode it is public."
+    },
+    {
+      "method": "POST",
+      "path": "/fhir/Goal/$evaluate",
+      "auth": "public",
+      "rateLimit": {
+        "limit": 100,
+        "windowSeconds": 60,
+        "scope": "ip"
+      },
+      "note": "FHIR facade. Rate limit is the public tier, but in enforce mode (FHIR_AUTH_MODE=enforce, the hosted default) a Bearer credential with scope system/Goal.write is required (401/403 otherwise); in open mode it is public."
+    },
+    {
+      "method": "POST",
+      "path": "/fhir/Bundle/$ncp-document",
+      "auth": "public",
+      "rateLimit": {
+        "limit": 100,
+        "windowSeconds": 60,
+        "scope": "ip"
+      },
+      "note": "FHIR facade. Rate limit is the public tier, but in enforce mode (FHIR_AUTH_MODE=enforce, the hosted default) a Bearer credential with scope system/Bundle.write is required (401/403 otherwise); in open mode it is public."
+    },
+    {
+      "method": "POST",
+      "path": "/fhir/Bundle/$care-context",
+      "auth": "public",
+      "rateLimit": {
+        "limit": 100,
+        "windowSeconds": 60,
+        "scope": "ip"
+      },
+      "note": "FHIR facade. Rate limit is the public tier, but in enforce mode (FHIR_AUTH_MODE=enforce, the hosted default) a Bearer credential with scope system/Bundle.write is required (401/403 otherwise); in open mode it is public."
+    },
+    {
+      "method": "POST",
+      "path": "/fhir/$validate",
+      "auth": "public",
+      "rateLimit": {
+        "limit": 100,
+        "windowSeconds": 60,
+        "scope": "ip"
+      },
+      "note": "FHIR facade. Rate limit is the public tier, but in enforce mode (FHIR_AUTH_MODE=enforce, the hosted default) a Bearer credential with scope system/Resource.read is required (401/403 otherwise); in open mode it is public."
+    },
+    {
+      "method": "POST",
+      "path": "/fhir/ConceptMap/$translate",
+      "auth": "public",
+      "rateLimit": {
+        "limit": 100,
+        "windowSeconds": 60,
+        "scope": "ip"
+      },
+      "note": "Terminology translation - always open, even in enforce mode."
+    },
+    {
+      "method": "GET",
+      "path": "/fhir/ConceptMap/{id}",
+      "auth": "public",
+      "rateLimit": {
+        "limit": 100,
+        "windowSeconds": 60,
+        "scope": "ip"
+      },
+      "note": "Conformance/terminology read - always open, even in enforce mode."
+    },
+    {
+      "method": "GET",
+      "path": "/fhir/AuditEvent",
       "auth": "admin",
       "rateLimit": {
-        "limit": 10,
+        "limit": 100,
         "windowSeconds": 60,
-        "scope": "admin"
-      }
+        "scope": "ip"
+      },
+      "note": "Always needs a credential in every access mode: admin role (or root key), or an explicit system/AuditEvent.read scope. A wildcard system/* scope never covers AuditEvent. Rate-limited per IP."
+    },
+    {
+      "method": "GET",
+      "path": "/fhir/AuditEvent/{id}",
+      "auth": "admin",
+      "rateLimit": {
+        "limit": 100,
+        "windowSeconds": 60,
+        "scope": "ip"
+      },
+      "note": "Always needs a credential in every access mode: admin role (or root key), or an explicit system/AuditEvent.read scope. A wildcard system/* scope never covers AuditEvent. Rate-limited per IP."
+    },
+    {
+      "method": "POST",
+      "path": "/fhir/Bundle/$validate-document",
+      "auth": "public",
+      "rateLimit": {
+        "limit": 100,
+        "windowSeconds": 60,
+        "scope": "ip"
+      },
+      "note": "FHIR facade. Rate limit is the public tier, but in enforce mode (FHIR_AUTH_MODE=enforce, the hosted default) a Bearer credential with scope system/Bundle.read is required (401/403 otherwise); in open mode it is public."
+    },
+    {
+      "method": "POST",
+      "path": "/fhir/Bundle/$nutrition-assessment",
+      "auth": "public",
+      "rateLimit": {
+        "limit": 100,
+        "windowSeconds": 60,
+        "scope": "ip"
+      },
+      "note": "FHIR facade. Rate limit is the public tier, but in enforce mode (FHIR_AUTH_MODE=enforce, the hosted default) a Bearer credential with scope system/Bundle.write is required (401/403 otherwise); in open mode it is public."
+    },
+    {
+      "method": "POST",
+      "path": "/fhir/QuestionnaireResponse/$validate",
+      "auth": "public",
+      "rateLimit": {
+        "limit": 100,
+        "windowSeconds": 60,
+        "scope": "ip"
+      },
+      "note": "FHIR facade. Rate limit is the public tier, but in enforce mode (FHIR_AUTH_MODE=enforce, the hosted default) a Bearer credential with scope system/QuestionnaireResponse.read is required (401/403 otherwise); in open mode it is public."
+    },
+    {
+      "method": "GET",
+      "path": "/fhir/Questionnaire",
+      "auth": "public",
+      "rateLimit": {
+        "limit": 100,
+        "windowSeconds": 60,
+        "scope": "ip"
+      },
+      "note": "Conformance/terminology read - always open, even in enforce mode."
+    },
+    {
+      "method": "GET",
+      "path": "/fhir/Questionnaire/{id}",
+      "auth": "public",
+      "rateLimit": {
+        "limit": 100,
+        "windowSeconds": 60,
+        "scope": "ip"
+      },
+      "note": "Conformance/terminology read - always open, even in enforce mode."
+    },
+    {
+      "method": "GET",
+      "path": "/fhir/CodeSystem/ncp-diagnosis",
+      "auth": "public",
+      "rateLimit": {
+        "limit": 100,
+        "windowSeconds": 60,
+        "scope": "ip"
+      },
+      "note": "Conformance/terminology read - always open, even in enforce mode."
+    },
+    {
+      "method": "GET",
+      "path": "/fhir/CodeSystem/{name}",
+      "auth": "public",
+      "rateLimit": {
+        "limit": 100,
+        "windowSeconds": 60,
+        "scope": "ip"
+      },
+      "note": "Conformance/terminology read - always open, even in enforce mode."
+    },
+    {
+      "method": "GET",
+      "path": "/fhir/OperationDefinition/{id}",
+      "auth": "public",
+      "rateLimit": {
+        "limit": 100,
+        "windowSeconds": 60,
+        "scope": "ip"
+      },
+      "note": "Conformance/terminology read - always open, even in enforce mode."
+    },
+    {
+      "method": "GET",
+      "path": "/fhir/StructureDefinition/{name}",
+      "auth": "public",
+      "rateLimit": {
+        "limit": 100,
+        "windowSeconds": 60,
+        "scope": "ip"
+      },
+      "note": "Conformance/terminology read - always open, even in enforce mode."
     },
     {
       "method": "GET",
@@ -832,31 +1434,21 @@
       }
     },
     {
-      "method": "GET",
-      "path": "/log/{id}",
-      "auth": "public",
-      "rateLimit": {
-        "limit": 100,
-        "windowSeconds": 60,
-        "scope": "ip"
-      }
-    },
-    {
-      "method": "GET",
-      "path": "/log/summary",
-      "auth": "public",
-      "rateLimit": {
-        "limit": 100,
-        "windowSeconds": 60,
-        "scope": "ip"
-      }
-    },
-    {
       "method": "POST",
       "path": "/log",
       "auth": "public",
       "rateLimit": {
         "limit": 30,
+        "windowSeconds": 60,
+        "scope": "ip"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/log/{id}",
+      "auth": "public",
+      "rateLimit": {
+        "limit": 100,
         "windowSeconds": 60,
         "scope": "ip"
       }
@@ -871,6 +1463,16 @@
         "scope": "ip"
       },
       "note": "Requires the same user_id the entry was logged under."
+    },
+    {
+      "method": "GET",
+      "path": "/log/summary",
+      "auth": "public",
+      "rateLimit": {
+        "limit": 100,
+        "windowSeconds": 60,
+        "scope": "ip"
+      }
     },
     {
       "method": "POST",
@@ -907,7 +1509,7 @@
     },
     {
       "method": "GET",
-      "path": "/dri",
+      "path": "/dri/life-stages",
       "auth": "public",
       "rateLimit": {
         "limit": 100,
@@ -917,7 +1519,7 @@
     },
     {
       "method": "GET",
-      "path": "/dri/life-stages",
+      "path": "/dri",
       "auth": "public",
       "rateLimit": {
         "limit": 100,
@@ -948,16 +1550,6 @@
       "note": "Also has a separate KV response cache: 10 min TTL, keyed on context + top_k + normalized query."
     },
     {
-      "method": "POST",
-      "path": "/rag/ingest",
-      "auth": "admin",
-      "rateLimit": {
-        "limit": 300,
-        "windowSeconds": 60,
-        "scope": "admin"
-      }
-    },
-    {
       "method": "DELETE",
       "path": "/rag/source",
       "auth": "admin",
@@ -970,6 +1562,16 @@
     },
     {
       "method": "POST",
+      "path": "/rag/ingest",
+      "auth": "admin",
+      "rateLimit": {
+        "limit": 300,
+        "windowSeconds": 60,
+        "scope": "admin"
+      }
+    },
+    {
+      "method": "POST",
       "path": "/rag/ask",
       "auth": "public",
       "rateLimit": {
@@ -978,6 +1580,61 @@
         "scope": "ip"
       },
       "note": "Most expensive route in the API - intent detection + fan-out search + rerank + LLM answer. Whole answers cached 5 min (skipped when session_id is passed)."
+    },
+    {
+      "method": "POST",
+      "path": "/rag/upload",
+      "auth": "admin",
+      "rateLimit": {
+        "limit": 20,
+        "windowSeconds": 60,
+        "scope": "admin"
+      },
+      "note": "Stores the file and queues Cohere embedding work, so capped tightly. Max 25 MB; pdf, docx, txt, md, csv, html."
+    },
+    {
+      "method": "POST",
+      "path": "/rag/enqueue",
+      "auth": "admin",
+      "rateLimit": {
+        "limit": 20,
+        "windowSeconds": 60,
+        "scope": "admin"
+      },
+      "note": "Queues an already-uploaded file, or retries a failed job via job_id."
+    },
+    {
+      "method": "GET",
+      "path": "/rag/jobs",
+      "auth": "admin",
+      "rateLimit": {
+        "limit": 60,
+        "windowSeconds": 60,
+        "scope": "admin"
+      },
+      "note": "Ingestion job status."
+    },
+    {
+      "method": "GET",
+      "path": "/rag/jobs/{id}",
+      "auth": "admin",
+      "rateLimit": {
+        "limit": 60,
+        "windowSeconds": 60,
+        "scope": "admin"
+      },
+      "note": "Ingestion job status."
+    },
+    {
+      "method": "POST",
+      "path": "/rag/webhook",
+      "auth": "public",
+      "rateLimit": {
+        "limit": 60,
+        "windowSeconds": 60,
+        "scope": "ip"
+      },
+      "note": "Authenticated inside the handler by the x-webhook-secret header (shared secret), not the admin key."
     },
     {
       "method": "POST",
