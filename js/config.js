@@ -5,6 +5,6 @@
 // because the API verifies login tokens against it.
 window.CHAKUDYA_AUTH = {
   supabaseUrl: "https://vivjinvanlttossdgiwc.supabase.co",
-  supabaseAnonKey: "PASTE_PUBLISHABLE_KEY_HERE",
+  supabaseAnonKey: "sb_publishable_LosrwYza1bjlBK5d_NwZBA_wBGOTf-v",
   googleEnabled: false, // set true after enabling the Google provider in Supabase
 };
