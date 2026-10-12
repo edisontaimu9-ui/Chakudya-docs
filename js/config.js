@@ -6,5 +6,5 @@
 window.CHAKUDYA_AUTH = {
   supabaseUrl: "https://vivjinvanlttossdgiwc.supabase.co",
   supabaseAnonKey: "sb_publishable_LosrwYza1bjlBK5d_NwZBA_wBGOTf-v",
-  googleEnabled: false, // set true after enabling the Google provider in Supabase
+  googleEnabled: true, // Google provider is enabled in Supabase
 };
