@@ -168,7 +168,7 @@ const RenderAccount = (() => {
   function render(el) {
     container = el;
     if (!DevAuth.configured()) {
-      el.innerHTML = `<div class="empty-state"><h3>Sign-in isn't set up yet</h3><p>The site owner still needs to add the Supabase publishable key to <span class="mono">js/config.js</span>.</p><a class="btn" href="#/">Back to overview</a></div>`;
+      el.innerHTML = `<div class="empty-state"><h3>Sign-in isn't set up yet</h3><p>The site owner still needs to add the Supabase publishable key to <span class="mono">js/config.js</span>.</p><a class="btn" href="#/docs/getting-started">Back to the docs</a></div>`;
       return;
     }
     if (DevAuth.isSignedIn()) renderSignedIn(); else renderSignedOut();

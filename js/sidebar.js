@@ -21,13 +21,18 @@ const Sidebar = (() => {
     const collapsed = loadCollapsed();
     container.innerHTML = "";
 
-    groups.forEach((group) => {
+    // Documentation guides first, then the endpoint groups.
+    const guides = { tag: "Documentation", guides: RenderDocs.SECTIONS };
+    const label = el(`<div class="nav-label">Endpoints by resource</div>`);
+    [guides, ...groups].forEach((group, gi) => {
+      if (gi === 1) container.appendChild(label);
+      const isGuides = !!group.guides;
       const groupEl = el(`
         <div class="nav-group" data-tag="${RenderEndpoint.escapeHtml(group.tag)}">
           <button class="nav-group__head" type="button">
             <svg class="nav-group__chevron" width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M2 3.5 5 6.5 8 3.5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
             <span></span>
-            <span class="nav-group__count">${group.endpoints.length}</span>
+            <span class="nav-group__count">${isGuides ? group.guides.length : group.endpoints.length}</span>
           </button>
           <ul class="nav-group__list"></ul>
         </div>
@@ -44,6 +49,18 @@ const Sidebar = (() => {
       });
 
       const list = groupEl.querySelector(".nav-group__list");
+      if (isGuides) {
+        group.guides.forEach((g) => {
+          const item = el(`
+            <li class="nav-item" data-id="guide:${g.id}" data-search="${RenderEndpoint.escapeHtml((g.title + " " + g.blurb + " docs guide").toLowerCase())}">
+              <a class="nav-item__link nav-item__link--guide" href="#/docs/${g.id}"><span class="nav-item__path"></span></a>
+            </li>`);
+          item.querySelector(".nav-item__path").textContent = g.title;
+          list.appendChild(item);
+        });
+        container.appendChild(groupEl);
+        return;
+      }
       group.endpoints.forEach((ep) => {
         const item = el(`
           <li class="nav-item" data-id="${ep.id}" data-search="${RenderEndpoint.escapeHtml((ep.summary + " " + ep.path + " " + ep.method).toLowerCase())}">

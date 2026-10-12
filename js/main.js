@@ -89,14 +89,34 @@
   });
   scrim.addEventListener("click", closeSidebar);
 
+  // ── Keep --header-h equal to the real header height (it changes on mobile, where the nav wraps to a second row)
+  const headerEl = document.getElementById("app-header");
+  function syncHeaderHeight() {
+    document.documentElement.style.setProperty("--header-h", headerEl.offsetHeight + "px");
+  }
+  syncHeaderHeight();
+  if ("ResizeObserver" in window) new ResizeObserver(syncHeaderHeight).observe(headerEl);
+  window.addEventListener("resize", syncHeaderHeight);
+
   // ── Router ─────────────────────────────────────────────────
   function route() {
     const hash = location.hash.replace(/^#\/?/, "");
-    // The landing page is full-width with no endpoint sidebar.
-    document.body.classList.toggle("is-landing", !hash);
-    document.getElementById("nav-home")?.setAttribute("aria-current", !hash ? "page" : "false");
-    document.getElementById("nav-reference")?.setAttribute("aria-current", hash && hash !== "account" ? "page" : "false");
-    if (!hash) {
+    // The landing page is full-width with no sidebar; docs and reference pages keep it.
+    const isLanding = !hash;
+    const isGuide = hash === "docs" || hash.startsWith("docs/");
+    document.body.classList.toggle("is-landing", isLanding);
+    const guideId = hash.split("/")[1] || "getting-started";
+    const activeNav = isLanding ? "nav-home"
+      : isGuide && guideId !== "api-reference" ? "nav-docs"
+      : hash === "account" ? ""
+      : "nav-reference";
+    ["nav-home", "nav-docs", "nav-reference"].forEach((id) => {
+      const a = document.getElementById(id);
+      if (!a) return;
+      if (id === activeNav) a.setAttribute("aria-current", "page"); else a.removeAttribute("aria-current");
+    });
+
+    if (isLanding) {
       RenderLanding.render(content);
       Sidebar.setActive(null);
       AppState.set({ activeId: null });
@@ -106,8 +126,26 @@
       return;
     }
     if (hash === "reference") {
-      RenderOverview.render(content);
-      Sidebar.setActive(null);
+      // Old overview route: its content now lives in the docs guides.
+      location.replace("#/docs/getting-started");
+      return;
+    }
+    if (isGuide) {
+      if (hash === "docs") { location.replace("#/docs/getting-started"); return; }
+      if (!RenderDocs.has(guideId) || hash.split("/").length > 2) {
+        content.innerHTML = `
+          <div class="empty-state">
+            <h3>Page not found</h3>
+            <p>There is no documentation page at <span class="mono">${RenderEndpoint.escapeHtml(hash)}</span>.</p>
+            <a class="btn" href="#/docs/getting-started">Go to Getting Started</a>
+          </div>`;
+        Sidebar.setActive(null);
+        AppState.set({ activeId: null });
+        closeSidebar();
+        return;
+      }
+      RenderDocs.render(guideId, content);
+      Sidebar.setActive(`guide:${guideId}`);
       AppState.set({ activeId: null });
       document.getElementById("main").focus({ preventScroll: true });
       window.scrollTo(0, 0);
@@ -129,7 +167,7 @@
         <div class="empty-state">
           <h3>Endpoint not found</h3>
           <p>No documented route matches <span class="mono">${RenderEndpoint.escapeHtml(hash)}</span>.</p>
-          <a class="btn" href="#/">Back to overview</a>
+          <a class="btn" href="#/docs/api-reference">Back to the API reference</a>
         </div>`;
       AppState.set({ activeId: null });
       return;

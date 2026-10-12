@@ -9,7 +9,7 @@
 .btn { text-decoration: none; }
 
 /* On the landing page the sidebar is hidden and content goes full width. */
-body.is-landing .sidebar, body.is-landing .sidebar-scrim, body.is-landing .sidebar-toggle { display: none !important; }
+body.is-landing .sidebar, body.is-landing .sidebar-scrim, body.is-landing .sidebar-toggle, body.is-landing .header-search { display: none !important; }
 body.is-landing .content { max-width: 1180px; padding: 24px 28px 0; }
 
 /* Header nav links */
@@ -201,7 +201,6 @@ body.is-landing .content { max-width: 1180px; padding: 24px 28px 0; }
 @media (max-width: 900px) {
   .lp-hero, .lp-dev { grid-template-columns: 1fr; }
   .lp-cols, .lp-aud-grid { grid-template-columns: 1fr; }
-  .header-nav { display: none; }
   .lp-float--a { left: 8px; } .lp-float--b { right: 8px; }
 }
 @media (max-width: 560px) {

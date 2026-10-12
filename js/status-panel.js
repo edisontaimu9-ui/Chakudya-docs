@@ -9,7 +9,7 @@
  * 60s while the tab is visible and the panel is on screen, and on click of
  * the Refresh button.
  *
- * The panel is destroyed/recreated every time RenderOverview re-renders
+ * The panel is destroyed/recreated every time the page re-renders
  * (container.innerHTML is cleared on navigation), so check() defensively
  * looks up its DOM elements each call and stops its own interval the
  * moment they're gone rather than relying on an external lifecycle hook.

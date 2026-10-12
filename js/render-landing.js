@@ -1,8 +1,7 @@
 /**
  * Landing page (route "#/") - the consumer-friendly front door.
  *
- * The full technical overview that used to live at "#/" is still
- * available, unchanged, at "#/reference" (see RenderOverview).
+ * The technical documentation lives under "#/docs/..." (see RenderDocs).
  *
  * Numbers shown here are never hard-coded:
  *   - Endpoints / resource groups come from the loaded OpenAPI spec.
@@ -39,7 +38,7 @@ const RenderLanding = (() => {
 
   function epLink(method, path) {
     const ep = AppState.state.endpoints.find((e) => e.method === method && e.path === path);
-    return ep ? `#/${ep.slug}` : "#/reference";
+    return ep ? `#/${ep.slug}` : "#/docs/api-reference";
   }
 
   /** Image with a graceful fallback: if the file isn't uploaded yet the <img> removes itself and the tinted backdrop remains. */
@@ -137,7 +136,7 @@ const RenderLanding = (() => {
           <p class="lp-lead">Chakudya is far more than a food database. It joins local food composition with WHO growth assessment, clinical nutrition tools, FHIR care workflows and AI-ready knowledge, so apps, clinics and researchers can build on one shared, trustworthy foundation.</p>
           <div class="lp-cta">
             <a class="btn btn--primary btn--lg" href="#lp-try" data-scroll="lp-try">Try a food lookup</a>
-            <a class="btn btn--lg" href="#/reference">Explore the API</a>
+            <a class="btn btn--lg" href="#/docs/getting-started">Explore the API</a>
             ${showKey ? `<a class="btn btn--lg btn--ghost" href="#/account">Get an API key</a>` : ""}
           </div>
           <ul class="lp-trust" aria-label="Highlights">
@@ -340,7 +339,7 @@ const RenderLanding = (() => {
   function audienceSection() {
     const a = [
       ["Consumers", "heart", "Apps built on Chakudya can show what's really in everyday Malawian meals, from nsima to relish, in familiar portions.", "#lp-try", "Try a lookup"],
-      ["Students", "book", "Learn with real composition data, glycaemic index, exchange lists and WHO standards instead of textbook tables.", "#/reference", "Browse the data"],
+      ["Students", "book", "Learn with real composition data, glycaemic index, exchange lists and WHO standards instead of textbook tables.", "#/docs/api-reference", "Browse the data"],
       ["Dietitians", "steth", "Support clinical decisions with growth assessment, renal, enteral and drug-interaction data, and FHIR-shaped output.", epLink("POST", "/growth/assess"), "See growth assessment"],
       ["Researchers", "flask", "Pull consistent, citable food and growth reference data through a documented, versioned API.", "openapi.json", "Download the spec"],
       ["Food businesses", "store", "Standardised labels, barcode lookup and recipe nutrition totals for products and menus.", epLink("GET", "/foods/{id}/label"), "See label data"],
@@ -401,7 +400,7 @@ const RenderLanding = (() => {
           <h2 id="lp-dev-h">Your first call takes one line</h2>
           <p class="lp-sub">Public routes need no key, and CORS is open, so you can call the API from a browser, a script or a phone terminal. Add a key later for higher limits and FHIR access.</p>
           <div class="lp-cta">
-            <a class="btn btn--primary" href="#/reference">Read the API overview</a>
+            <a class="btn btn--primary" href="#/docs/api-reference">Read the docs</a>
             <a class="btn" href="openapi.yaml" download>Download openapi.yaml</a>
           </div>
         </div>
@@ -421,7 +420,7 @@ const RenderLanding = (() => {
       <section class="lp-closing reveal" aria-labelledby="lp-close-h">
         <h2 id="lp-close-h">Better food data. Healthier Malawi.</h2>
         <div class="lp-cta lp-cta--center">
-          <a class="btn btn--primary btn--lg" href="#/reference">Explore the API</a>
+          <a class="btn btn--primary btn--lg" href="#/docs/api-reference">Explore the API</a>
           ${showKey ? `<a class="btn btn--lg" href="#/account">Get an API key</a>` : ""}
         </div>
       </section>
@@ -434,7 +433,7 @@ const RenderLanding = (() => {
         <img class="lp-footer__logo" src="assets/images/chakudya-logo.png" alt="Chakudya Nutrition Registry logo" width="120" height="120" loading="lazy" onerror="this.remove()" />
         <p><strong>Chakudya Nutrition Registry</strong> · Better food data. Healthier Malawi.</p>
         <p class="lp-footer__note">Growth and clinical tools are screening aids, not diagnoses. Always confirm with a qualified health professional.</p>
-        <nav aria-label="Footer"><a href="#/reference">API overview</a><a href="#/account">API keys</a><a href="openapi.json" download>openapi.json</a><a href="https://github.com/edisontaimu9-ui/chakudya-api" target="_blank" rel="noopener">GitHub</a></nav>
+        <nav aria-label="Footer"><a href="#/docs/getting-started">Docs</a><a href="#/account">API keys</a><a href="openapi.json" download>openapi.json</a><a href="https://github.com/edisontaimu9-ui/chakudya-api" target="_blank" rel="noopener">GitHub</a></nav>
       </footer>
     `);
   }

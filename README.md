@@ -32,6 +32,27 @@ and `#/account` routes are untouched.
   `food-legumes-protein.webp`, `food-fruit-veg.webp`, `food-fish.webp` (480x600 each),
   `chakudya-logo.png` and `og-chakudya.jpg` (1200x630, social preview).
 
+## Routes and documentation structure
+
+| Route | Page |
+|---|---|
+| `#/` | Consumer landing page (no sidebar) |
+| `#/docs/getting-started` | Getting Started: base URL, first request, live status |
+| `#/docs/endpoints` | API Endpoints: what the API provides, by resource |
+| `#/docs/authentication` | Authentication: public routes, consumer keys, OAuth 2.0, rate limits |
+| `#/docs/examples` | Request & Response Examples: envelope, pagination, runnable examples |
+| `#/docs/schemas` | Data Schemas: every `components.schemas` entry in the spec |
+| `#/docs/errors` | Error Handling: status codes, headers, retries |
+| `#/docs/integrations` | Integrations: CORS, JS SDK, OpenAPI, FHIR, RAG, batch |
+| `#/docs/api-reference` | API Reference: every documented route, filterable |
+| `#/<method>-<path-slug>` | One endpoint page (unchanged), e.g. `#/get-foods` |
+| `#/account` | Developer login and consumer keys (unchanged) |
+| `#/reference` | Legacy link; redirects to `#/docs/getting-started` |
+
+Route lists, schemas, status-code counts, rate limits and the FHIR operation table are
+generated from `openapi.json` and `data/endpoint-metadata.json`. The hand-written parts are
+the "What the API provides" list (kept in sync with the API README) and the prose.
+
 ## 1. Run it locally
 
 No dependencies, no build step. Any static file server works, because the
@@ -150,14 +171,17 @@ chakudya-docs/
 ├── css/
 │   ├── theme.css                 # color tokens, typography, dark/light
 │   ├── layout.css                # header/sidebar/main grid, responsive rules
-│   └── components.css            # badges, cards, tables, try-it console, toasts
+│   ├── components.css            # badges, cards, tables, try-it console, toasts
+│   ├── landing.css               # consumer landing page (#/)
+│   └── docs.css                  # developer guides (#/docs/...), header nav, sidebar guide list
 ├── js/
 │   ├── state.js                  # tiny shared state + pub/sub
 │   ├── spec-loader.js            # fetches + normalizes openapi.json into endpoints/groups
 │   ├── schema-example.js         # builds example JSON from schemas; JSON highlighter
 │   ├── api-client.js             # builds & executes the real fetch() for Try It
 │   ├── render-endpoint.js        # renders one endpoint's full doc page
-│   ├── render-overview.js        # renders the landing page
+│   ├── render-landing.js         # consumer landing page (#/)
+│   ├── render-docs.js            # the eight developer guides (#/docs/...)
 │   ├── try-it.js                 # the interactive request/response console
 │   ├── sidebar.js                # nav tree: grouping, collapse, active state
 │   ├── search.js                 # filters the sidebar from header or sidebar search

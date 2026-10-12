@@ -21,6 +21,7 @@
 <link rel="stylesheet" href="css/layout.css" />
 <link rel="stylesheet" href="css/components.css" />
 <link rel="stylesheet" href="css/landing.css" />
+<link rel="stylesheet" href="css/docs.css" />
 </head>
 <body>
 
@@ -49,14 +50,15 @@
 
     <nav class="header-nav" aria-label="Main">
       <a href="#/" id="nav-home">Home</a>
-      <a href="#/reference" id="nav-reference">API reference</a>
+      <a href="#/docs/getting-started" id="nav-docs">Docs</a>
+      <a href="#/docs/api-reference" id="nav-reference">API reference</a>
     </nav>
 
     <span class="version-chip" id="version-chip" title="API version">v-</span>
 
     <div class="header-search">
       <svg class="header-search__icon" width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true"><circle cx="7" cy="7" r="5.2" stroke="currentColor" stroke-width="1.4"/><path d="M11.2 11.2 14.5 14.5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
-      <input id="global-search" type="search" placeholder="Search endpoints…" aria-label="Search documentation" autocomplete="off" />
+      <input id="global-search" type="search" placeholder="Search docs &amp; endpoints…" aria-label="Search documentation and endpoints" autocomplete="off" />
       <kbd class="header-search__kbd">/</kbd>
     </div>
 
@@ -78,7 +80,7 @@
 <div class="app-shell">
 
   <!-- ───────────────────────── Sidebar ───────────────────────── -->
-  <nav class="sidebar" id="sidebar" aria-label="API endpoints">
+  <nav class="sidebar" id="sidebar" aria-label="Documentation and API endpoints">
     <div class="sidebar__search">
       <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true"><circle cx="7" cy="7" r="5.2" stroke="currentColor" stroke-width="1.4"/><path d="M11.2 11.2 14.5 14.5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
       <input id="sidebar-search" type="search" placeholder="Filter…" aria-label="Filter endpoint list" autocomplete="off" />
@@ -87,7 +89,7 @@
       <div class="sidebar__loading">Loading endpoints…</div>
     </div>
     <div class="sidebar__footer">
-      <a href="#/reference" class="sidebar__overview-link">API overview</a>
+      <a href="#/docs/getting-started" class="sidebar__overview-link">Docs home</a>
       <span class="sidebar__count" id="endpoint-count"></span>
     </div>
   </nav>
@@ -98,7 +100,7 @@
     <div id="content" class="content">
       <div class="loading-state">
         <div class="spinner" aria-hidden="true"></div>
-        <p>Loading Chakudya API reference…</p>
+        <p>Loading Chakudya…</p>
       </div>
     </div>
   </main>
@@ -125,8 +127,8 @@
 <script src="js/status-panel.js"></script>
 <script src="js/render-endpoint.js"></script>
 <script src="js/demo-terminal.js"></script>
-<script src="js/render-overview.js"></script>
 <script src="js/render-landing.js"></script>
+<script src="js/render-docs.js"></script>
 <script src="js/auth.js"></script>
 <script src="js/render-account.js"></script>
 <script src="js/try-it.js"></script>
