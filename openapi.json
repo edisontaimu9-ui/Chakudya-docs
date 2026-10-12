@@ -2,8 +2,8 @@
   "openapi": "3.0.3",
   "info": {
     "title": "Chakudya Nutrition Registry API (CNR)",
-    "description": "Chakudya is a Malawi focused nutrition data and intelligence API. It provides structured, searchable nutrition information for health applications, researchers, students, dietitians, and developers building tools for clinical or public health nutrition work. The API combines local food composition data with international sources such as USDA FoodData Central, Open Food Facts, and FatSecret, and adds retrieval augmented question answering and session memory for AI assisted applications.\n\nIt also covers clinical growth assessment (WHO child growth standards from birth to 19 years, Fenton preterm charts, and a combined `/growth/assess` call), recipe and meal nutrition analysis, dietary reference intakes, and a stateless FHIR R4 facade that exposes growth evaluation and the full Nutrition Care Process (screening, assessment, diagnosis, intervention, monitoring and ADIME documents).\n\nMachine-to-machine callers can authenticate with OAuth 2.0 client_credentials (`POST /oauth/token`) instead of a long-lived admin key.\n",
-    "version": "1.31.0",
+    "description": "Chakudya is a Malawi focused nutrition data and intelligence API. It provides structured, searchable nutrition information for health applications, researchers, students, dietitians, and developers building tools for clinical or public health nutrition work. The API combines local food composition data with international sources such as USDA FoodData Central, Open Food Facts, and FatSecret, and adds retrieval augmented question answering and session memory for AI assisted applications.\n\nIt also covers clinical growth assessment (WHO child growth standards from birth to 19 years, Fenton preterm charts, and a combined `/growth/assess` call), recipe and meal nutrition analysis, dietary reference intakes, and a stateless FHIR R4 facade that exposes growth evaluation and the full Nutrition Care Process (screening, assessment, diagnosis, intervention, monitoring and ADIME documents).\n\nPeople can sign in on the docs site and create their own consumer API keys (higher rate limits, FHIR access, usage counts) with `/developer/keys`.\n\nMachine-to-machine callers can authenticate with OAuth 2.0 client_credentials (`POST /oauth/token`) instead of a long-lived admin key.\n",
+    "version": "1.32.0",
     "contact": {
       "name": "Edison Taimu",
       "x-location": "Blantyre, Malawi"
@@ -39,6 +39,9 @@
     },
     {
       "name": "OAuth"
+    },
+    {
+      "name": "Developer keys"
     },
     {
       "name": "Foods"
@@ -677,6 +680,274 @@
           },
           "404": {
             "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/developer/keys": {
+      "get": {
+        "tags": [
+          "Developer keys"
+        ],
+        "summary": "List your consumer API keys",
+        "security": [
+          {
+            "loginToken": []
+          }
+        ],
+        "description": "Your active keys with last-used time and usage counts. Authenticate with your login access token (the docs site account page does this for you). Never returns a raw key or its hash.",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "example": "success"
+                    },
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "integer"
+                          },
+                          "label": {
+                            "type": "string"
+                          },
+                          "key_prefix": {
+                            "type": "string",
+                            "example": "cnr_1a2b3c4d"
+                          },
+                          "created_at": {
+                            "type": "string",
+                            "format": "date-time"
+                          },
+                          "last_used_at": {
+                            "type": "string",
+                            "format": "date-time",
+                            "nullable": true
+                          },
+                          "usage": {
+                            "type": "object",
+                            "properties": {
+                              "today": {
+                                "type": "integer"
+                              },
+                              "last_7_days": {
+                                "type": "integer"
+                              }
+                            }
+                          }
+                        }
+                      }
+                    },
+                    "email": {
+                      "type": "string"
+                    },
+                    "max_keys": {
+                      "type": "integer",
+                      "example": 3
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Developer keys"
+        ],
+        "summary": "Create a consumer API key",
+        "security": [
+          {
+            "loginToken": []
+          }
+        ],
+        "description": "Creates a key with the `consumer` role. The raw key is returned once; only its hash is stored. Up to 3 active keys per account, and the account email must be confirmed. A consumer key gets 3x each public route's rate limit (tracked per key) and FHIR scopes `system/*.*` (never AuditEvent). It can never reach admin routes or write data.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "label"
+                ],
+                "properties": {
+                  "label": {
+                    "type": "string",
+                    "maxLength": 60,
+                    "description": "The app or project this key is for.",
+                    "example": "Thanzi mobile app"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "example": "success"
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "integer"
+                        },
+                        "label": {
+                          "type": "string"
+                        },
+                        "key_prefix": {
+                          "type": "string",
+                          "example": "cnr_1a2b3c4d"
+                        },
+                        "created_at": {
+                          "type": "string",
+                          "format": "date-time"
+                        },
+                        "last_used_at": {
+                          "type": "string",
+                          "format": "date-time",
+                          "nullable": true
+                        },
+                        "usage": {
+                          "type": "object",
+                          "properties": {
+                            "today": {
+                              "type": "integer"
+                            },
+                            "last_7_days": {
+                              "type": "integer"
+                            }
+                          }
+                        }
+                      }
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "key": {
+                      "type": "string",
+                      "example": "cnr_0123...",
+                      "description": "Shown once. Store it now."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "description": "Email address not confirmed yet",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Already at the limit of 3 active keys",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          }
+        }
+      }
+    },
+    "/developer/keys/{id}": {
+      "delete": {
+        "tags": [
+          "Developer keys"
+        ],
+        "summary": "Revoke one of your keys",
+        "security": [
+          {
+            "loginToken": []
+          }
+        ],
+        "description": "Revokes a key you own. Apps using it stop working immediately.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "example": "success"
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "integer"
+                        }
+                      }
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
           }
         }
       }
@@ -9617,6 +9888,11 @@
         "type": "http",
         "scheme": "bearer",
         "description": "The root ADMIN_API_KEY, a per-consumer key minted via POST /admin/keys, or an OAuth 2.0 access token from POST /oauth/token. For /fhir, when FHIR_AUTH_MODE=enforce every operation except conformance reads needs a credential with the scope system/<ResourceType>.<read|write|*> (role defaults: admin system/*.*, reviewer system/*.read; narrow with fhir_scopes on /admin/keys and /admin/oauth-clients). Only the root key can manage API keys and OAuth clients.\n"
+      },
+      "loginToken": {
+        "type": "http",
+        "scheme": "bearer",
+        "description": "The access token from a developer login (Supabase Auth), not an API key. Only /developer/keys uses it. The docs site handles this for you on the account page."
       }
     },
     "parameters": {

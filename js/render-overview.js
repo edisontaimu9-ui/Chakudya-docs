@@ -20,6 +20,7 @@ const RenderOverview = (() => {
         <p class="hero__lead"></p>
         <div class="hero__actions">
           <a class="btn btn--primary" href="#" data-jump="first">Browse endpoints</a>
+          <a class="btn" href="#/account">Get an API key</a>
           <a class="btn" href="openapi.yaml" download>Download openapi.yaml</a>
           <a class="btn" href="openapi.json" download>Download openapi.json</a>
         </div>
@@ -70,6 +71,7 @@ const RenderOverview = (() => {
           <li><span><strong>Favorites, history, and food log</strong> (<code>/favorites</code>, <code>/history</code>, <code>/log</code>). Client-supplied-identity diary and tracking, no account system required.</span></li>
           <li><span><strong>RAG powered nutrition knowledge</strong> (<code>/rag/ask</code>, <code>/rag/retrieve</code>). Retrieve relevant knowledge or ask a question directly. Admins can add documents with <code>/rag/ingest</code> or upload files for automatic ingestion with <code>/rag/upload</code>.</span></li>
           <li><span><strong>Session memory</strong> (<code>/memory/write</code>, <code>/memory/recall</code>, <code>/memory/consolidate</code>). Store, consolidate, and recall contextual information for AI assisted applications.</span></li>
+          <li><span><strong>Consumer API keys</strong> (<a href="#/account">sign in to get one</a>). Self-service keys with three times the public rate limit, access to the FHIR operations and per-key usage counts.</span></li>
           <li><span><strong>OAuth 2.0 client credentials</strong> (<code>/oauth/token</code>). Machine-to-machine services exchange a revocable client secret for a one-hour bearer token instead of holding an admin key.</span></li>
           <li><span><strong>Batch requests</strong> (<code>/batch</code>). Fan out several calls in one round trip through the same auth/rate-limit pipeline as a normal request.</span></li>
         </ul>

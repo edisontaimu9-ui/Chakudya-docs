@@ -166,7 +166,9 @@ const TryIt = (() => {
     });
 
     const authInput = panel.querySelector('[data-role="auth"]');
-    const authToken = authInput ? authInput.value.trim() : "";
+    // Admin routes use the token field; public routes send the visitor's own consumer key
+    // (only if they chose "Use in Try It" on the account page) so they see their higher limits.
+    const authToken = authInput ? authInput.value.trim() : (endpoint.authMode === "public" ? DevAuth.getTryItKey() : ""); 
     if (endpoint.authMode === "admin" && !authToken) {
       errorBox.textContent = "This endpoint requires a bearer token.";
       errorBox.classList.add("is-visible");

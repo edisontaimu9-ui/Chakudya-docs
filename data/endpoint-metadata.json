@@ -133,6 +133,39 @@
     },
     {
       "method": "GET",
+      "path": "/developer/keys",
+      "auth": "public",
+      "rateLimit": {
+        "limit": 30,
+        "windowSeconds": 60,
+        "scope": "ip"
+      },
+      "note": "Needs a developer login access token (Supabase Auth), not an API key; verified on every call. The rate limit is per IP."
+    },
+    {
+      "method": "POST",
+      "path": "/developer/keys",
+      "auth": "public",
+      "rateLimit": {
+        "limit": 10,
+        "windowSeconds": 60,
+        "scope": "ip"
+      },
+      "note": "Needs a developer login access token (Supabase Auth), not an API key; verified on every call. The rate limit is per IP."
+    },
+    {
+      "method": "DELETE",
+      "path": "/developer/keys/{id}",
+      "auth": "public",
+      "rateLimit": {
+        "limit": 30,
+        "windowSeconds": 60,
+        "scope": "ip"
+      },
+      "note": "Needs a developer login access token (Supabase Auth), not an API key; verified on every call. The rate limit is per IP."
+    },
+    {
+      "method": "GET",
       "path": "/foods",
       "auth": "public",
       "rateLimit": {

@@ -27,7 +27,8 @@ const SpecLoader = (() => {
   /** true = requires a bearer token, false = public, per this operation's `security`. */
   function isAdminAuth(security) {
     if (!Array.isArray(security)) return false;
-    return security.some((req) => req && Object.prototype.hasOwnProperty.call(req, "bearerAuth"));
+    // bearerAuth = admin/consumer API key; loginToken = developer login session (only used by /developer/keys)
+    return security.some((req) => req && (Object.prototype.hasOwnProperty.call(req, "bearerAuth") || Object.prototype.hasOwnProperty.call(req, "loginToken")));
   }
   function isPublicAllowed(security) {
     if (!Array.isArray(security)) return true;

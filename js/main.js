@@ -51,6 +51,22 @@
   try { localStorage.removeItem(BASE_URL_KEY); } catch (_) { /* ignore */ }
   AppState.set({ baseUrl: productionUrl });
 
+  // ── Developer login ────────────────────────────────────────
+  // Capture a session Supabase put in the URL hash (email confirmation, password
+  // reset, Google) BEFORE the router runs, then show the account page.
+  const accountLink = document.getElementById("account-link");
+  function updateAccountLink() {
+    accountLink.hidden = !DevAuth.configured();
+    accountLink.textContent = DevAuth.isSignedIn() ? "My API keys" : "Get API key";
+  }
+  updateAccountLink();
+  DevAuth.onChange(updateAccountLink);
+  function applyRedirect(r) {
+    if (r?.error) RenderAccount.setFlash("err", r.error);
+    else if (r?.signedIn) RenderAccount.setFlash("ok", r.type === "recovery" ? "Choose a new password below." : "You're signed in.");
+  }
+  applyRedirect(await DevAuth.handleRedirect());
+
   // ── Sidebar / search / mobile toggle ─────────────────────────
   Sidebar.render();
   SearchModule.init();
@@ -84,6 +100,15 @@
       window.scrollTo(0, 0);
       return;
     }
+    if (hash === "account") {
+      RenderAccount.show(content);
+      Sidebar.setActive(null);
+      AppState.set({ activeId: null });
+      document.getElementById("main").focus({ preventScroll: true });
+      window.scrollTo(0, 0);
+      closeSidebar();
+      return;
+    }
     const endpoint = endpoints.find((e) => e.slug === hash);
     if (!endpoint) {
       content.innerHTML = `
@@ -103,7 +128,11 @@
     closeSidebar();
   }
 
-  window.addEventListener("hashchange", route);
+  window.addEventListener("hashchange", async () => {
+    // A confirmation / reset link opened while the docs are already loaded.
+    if (/access_token=|error_description=/.test(location.hash)) applyRedirect(await DevAuth.handleRedirect());
+    route();
+  });
   route();
 
   // ── Prev/next keyboard shortcuts (← / →) ──────────────────

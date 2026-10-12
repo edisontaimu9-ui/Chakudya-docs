@@ -13,7 +13,7 @@ it's a separate, deployable-on-its-own frontend.
 Everything documented here was verified against the actual repository
 (`src/index.js`'s router and `routePolicy()`, the `src/fhir*.js` modules,
 `src/ragPipeline.js`, `src/oauth.js` and `wrangler.toml`) - nothing here was
-invented. Currently in line with API **v1.31.0**.
+invented. Currently in line with API **v1.32.0**.
 
 ---
 
@@ -126,6 +126,7 @@ would benefit from, and it's optional.
 ```
 chakudya-docs/
 ├── index.html                    # shell: header, sidebar, main containers
+├── js/config.js                  # Supabase URL + publishable key for the developer login
 ├── openapi.yaml                  # spec, kept in line with the API source (src/index.js router + routePolicy)
 ├── openapi.json                  # same spec, JSON - what the UI actually fetches
 ├── data/
@@ -161,11 +162,11 @@ of the OpenAPI document - they're read out of `routePolicy()` in
 
 ---
 
-## 6. Endpoints documented (160 of 160)
+## 6. Endpoints documented (163 of 163)
 
 Every route the Worker actually serves is documented - nothing was skipped.
 `/manufacturers`, `/products`, and `/nutrition` were removed from the API in
-v1.15.0-v1.16.0 and no longer appear here. The list below matches API v1.31.0.
+v1.15.0-v1.16.0 and no longer appear here. The list below matches API v1.32.0.
 
 This list covers the whole spec (`openapi.json`). The portal UI deliberately
 renders only public routes (see `js/spec-loader.js`), so admin-gated routes
@@ -192,6 +193,11 @@ not shown in the sidebar.
 - `GET /admin/oauth-clients` - List OAuth clients (root key only)
 - `POST /admin/oauth-clients` - Create an OAuth client (root key only)
 - `DELETE /admin/oauth-clients/{id}` - Revoke an OAuth client (root key only)
+
+**Developer keys** (self-service consumer keys; authenticate with a developer login token, not an API key)
+- `GET /developer/keys` - List your consumer API keys
+- `POST /developer/keys` - Create a consumer API key
+- `DELETE /developer/keys/{id}` - Revoke one of your keys
 
 **Foods**
 - `GET /foods` - List foods
@@ -454,3 +460,35 @@ scan could manage, not less.
 The API repo's README points to a separate SDK repo
 ([`Chakudya-sdk`](https://github.com/edisontaimu9-ui/Chakudya-sdk)) - that's
 a different project from this docs site and wasn't touched here.
+
+---
+
+## 9. Developer login (consumer API keys)
+
+The site has a sign-in page (`#/account`) where people create an account and
+generate their own consumer API keys. It talks to Supabase Auth with plain
+`fetch` (`js/auth.js`) and to the API's `/developer/keys` routes
+(`js/render-account.js`). Those routes are in the spec but hidden from the
+sidebar, like the admin routes.
+
+One-time setup:
+
+1. Run the API repo's `sql/029_add_developer_keys.sql` and deploy API v1.32.0.
+2. Open `js/config.js` and replace `PASTE_PUBLISHABLE_KEY_HERE` with the
+   project's publishable (anon) key from Supabase > Project Settings > API.
+   That key is meant to be public. Never use the service_role key here.
+   `supabaseUrl` must be the same project as the API's `SUPABASE_URL`.
+3. In Supabase > Authentication: keep Email with "Confirm email" on, and add
+   this site's URL (for example the GitHub Pages address) as the Site URL and
+   under Redirect URLs. Confirmation and reset links send people back there.
+4. Optional Google sign-in: enable the Google provider in Supabase, then set
+   `googleEnabled: true` in `js/config.js`.
+
+Notes:
+
+- The login session (access and refresh token) is kept in `localStorage`. A
+  raw API key is shown once and is never stored. If the person clicks
+  "Use in Try It", it is kept in `sessionStorage` for that tab only.
+- Until the publishable key is set, the header button stays hidden and
+  `#/account` explains that sign-in isn't set up.
+
