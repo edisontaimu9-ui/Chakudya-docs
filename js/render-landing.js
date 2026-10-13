@@ -138,18 +138,20 @@ const RenderLanding = (() => {
       <section class="lp-hero" aria-labelledby="lp-title">
         <div class="lp-hero__glow" aria-hidden="true"></div>
         <div class="lp-hero__copy">
-          <p class="lp-pill"><span class="lp-pill__dot" id="lp-health-dot" aria-hidden="true"></span><span id="lp-health-text">Malawi's open nutrition registry</span></p>
-          <h1 id="lp-title" class="lp-title">Nutrition data and tools for a <em>healthier</em> Malawi.</h1>
-          <p class="lp-lead">Find the nutrients in Malawian foods, explore WHO growth standards and use clinical nutrition information, all in one free, open place for students, health professionals, researchers and everyone who cares about good nutrition.</p>
+          <p class="lp-pill"><span class="lp-pill__dot" id="lp-health-dot" aria-hidden="true"></span><span id="lp-health-text">Malawi's open nutrition intelligence platform</span></p>
+          <h1 id="lp-title" class="lp-title">The intelligence behind better nutrition and <em>healthier lives.</em></h1>
+          <p class="lp-lead">Chakudya brings together food composition data, nutrition computation, growth and anthropometric assessment, disease-specific nutrition information, and clinical decision-support resources in one connected platform. Built for Malawi, designed for wider impact, and open to developers, students, researchers, health professionals, and innovators building the future of nutrition and health.</p>
           <div class="lp-cta">
-            <a class="btn btn--primary btn--lg" href="#lp-try" data-scroll="lp-try">Try a food lookup</a>
-            <a class="btn btn--lg" href="#lp-dev" data-scroll="lp-dev">For developers</a>
-            ${showKey ? `<a class="btn btn--lg btn--ghost" href="#/account">Get an API key</a>` : ""}
+            <a class="btn btn--primary btn--lg" href="#lp-try" data-scroll="lp-try">Explore nutrition data</a>
+            <a class="btn btn--lg" href="#lp-about" data-scroll="lp-about">Explore the platform</a>
+            ${showKey ? `<a class="lp-link lp-cta__link" href="#/account">Get an API key <span aria-hidden="true">\u2192</span></a>` : ""}
           </div>
-          <ul class="lp-trust" aria-label="Highlights">
-            <li>Local food data</li>
-            <li>WHO growth standards</li>
-            <li>Free to explore</li>
+          <p class="lp-trust__label">Platform highlights</p>
+          <ul class="lp-trust" aria-label="Platform highlights">
+            <li>Malawian food composition data</li>
+            <li>Nutrition computation and assessment</li>
+            <li>Clinical and disease-specific nutrition intelligence</li>
+            <li>Open infrastructure for health innovation</li>
           </ul>
         </div>
         <div class="lp-hero__media">
@@ -564,7 +566,7 @@ const RenderLanding = (() => {
       const dot = root.querySelector("#lp-health-dot"), txt = root.querySelector("#lp-health-text");
       if (!dot || !dot.isConnected || !ok) return;
       dot.classList.add("is-ok");
-      txt.textContent = "API online · Malawi's open nutrition registry";
+      txt.textContent = "API online · Malawi's open nutrition intelligence platform";
     });
   }
 

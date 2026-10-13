@@ -53,9 +53,11 @@ body.is-landing .content { max-width: 1180px; padding: 24px 28px 0; }
 .lp-lead { font-size: clamp(16px, 1.6vw, 18px); line-height: 1.65; color: var(--text-secondary); max-width: 56ch; margin: 20px 0 0; }
 .lp-cta { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 28px; }
 .lp-cta--center { justify-content: center; }
-.lp-trust { list-style: none; padding: 0; margin: 26px 0 0; display: flex; flex-wrap: wrap; gap: 8px 22px; font-size: 13px; color: var(--text-secondary); }
-.lp-trust li { display: flex; align-items: center; gap: 8px; }
-.lp-trust li::before { content: ""; width: 6px; height: 6px; background: var(--green); transform: rotate(45deg); }
+.lp-trust__label { margin: 28px 0 10px; font-family: var(--font-mono); font-size: 10.5px; font-weight: 700; letter-spacing: 1.2px; text-transform: uppercase; color: var(--text-tertiary); }
+.lp-trust { list-style: none; padding: 0; margin: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px 22px; font-size: 13px; line-height: 1.4; color: var(--text-secondary); }
+.lp-cta__link { align-self: center; margin: 0; padding: 0 4px; font-size: 14px; }
+.lp-trust li { display: flex; align-items: flex-start; gap: 9px; }
+.lp-trust li::before { content: ""; flex: none; margin-top: 6px; width: 6px; height: 6px; background: var(--green); transform: rotate(45deg); }
 
 .lp-hero__media { position: relative; }
 .lp-photo {
@@ -224,3 +226,8 @@ body.is-landing .content { max-width: 1180px; padding: 24px 28px 0; }
 /* Thanzi Coach WhatsApp card */
 .lp-coach__panel { text-align: left; }
 .lp-coach__note { margin: 16px 0 0; font-size: 12.5px; color: var(--text-tertiary); max-width: 62ch; }
+
+@media (max-width: 640px) {
+  .lp-trust { grid-template-columns: 1fr; }
+  .lp-cta .lp-cta__link { flex: 1 1 100%; text-align: center; padding: 6px 0; }
+}
