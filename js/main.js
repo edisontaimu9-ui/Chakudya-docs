@@ -107,14 +107,16 @@
   // ── Router ─────────────────────────────────────────────────
   function route() {
     const hash = location.hash.replace(/^#\/?/, "");
+    document.title = `${spec.info?.title || "Chakudya API"} - Docs`;
     // The landing page is full-width with no sidebar; docs and reference pages keep it.
     const isLanding = !hash;
     const isGuide = hash === "docs" || hash.startsWith("docs/");
+    const isLegal = hash.startsWith("legal/");
     document.body.classList.toggle("is-landing", isLanding);
     const guideId = hash.split("/")[1] || "getting-started";
     const activeNav = isLanding ? "nav-home"
       : isGuide && guideId !== "api-reference" ? "nav-docs"
-      : hash === "account" ? ""
+      : hash === "account" || isLegal ? ""
       : "nav-reference";
     ["nav-home", "nav-docs", "nav-reference"].forEach((id) => {
       const a = document.getElementById(id);
@@ -124,6 +126,25 @@
 
     if (isLanding) {
       RenderLanding.render(content);
+      Sidebar.setActive(null);
+      AppState.set({ activeId: null });
+      document.getElementById("main").focus({ preventScroll: true });
+      window.scrollTo(0, 0);
+      closeSidebar();
+      return;
+    }
+    if (isLegal) {
+      const legalId = hash.split("/")[1];
+      if (!RenderLegal.has(legalId) || hash.split("/").length > 2) {
+        content.innerHTML = `
+          <div class="empty-state">
+            <h3>Page not found</h3>
+            <p>There is no legal page at <span class="mono">${RenderEndpoint.escapeHtml(hash)}</span>.</p>
+            <a class="btn" href="#/legal/privacy">Go to Privacy Policy</a>
+          </div>`;
+      } else {
+        RenderLegal.render(legalId, content);
+      }
       Sidebar.setActive(null);
       AppState.set({ activeId: null });
       document.getElementById("main").focus({ preventScroll: true });

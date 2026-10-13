@@ -147,3 +147,14 @@ kbd { font-family: var(--font-mono); font-size: 11px; border: 1px solid var(--bo
   .doc-example { padding: 14px 12px; }
   .doc-filter { flex-direction: column; align-items: stretch; gap: 6px; }
 }
+
+/* Legal pages */
+.legal-updated { margin: 10px 0 0; font-size: 12.5px; color: var(--text-tertiary); }
+.legal-nav { display: flex; flex-wrap: wrap; gap: 6px 8px; margin: 22px 0 0; padding-bottom: 18px; border-bottom: 1px solid var(--border); }
+.legal-nav a { font-size: 13px; font-weight: 600; color: var(--text-secondary); text-decoration: none; padding: 6px 12px; border-radius: 999px; border: 1px solid var(--border); }
+.legal-nav a:hover { color: var(--accent-strong); background: var(--accent-bg); }
+.legal-nav a[aria-current="page"] { color: var(--accent-ink); background: var(--accent); border-color: var(--accent); }
+.legal-list { margin: 10px 0 0; padding-left: 20px; display: grid; gap: 10px; color: var(--text-secondary); line-height: 1.65; font-size: 14.5px; }
+.legal-list strong { color: var(--text-primary); }
+.legal-copy { margin: 48px 0 0; padding-top: 18px; border-top: 1px solid var(--border); font-size: 12.5px; color: var(--text-tertiary); }
+.legal-page .doc-body code { font-family: var(--font-mono); font-size: .9em; }

@@ -405,10 +405,29 @@ const RenderLanding = (() => {
   function footer() {
     return el(`
       <footer class="lp-footer">
-        <img class="lp-footer__logo" src="assets/images/chakudya-logo-192.webp" alt="Chakudya Nutrition Registry logo" width="96" height="96" loading="lazy" onerror="this.remove()" />
-        <p><strong>Chakudya Nutrition Registry</strong> · Better food data. Healthier Malawi.</p>
-        <p class="lp-footer__note">Growth and clinical tools are screening aids, not diagnoses. Always confirm with a qualified health professional.</p>
-        <nav aria-label="Footer"><a href="#/docs/getting-started">Docs</a><a href="#/account">API keys</a><a href="openapi.json" download>openapi.json</a><a href="https://github.com/edisontaimu9-ui/chakudya-api" target="_blank" rel="noopener">GitHub</a></nav>
+        <div class="lp-footer__grid">
+          <div class="lp-footer__brand">
+            <img class="lp-footer__logo" src="assets/images/chakudya-logo-192.webp" alt="Chakudya Nutrition Registry logo" width="72" height="72" loading="lazy" onerror="this.remove()" />
+            <p class="lp-footer__name">Chakudya Nutrition Registry</p>
+            <p class="lp-footer__tag">Better food data. Healthier Malawi.</p>
+          </div>
+          <nav aria-label="Resources">
+            <h3 class="lp-footer__h">Resources</h3>
+            <a href="#/docs/getting-started">Documentation</a>
+            <a href="#/docs/api-reference">API Reference</a>
+            <a href="openapi.json" download>OpenAPI spec</a>
+            <a href="https://github.com/edisontaimu9-ui/chakudya-api" target="_blank" rel="noopener">GitHub</a>
+          </nav>
+          <nav aria-label="Legal">
+            <h3 class="lp-footer__h">Legal</h3>
+            <a href="#/legal/privacy">Privacy Policy</a>
+            <a href="#/legal/terms">Terms of Use</a>
+            <a href="#/legal/data-sources">Data Sources &amp; Attribution</a>
+            <a href="#/legal/disclaimer">Clinical Disclaimer</a>
+          </nav>
+        </div>
+        <p class="lp-footer__note">Growth and clinical tools are for screening and decision support only. They do not replace professional judgment or establish a diagnosis. Always consult a qualified health professional.</p>
+        <p class="lp-footer__copy">© 2026 Chakudya Nutrition Registry. All rights reserved.</p>
       </footer>
     `);
   }

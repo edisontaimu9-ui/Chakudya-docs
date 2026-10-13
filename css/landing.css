@@ -170,13 +170,17 @@ body.is-landing .content { max-width: 1180px; padding: 24px 28px 0; }
   background: radial-gradient(500px 240px at 50% 0%, var(--accent-bg), transparent 70%), var(--bg-raised);
 }
 .lp-closing h2 { font-size: clamp(26px, 4vw, 42px); max-width: 20ch; margin: 0 auto; letter-spacing: -.6px; line-height: 1.12; }
-.lp-footer { margin-top: 56px; padding: 28px 0 56px; border-top: 1px solid var(--border); color: var(--text-secondary); font-size: 13.5px; }
-.lp-footer__logo { display: block; width: 96px; height: 96px; object-fit: contain; background: #fff; border-radius: 16px; padding: 8px; margin-bottom: 14px; border: 1px solid var(--border); }
-.lp-footer p { margin: 0 0 8px; }
-.lp-footer__note { color: var(--text-tertiary); }
-.lp-footer nav { display: flex; flex-wrap: wrap; gap: 8px 20px; margin-top: 14px; }
-.lp-footer a { color: var(--text-secondary); font-weight: 600; text-decoration: none; }
-.lp-footer a:hover { color: var(--accent-strong); }
+.lp-footer { margin-top: 56px; padding: 36px 0 48px; border-top: 1px solid var(--border); color: var(--text-secondary); font-size: 13.5px; }
+.lp-footer__grid { display: grid; grid-template-columns: 1.6fr 1fr 1fr; gap: 28px 40px; }
+.lp-footer__logo { display: block; width: 72px; height: 72px; object-fit: contain; background: #fff; border-radius: 14px; padding: 6px; margin-bottom: 12px; border: 1px solid var(--border); }
+.lp-footer p { margin: 0; }
+.lp-footer__name { color: var(--text-primary); font-weight: 700; font-size: 15px; }
+.lp-footer__tag { margin-top: 4px !important; color: var(--text-secondary); }
+.lp-footer__h { margin: 0 0 12px; font-family: var(--font-mono); font-size: 10.5px; font-weight: 700; letter-spacing: 1.2px; text-transform: uppercase; color: var(--text-tertiary); }
+.lp-footer nav a { display: block; padding: 5px 0; color: var(--text-secondary); font-weight: 500; text-decoration: none; }
+.lp-footer nav a:hover { color: var(--accent-strong); text-decoration: underline; }
+.lp-footer__note { margin-top: 32px !important; padding-top: 20px; border-top: 1px solid var(--border); max-width: 78ch; color: var(--text-tertiary); line-height: 1.6; }
+.lp-footer__copy { margin-top: 12px !important; color: var(--text-tertiary); font-size: 12.5px; }
 
 /* ── Responsive ── */
 @media (max-width: 1040px) {
@@ -206,3 +210,8 @@ body.is-landing .content { max-width: 1180px; padding: 24px 28px 0; }
 .lp-pillar__n { font-family: var(--font-mono); font-size: 13px; font-weight: 700; color: var(--text-tertiary); letter-spacing: 1px; }
 @media (max-width: 900px) { .lp-pillars { grid-template-columns: 1fr; } }
 @media (min-width: 901px) and (max-width: 1040px) { .lp-pillars { grid-template-columns: repeat(2, 1fr); } }
+
+@media (max-width: 720px) {
+  .lp-footer__grid { grid-template-columns: 1fr 1fr; }
+  .lp-footer__brand { grid-column: 1 / -1; }
+}

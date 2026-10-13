@@ -16,7 +16,7 @@
  *   Run it before every deploy. A new BUILD installs a new cache in the background; the page
  *   then offers a "Reload" button (see js/pwa.js) so HTML and JS are never mixed across versions.
  */
-const BUILD = "d1c14f1fa611";
+const BUILD = "d2884569e1d0";
 
 const SHELL_CACHE = "chakudya-shell-" + BUILD;
 const DATA_CACHE = "chakudya-data-v1";
@@ -45,6 +45,7 @@ const CORE = [
   "js/demo-terminal.js",
   "js/render-landing.js",
   "js/render-docs.js",
+  "js/render-legal.js",
   "js/auth.js",
   "js/render-account.js",
   "js/try-it.js",
