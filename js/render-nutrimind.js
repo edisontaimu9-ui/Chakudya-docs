@@ -258,6 +258,36 @@ const RenderNutriMind = (() => {
     return "NutriMind had a problem answering. Please try again.";
   }
 
+  // Show sources only when the answer actually leans on them: greetings and small talk
+  // get none, and each source appears once however many times it was cited.
+  function shapeAnswer(data) {
+    const raw = String(data.answer);
+    const all = Array.isArray(data.sources) ? data.sources : [];
+    const cited = new Set();
+    const marker = /\[(\d{1,2}(?:\s*,\s*\d{1,2})*)\]/g;
+    for (const m of raw.matchAll(marker)) m[1].split(",").forEach((n) => cited.add(parseInt(n, 10)));
+    const text = raw
+      .replace(/\s*\[\d{1,2}(?:\s*,\s*\d{1,2})*\]/g, "")
+      .replace(/\s+([.,;:!?])/g, "$1")
+      .replace(/([,;])\s*([.,;:!?])/g, "$2")
+      .trim();
+    const seen = new Set();
+    const sources = [];
+    if (data.intent !== "general_chat") {
+      for (const n of [...cited].sort((a, b) => a - b)) {
+        const s = all[n - 1];
+        if (!s) continue;
+        const title = s.title || s.source || "";
+        const origin = s.source && s.source !== "knowledge_base" && s.source !== title ? s.source : "";
+        const key = (title + "|" + origin).toLowerCase();
+        if (!title || seen.has(key)) continue;
+        seen.add(key);
+        sources.push({ title, source: origin });
+      }
+    }
+    return { text: text || raw, sources: sources.slice(0, 6) };
+  }
+
   async function ask(question) {
     const q = String(question).trim().slice(0, MAX_Q);
     if (!q || state.busy) return;
@@ -280,11 +310,8 @@ const RenderNutriMind = (() => {
       const body = await res.json().catch(() => null);
       const data = body && (body.data || body);
       if (res.ok && data && typeof data.answer === "string" && data.answer.trim()) {
-        reply = {
-          role: "bot",
-          text: data.answer,
-          sources: (Array.isArray(data.sources) ? data.sources : []).slice(0, 8).map((s) => ({ title: s.title || "", source: s.source || "" })),
-        };
+        const shaped = shapeAnswer(data);
+        reply = { role: "bot", text: shaped.text, sources: shaped.sources };
       } else {
         reply = { role: "bot", error: true, text: failText(res.status), retry: q };
       }
