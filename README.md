@@ -539,3 +539,7 @@ Notes:
 - Until the publishable key is set, the header button stays hidden and
   `#/account` explains that sign-in isn't set up.
 
+
+## Progressive Web App
+
+The site is installable and works offline. See [PWA.md](PWA.md). Before every deploy run `node tools/stamp-sw.mjs` so returning users get the new version.

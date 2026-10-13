@@ -7,12 +7,15 @@
   try {
     await SpecLoader.load();
   } catch (e) {
+    const offline = navigator.onLine === false;
     content.innerHTML = `
       <div class="empty-state">
-        <h3>Couldn't load the API spec</h3>
-        <p>${RenderEndpoint.escapeHtml(e.message)}</p>
-        <p class="field__hint">Make sure this page is served over HTTP (not opened as a local <code>file://</code>), so <code>fetch("openapi.json")</code> is allowed.</p>
+        <h3>${offline ? "You're offline" : "Couldn't load the API spec"}</h3>
+        <p>${offline ? "The docs haven't been saved on this device yet. Connect once and they'll be available offline next time." : RenderEndpoint.escapeHtml(e.message)}</p>
+        <p><button class="btn btn--sm" id="spec-retry" type="button">Try again</button></p>
+        <p class="field__hint">If you opened this file directly, serve it over HTTP (not <code>file://</code>) so <code>fetch("openapi.json")</code> is allowed.</p>
       </div>`;
+    document.getElementById("spec-retry").addEventListener("click", () => location.reload());
     return;
   }
 

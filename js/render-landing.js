@@ -197,7 +197,7 @@ const RenderLanding = (() => {
       grid.appendChild(card);
     });
     if (!rows.length) {
-      grid.appendChild(el(`<p class="lp-stat__offline">Live record counts are unavailable right now. The documentation below still works.</p>`));
+      grid.appendChild(el(`<p class="lp-stat__offline">${navigator.onLine === false ? "You're offline, so live record counts aren't shown." : "Live record counts are unavailable right now."} The documentation below still works.</p>`));
     }
     // Counters added after the observer ran: start the ones already on screen.
     if (reduceMotion() || !("IntersectionObserver" in window)) {
@@ -274,7 +274,7 @@ const RenderLanding = (() => {
       const r = await ApiClient.execute({ url, method: "GET", headers: {} });
       if (!out.isConnected) return;
       if (!r.ok || r.status >= 500) {
-        out.innerHTML = `<p class="lp-result__msg lp-result__msg--err">Couldn't reach the API just now. Please try again in a moment.</p>`;
+        out.innerHTML = `<p class="lp-result__msg lp-result__msg--err">${navigator.onLine === false ? "You're offline. Food lookups need an internet connection." : "Couldn't reach the API just now. Please try again in a moment."}</p>`;
         return;
       }
       const d = r.bodyJson?.data;

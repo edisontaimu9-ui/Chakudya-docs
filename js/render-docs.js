@@ -192,7 +192,7 @@ const RenderDocs = (() => {
       btn.disabled = false;
       out.innerHTML = "";
       if (!r.ok) {
-        out.appendChild(el(`<p class="doc-run__msg doc-run__msg--err">Couldn't reach the API: ${esc(r.message)}</p>`));
+        out.appendChild(el(`<p class="doc-run__msg doc-run__msg--err">${navigator.onLine === false ? "You're offline. Live examples need an internet connection." : "Couldn't reach the API: " + esc(r.message)}</p>`));
         return;
       }
       const raw = r.bodyJson ?? r.bodyText;
