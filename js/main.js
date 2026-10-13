@@ -23,7 +23,6 @@
 
   // ── Header: brand / version / GitHub ──────────────────────
   document.getElementById("version-chip").textContent = `v${spec.info?.version || "?"}`;
-  document.title = `${spec.info?.title || "Chakudya API"} - Docs`;
 
   const repoUrl = "https://github.com/edisontaimu9-ui/chakudya-api";
   const githubLink = document.getElementById("github-link");
@@ -107,7 +106,7 @@
   // ── Router ─────────────────────────────────────────────────
   function route() {
     const hash = location.hash.replace(/^#\/?/, "");
-    document.title = `${spec.info?.title || "Chakudya API"} - Docs`;
+    Seo.reset();
     // The landing page is full-width with no sidebar; docs and reference pages keep it.
     const isLanding = !hash;
     const isGuide = hash === "docs" || hash.startsWith("docs/");
@@ -172,6 +171,8 @@
         return;
       }
       RenderDocs.render(guideId, content);
+      const gs = RenderDocs.SECTIONS.find((s) => s.id === guideId);
+      Seo.set(`${gs.title} - API Documentation`, gs.blurb);
       Sidebar.setActive(`guide:${guideId}`);
       AppState.set({ activeId: null });
       document.getElementById("main").focus({ preventScroll: true });
@@ -181,6 +182,7 @@
     }
     if (hash === "account") {
       RenderAccount.show(content);
+      Seo.set("Developer account and API keys", "Sign in to create and manage Chakudya API keys for higher rate limits.");
       Sidebar.setActive(null);
       AppState.set({ activeId: null });
       document.getElementById("main").focus({ preventScroll: true });
@@ -200,6 +202,7 @@
       return;
     }
     RenderEndpoint.render(endpoint, content);
+    Seo.set(`${endpoint.summary} - API Reference`, `${endpoint.method} ${endpoint.path}. ${endpoint.description || endpoint.summary}`);
     Sidebar.setActive(endpoint.id);
     AppState.set({ activeId: endpoint.id });
     document.getElementById("main").focus({ preventScroll: true });

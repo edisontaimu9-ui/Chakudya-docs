@@ -129,7 +129,7 @@ const RenderLegal = (() => {
     root.appendChild(body);
     root.appendChild(el(`<p class="legal-copy">© ${new Date().getFullYear()} Chakudya Nutrition Registry. All rights reserved.</p>`));
     container.appendChild(root);
-    document.title = `${meta.title} - Chakudya Nutrition Registry`;
+    Seo.set(meta.title, meta.lead);
   }
 
   return { PAGES, has, render };

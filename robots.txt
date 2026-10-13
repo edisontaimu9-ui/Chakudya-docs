@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://edisontaimu9-ui.github.io/Chakudya-docs/sitemap.xml
