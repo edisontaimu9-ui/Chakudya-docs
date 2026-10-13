@@ -378,6 +378,19 @@ const RenderLanding = (() => {
     `);
   }
 
+  function missionSection() {
+    return el(`
+      <section class="lp-section lp-mission reveal" id="lp-mission" aria-labelledby="lp-mission-h">
+        <div class="lp-head">
+          <p class="lp-kicker">About Chakudya</p>
+          <h2 id="lp-mission-h">Open nutrition infrastructure for Malawi</h2>
+          <p class="lp-sub">Chakudya Nutrition Registry is an open nutrition data and intelligence infrastructure built for Malawi. It brings together food composition data, nutrition reference systems, computational methods and disease-specific nutrition knowledge within a shared, interoperable platform.</p>
+          <p class="lp-sub">From nutrient analysis and nutrition assessment to therapeutic dietary planning and clinical nutrition workflows, Chakudya provides structured data, reusable tools and API services for health professionals, researchers, students, developers and AI-enabled applications. Its goal is to make nutrition knowledge more accessible, computation more reusable and health technology development more grounded in reliable, locally relevant nutrition data.</p>
+        </div>
+      </section>
+    `);
+  }
+
   function devSection() {
     const base = AppState.state.baseUrl || "";
     const { endpoints, groups, spec } = AppState.state;
@@ -435,6 +448,7 @@ const RenderLanding = (() => {
           </div>
           <nav aria-label="Resources">
             <h3 class="lp-footer__h">Resources</h3>
+            <a href="#lp-mission" data-scroll="lp-mission">About Chakudya</a>
             <a href="#/docs/getting-started">Documentation</a>
             <a href="#/docs/api-reference">API Reference</a>
             <a href="openapi.json" download>OpenAPI spec</a>
@@ -501,6 +515,7 @@ const RenderLanding = (() => {
       coachSection(),
       audienceSection(),
       usesSection(),
+      missionSection(),
       devSection(),
       closingSection({ showKey }),
       footer()
