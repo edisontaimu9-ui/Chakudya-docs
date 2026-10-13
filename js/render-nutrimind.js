@@ -8,16 +8,18 @@ const RenderNutriMind = (() => {
   const MAX_Q = 600;
   const MAX_SAVED = 40;
   const PROMPTS = [
-    "How many calories are in nsima?",
-    "Which Malawian foods are rich in iron?",
-    "What foods should I limit on a kidney-friendly diet?",
-    "Compare groundnuts and soya pieces for protein",
+    ["\u{1F33D}", "How many calories are in nsima?"],
+    ["\u{1FA78}", "Which Malawian foods are rich in iron?"],
+    ["\u{1FA7A}", "What foods should I limit on a kidney-friendly diet?"],
+    ["\u{1F4AA}", "Compare groundnuts and soya pieces for protein"],
   ];
   const MODES = [
-    ["both", "All"],
-    ["general", "Everyday"],
-    ["clinical", "Clinical"],
+    ["both", "\u2728 All"],
+    ["general", "\u{1F372} Everyday"],
+    ["clinical", "\u{1FA7A} Clinical"],
   ];
+  const TICK_MS = 28;
+  const reducedMotion = () => !!(window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches);
 
   const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
   function el(html) {
@@ -44,10 +46,11 @@ const RenderNutriMind = (() => {
           mode: MODES.some((m) => m[0] === s.mode) ? s.mode : "both",
           sessionId: typeof s.sessionId === "string" ? s.sessionId : newId(),
           busy: false,
+          stream: null,
         };
       }
     } catch { /* storage unavailable or corrupt: start fresh */ }
-    return { messages: [], mode: "both", sessionId: newId(), busy: false };
+    return { messages: [], mode: "both", sessionId: newId(), busy: false, stream: null };
   }
   function save() {
     try {
@@ -59,28 +62,124 @@ const RenderNutriMind = (() => {
     } catch { /* ignore */ }
   }
 
-  // ── Tiny, safe markdown (bold, italics, lists, headings, [n] citations) ──
+  // ── Emoji, callouts and nutrient cards (presentation only, never changes the facts) ──
+  const EMOJI_RULES = [
+    [/energy|calori|kcal|kilojoule/i, "\u26A1"],
+    [/protein/i, "\u{1F4AA}"],
+    [/\bfats?\b|\boils?\b/i, "\u{1FAD2}"],
+    [/fibre|fiber/i, "\u{1F33E}"],
+    [/sugar/i, "\u{1F36C}"],
+    [/calcium|bone/i, "\u{1F9B4}"],
+    [/vitamin a\b/i, "\u{1F441}\uFE0F"],
+    [/vitamin c\b/i, "\u{1F34A}"],
+    [/vitamin d\b/i, "\u2600\uFE0F"],
+    [/iron|anaemi|anemi/i, "\u{1FA78}"],
+    [/zinc/i, "\u{1F6E1}\uFE0F"],
+    [/potassium/i, "\u{1F34C}"],
+    [/sodium|salt/i, "\u{1F9C2}"],
+    [/carb|starch/i, "\u{1F35E}"],
+    [/water|fluid|hydrat/i, "\u{1F4A7}"],
+    [/vitamin|mineral|micronutrient|folate|folic/i, "\u{1F9EA}"],
+    [/maize|nsima|cassava|sorghum|millet|rice|bread|staple|cereal|grain|porridge/i, "\u{1F33D}"],
+    [/bean|legume|groundnut|peanut|soya|soy\b|pulse|lentil|cowpea|pigeon pea/i, "\u{1FAD8}"],
+    [/fish|chambo|usipa|kapenta/i, "\u{1F41F}"],
+    [/meat|beef|chicken|goat|pork|poultry/i, "\u{1F357}"],
+    [/\begg/i, "\u{1F95A}"],
+    [/milk|dairy|yoghurt|yogurt|cheese/i, "\u{1F95B}"],
+    [/sweet potato|potato/i, "\u{1F360}"],
+    [/vegetable|leafy|greens|spinach|kale|pumpkin leaves|tomato/i, "\u{1F96C}"],
+    [/fruit|mango|banana|orange|papaya|guava/i, "\u{1F34E}"],
+    [/infant|baby|babies|breastfe|complementary|weaning/i, "\u{1F476}"],
+    [/child|toddler/i, "\u{1F9D2}"],
+    [/pregnan|lactat/i, "\u{1F930}"],
+    [/kidney|renal|diabet|glyc|glucose|insulin|clinical/i, "\u{1FA7A}"],
+    [/malnutrition|wasting|stunting|underweight/i, "\u26A0\uFE0F"],
+    [/tube|enteral|formula/i, "\u{1F37C}"],
+    [/weight|obes|bmi/i, "\u2696\uFE0F"],
+    [/exercise|activity/i, "\u{1F3C3}"],
+    [/meal|menu|recipe|diet|serving|portion/i, "\u{1F37D}\uFE0F"],
+    [/avoid|limit|reduce|restrict/i, "\u26A0\uFE0F"],
+  ];
+  const STARTS_WITH_EMOJI = /^\p{Extended_Pictographic}/u;
+  function emojiFor(text) {
+    const t = String(text || "").trim();
+    if (!t || STARTS_WITH_EMOJI.test(t)) return "";
+    for (const [re, emoji] of EMOJI_RULES) if (re.test(t)) return emoji;
+    return "";
+  }
+  const withEmoji = (text, html) => {
+    const e = emojiFor(text);
+    return e ? `<span class="nm-emoji" aria-hidden="true">${e}</span>${html}` : html;
+  };
+
+  const CALLOUTS = {
+    tip: ["\u{1F4A1}", "tip"], note: ["\u{1F4DD}", "note"], remember: ["\u{1F4CC}", "note"],
+    important: ["\u26A0\uFE0F", "warn"], warning: ["\u26A0\uFE0F", "warn"], caution: ["\u26A0\uFE0F", "warn"],
+  };
+  const CALLOUT_RE = /^(tip|note|remember|important|warning|caution)\s*[:\u2013-]\s*(.+)/i;
+
+  const NUTRIENT_NAME = /^(energy|calories?|protein|carbohydrates?|carbs|total fat|fat|saturated fat|fibre|fiber|dietary fibre|dietary fiber|sugars?|iron|zinc|calcium|magnesium|potassium|sodium|phosphorus|selenium|iodine|folate|vitamin [a-ek]|vitamin b\d{1,2}|thiamine|riboflavin|niacin|cholesterol|water)$/i;
+  const NUTRIENT_LINE = /^\s*([A-Za-z][A-Za-z ]{1,24}?)\s*[:\u2013-]\s*(?:about |approximately |approx\.? |around |~)?(\d+(?:[.,]\d+)?)\s*(kcal|kj|g|mg|\u00b5g|mcg|ug|iu|%)(?![A-Za-z])\s*(.*)$/i;
+  function parseNutrients(items) {
+    if (items.length < 3) return null;
+    const out = [];
+    for (const raw of items) {
+      const m = raw.replace(/\*/g, "").match(NUTRIENT_LINE);
+      if (!m || !NUTRIENT_NAME.test(m[1].trim())) return null;
+      out.push({ name: m[1].trim(), value: m[2], unit: m[3], note: m[4].replace(/^[\s,;()-]+|[\s,;()-]+$/g, "") });
+    }
+    return out;
+  }
+  function factsHtml(list) {
+    return '<div class="nm-facts" role="list">' + list.map((n) => {
+      const icon = emojiFor(n.name) || "\u{1F9EA}";
+      return `<div class="nm-fact" role="listitem"><span class="nm-fact__icon" aria-hidden="true">${icon}</span>` +
+        `<span class="nm-fact__val">${esc(n.value)}<small>${esc(n.unit)}</small></span>` +
+        `<span class="nm-fact__name">${esc(n.name)}</span>` +
+        (n.note ? `<span class="nm-fact__note">${esc(n.note)}</span>` : "") + "</div>";
+    }).join("") + "</div>";
+  }
+
+  // ── Tiny, safe markdown (bold, italics, lists, headings) ──
   function inline(s) {
     s = esc(s);
     s = s.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
     s = s.replace(/(^|[^*])\*(?!\s)(.+?)\*(?!\*)/g, "$1<em>$2</em>");
-    s = s.replace(/\[(\d{1,2})\]/g, '<sup class="nm-cite">$1</sup>');
     return s;
   }
   function mdToHtml(text) {
-    let html = "";
-    let list = null;
-    const close = () => { if (list) { html += `</${list}>`; list = null; } };
+    // 1) split into blocks
+    const blocks = [];
+    let cur = null;
     for (const raw of String(text).replace(/\r/g, "").split("\n")) {
       const line = raw.trimEnd();
       let m;
-      if (!line.trim()) { close(); continue; }
-      if ((m = line.match(/^#{1,4}\s+(.*)/))) { close(); html += `<h4>${inline(m[1])}</h4>`; }
-      else if ((m = line.match(/^\s*[-*\u2022]\s+(.*)/))) { if (list !== "ul") { close(); html += "<ul>"; list = "ul"; } html += `<li>${inline(m[1])}</li>`; }
-      else if ((m = line.match(/^\s*(\d+)[.)]\s+(.*)/))) { if (list !== "ol") { close(); html += "<ol>"; list = "ol"; } html += `<li>${inline(m[2])}</li>`; }
-      else { close(); html += `<p>${inline(line)}</p>`; }
+      if (!line.trim()) { cur = null; continue; }
+      if ((m = line.match(/^#{1,4}\s+(.*)/))) { blocks.push({ t: "h", text: m[1] }); cur = null; }
+      else if ((m = line.match(/^\s*[-*\u2022]\s+(.*)/))) { if (!cur || cur.t !== "ul") { cur = { t: "ul", items: [] }; blocks.push(cur); } cur.items.push(m[1]); }
+      else if ((m = line.match(/^\s*(\d+)[.)]\s+(.*)/))) { if (!cur || cur.t !== "ol") { cur = { t: "ol", items: [] }; blocks.push(cur); } cur.items.push(m[2]); }
+      else { blocks.push({ t: "p", text: line }); cur = null; }
     }
-    close();
+    // 2) render
+    let html = "";
+    for (const b of blocks) {
+      if (b.t === "h") {
+        html += `<h4>${withEmoji(b.text.replace(/\*/g, ""), inline(b.text))}</h4>`;
+      } else if (b.t === "p") {
+        const c = b.text.match(CALLOUT_RE);
+        if (c) {
+          const [icon, kind] = CALLOUTS[c[1].toLowerCase()];
+          html += `<div class="nm-callout nm-callout--${kind}"><span class="nm-callout__icon" aria-hidden="true">${icon}</span><div>${inline(c[2])}</div></div>`;
+        } else html += `<p>${inline(b.text)}</p>`;
+      } else {
+        const facts = b.t === "ul" ? parseNutrients(b.items) : null;
+        if (facts) { html += factsHtml(facts); continue; }
+        html += `<${b.t}>` + b.items.map((it) => {
+          const lead = it.match(/^\*\*(.+?)\*\*/);
+          return `<li>${lead ? withEmoji(lead[1], inline(it)) : inline(it)}</li>`;
+        }).join("") + `</${b.t}>`;
+      }
+    }
     return html;
   }
 
@@ -122,13 +221,14 @@ const RenderNutriMind = (() => {
     paintModes();
     paint();
 
-    view.send.addEventListener("click", submit);
+    view.send.addEventListener("click", () => { if (state.stream) finishStream(); else submit(); });
     view.input.addEventListener("keydown", (e) => {
       const touch = window.matchMedia && window.matchMedia("(pointer: coarse)").matches;
       if (e.key === "Enter" && !e.shiftKey && !touch) { e.preventDefault(); submit(); }
     });
     view.input.addEventListener("input", autosize);
     root.querySelector("#nm-new").addEventListener("click", () => {
+      if (state.stream) finishStream();
       if (state.busy) return;
       state.messages = [];
       state.sessionId = newId();
@@ -147,21 +247,36 @@ const RenderNutriMind = (() => {
   function paintModes() {
     view.modes.innerHTML = "";
     for (const [value, label] of MODES) {
-      const b = el(`<button type="button" class="nm-mode" aria-pressed="${state.mode === value}">${label}</button>`);
+      const b = el(`<button type="button" class="nm-mode" aria-pressed="${state.mode === value}">${esc(label)}</button>`);
       b.addEventListener("click", () => { state.mode = value; save(); paintModes(); });
       view.modes.appendChild(b);
     }
   }
 
-  function paint() {
+  const STOP_ICON = '<svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><rect x="3" y="3" width="10" height="10" rx="2" fill="currentColor"/></svg>';
+
+  function updateSend() {
+    if (!view) return;
+    const streaming = !!state.stream;
+    view.send.disabled = state.busy && !streaming;
+    view.send.innerHTML = streaming ? STOP_ICON : SEND_ICON;
+    view.send.setAttribute("aria-label", streaming ? "Show the full answer now" : "Send question");
+    view.send.classList.toggle("is-stop", streaming);
+  }
+
+  function paint(animate) {
     if (!view || !view.root.isConnected) return;
+    view.live = null;
     view.thread.innerHTML = "";
     if (!state.messages.length) view.thread.appendChild(welcome());
     state.messages.forEach((m, i) => view.thread.appendChild(messageEl(m, i)));
-    if (state.busy) view.thread.appendChild(typingEl());
-    view.send.disabled = state.busy;
+    if (state.busy && !state.stream) view.thread.appendChild(typingEl());
+    updateSend();
     const last = view.thread.lastElementChild;
-    if (last && state.messages.length) last.scrollIntoView({ block: "end", behavior: "smooth" });
+    if (last && state.messages.length) {
+      if (animate && !reducedMotion()) last.classList.add("nm-msg--new");
+      last.scrollIntoView({ block: "end", behavior: "smooth" });
+    }
   }
 
   function welcome() {
@@ -174,8 +289,8 @@ const RenderNutriMind = (() => {
       </div>
     `);
     const box = w.querySelector(".nm-prompts");
-    for (const p of PROMPTS) {
-      const b = el(`<button type="button" class="nm-prompt">${esc(p)}</button>`);
+    for (const [icon, p] of PROMPTS) {
+      const b = el(`<button type="button" class="nm-prompt"><span class="nm-prompt__icon" aria-hidden="true">${icon}</span><span>${esc(p)}</span></button>`);
       b.addEventListener("click", () => ask(p));
       box.appendChild(b);
     }
@@ -211,6 +326,11 @@ const RenderNutriMind = (() => {
       }
       return b;
     }
+    if (state.stream && state.stream.msg === m) {
+      bubble.innerHTML = partialHtml(state.stream);
+      view.live = bubble;
+      return b;
+    }
     bubble.innerHTML = mdToHtml(m.text);
     const tools = el('<div class="nm-tools"></div>');
     if (m.sources && m.sources.length) {
@@ -244,7 +364,7 @@ const RenderNutriMind = (() => {
 
   // ── Asking ───────────────────────────────────────────────────
   function submit() {
-    if (!view) return;
+    if (!view || state.stream) return;
     const q = view.input.value;
     if (!q.trim()) return;
     view.input.value = "";
@@ -288,13 +408,54 @@ const RenderNutriMind = (() => {
     return { text: text || raw, sources: sources.slice(0, 6) };
   }
 
+  // ── Word-by-word reveal (the API returns the whole answer; we show it progressively) ──
+  function partialHtml(st) {
+    let text = st.parts.slice(0, st.pos).join("");
+    if ((text.match(/\*\*/g) || []).length % 2) text += "**"; // keep half-typed bold tidy
+    return mdToHtml(text) + '<span class="nm-caret" aria-hidden="true"></span>';
+  }
+
+  function nearBottom() {
+    return window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 180;
+  }
+
+  function startStream(msg) {
+    const parts = msg.text.split(/(\s+)/);
+    const perTick = Math.max(2, Math.ceil(parts.length / 240));
+    state.stream = { msg, parts, pos: 0, perTick, timer: null };
+    paint(true);
+    state.stream.timer = setInterval(() => {
+      const st = state.stream;
+      if (!st) return;
+      st.pos = Math.min(st.parts.length, st.pos + st.perTick);
+      if (st.pos >= st.parts.length) { finishStream(); return; }
+      if (view && view.live && view.live.isConnected) {
+        const follow = nearBottom();
+        view.live.innerHTML = partialHtml(st);
+        if (follow) window.scrollTo(0, document.documentElement.scrollHeight);
+      }
+    }, TICK_MS);
+  }
+
+  function finishStream() {
+    const st = state.stream;
+    if (!st) return;
+    clearInterval(st.timer);
+    state.stream = null;
+    state.busy = false;
+    save();
+    paint();
+  }
+
   async function ask(question) {
     const q = String(question).trim().slice(0, MAX_Q);
-    if (!q || state.busy) return;
+    if (!q) return;
+    if (state.stream) finishStream();
+    if (state.busy) return;
     state.messages.push({ role: "user", text: q });
     state.busy = true;
     save();
-    paint();
+    paint(true);
 
     const base = String((AppState.state && AppState.state.baseUrl) || "").replace(/\/$/, "");
     let reply = null;
@@ -326,9 +487,10 @@ const RenderNutriMind = (() => {
       clearTimeout(timer);
     }
     state.messages.push(reply);
+    if (!reply.error && !reducedMotion()) { startStream(reply); return; }
     state.busy = false;
     save();
-    paint();
+    paint(true);
   }
 
   return { render };
