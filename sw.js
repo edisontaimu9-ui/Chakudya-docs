@@ -16,7 +16,7 @@
  *   Run it before every deploy. A new BUILD installs a new cache in the background; the page
  *   then offers a "Reload" button (see js/pwa.js) so HTML and JS are never mixed across versions.
  */
-const BUILD = "8fee187c4810";
+const BUILD = "49a98b4b78e0";
 
 const SHELL_CACHE = "chakudya-shell-" + BUILD;
 const DATA_CACHE = "chakudya-data-v1";
@@ -32,6 +32,7 @@ const CORE = [
   "css/layout.css",
   "css/components.css",
   "css/landing.css",
+  "css/nutrimind.css",
   "css/docs.css",
   "js/config.js",
   "js/state.js",
@@ -47,6 +48,7 @@ const CORE = [
   "js/render-landing.js",
   "js/render-docs.js",
   "js/render-legal.js",
+  "js/render-nutrimind.js",
   "js/auth.js",
   "js/render-account.js",
   "js/try-it.js",
@@ -71,6 +73,9 @@ const OPTIONAL = [
   "assets/images/food-legumes-protein.webp",
   "assets/images/food-staples.webp",
   "assets/images/chakudya-logo-192.webp",
+  "assets/images/nutrimind-mark-96.png",
+  "assets/images/nutrimind-mark-192.png",
+  "assets/images/nutrimind-logo-420.webp",
 ];
 
 // Content that changes between releases: network first, saved copy as fallback.

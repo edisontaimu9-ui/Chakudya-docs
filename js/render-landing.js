@@ -305,6 +305,24 @@ const RenderLanding = (() => {
     return sec;
   }
 
+  function nutriMindSection() {
+    return el(`
+      <section class="lp-section lp-nutrimind reveal" id="lp-nutrimind" aria-labelledby="lp-nm-h">
+        <div class="lp-try__panel lp-nm__panel">
+          <img class="lp-nm__logo" src="assets/images/nutrimind-logo-420.webp" width="112" height="112" alt="Chakudya NutriMind logo" loading="lazy" />
+          <div class="lp-try__copy">
+            <p class="lp-kicker">Nutrition assistant</p>
+            <h2 id="lp-nm-h">Ask Chakudya NutriMind</h2>
+            <p class="lp-sub">Ask questions about Malawian foods, nutrients and nutrition guidance and get answers with sources, powered by the Chakudya Nutrition Registry.</p>
+          </div>
+          <div class="lp-cta">
+            <a class="btn btn--primary btn--lg" href="#/nutrimind">Start chatting</a>
+          </div>
+        </div>
+      </section>
+    `);
+  }
+
   function coachSection() {
     const wa = "https://wa.me/265886295324?text=" + encodeURIComponent("Hi Thanzi Coach");
     return el(`
@@ -448,6 +466,7 @@ const RenderLanding = (() => {
           </div>
           <nav aria-label="Resources">
             <h3 class="lp-footer__h">Resources</h3>
+            <a href="#/nutrimind">NutriMind assistant</a>
             <a href="#lp-mission" data-scroll="lp-mission">About Chakudya</a>
             <a href="#/docs/getting-started">Documentation</a>
             <a href="#/docs/api-reference">API Reference</a>
@@ -512,6 +531,7 @@ const RenderLanding = (() => {
       statsSection(),
       aboutSection(),
       trySection(),
+      nutriMindSection(),
       coachSection(),
       audienceSection(),
       usesSection(),

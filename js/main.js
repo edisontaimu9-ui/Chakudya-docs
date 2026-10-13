@@ -111,13 +111,16 @@
     const isLanding = !hash;
     const isGuide = hash === "docs" || hash.startsWith("docs/");
     const isLegal = hash.startsWith("legal/");
+    const isNutri = hash === "nutrimind";
     document.body.classList.toggle("is-landing", isLanding);
+    document.body.classList.toggle("is-nutrimind", isNutri);
     const guideId = hash.split("/")[1] || "getting-started";
     const activeNav = isLanding ? "nav-home"
+      : isNutri ? "nav-nutrimind"
       : isGuide && guideId !== "api-reference" ? "nav-docs"
       : hash === "account" || isLegal ? ""
       : "nav-reference";
-    ["nav-home", "nav-docs", "nav-reference"].forEach((id) => {
+    ["nav-home", "nav-nutrimind", "nav-docs", "nav-reference"].forEach((id) => {
       const a = document.getElementById(id);
       if (!a) return;
       if (id === activeNav) a.setAttribute("aria-current", "page"); else a.removeAttribute("aria-current");
@@ -125,6 +128,16 @@
 
     if (isLanding) {
       RenderLanding.render(content);
+      Sidebar.setActive(null);
+      AppState.set({ activeId: null });
+      document.getElementById("main").focus({ preventScroll: true });
+      window.scrollTo(0, 0);
+      closeSidebar();
+      return;
+    }
+    if (isNutri) {
+      RenderNutriMind.render(content);
+      Seo.set("Chakudya NutriMind - Nutrition assistant", "Ask Chakudya NutriMind about Malawian foods, nutrients and nutrition guidance. Answers come with sources from the Chakudya Nutrition Registry.");
       Sidebar.setActive(null);
       AppState.set({ activeId: null });
       document.getElementById("main").focus({ preventScroll: true });
