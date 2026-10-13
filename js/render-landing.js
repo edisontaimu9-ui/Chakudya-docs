@@ -305,6 +305,25 @@ const RenderLanding = (() => {
     return sec;
   }
 
+  function coachSection() {
+    const wa = "https://wa.me/265886295324?text=" + encodeURIComponent("Hi Thanzi Coach");
+    return el(`
+      <section class="lp-section lp-coach reveal" id="lp-coach" aria-labelledby="lp-coach-h">
+        <div class="lp-try__panel lp-coach__panel">
+          <div class="lp-try__copy">
+            <p class="lp-kicker">On WhatsApp</p>
+            <h2 id="lp-coach-h">Meet Thanzi Coach</h2>
+            <p class="lp-sub">Personalized nutrition and wellness coaching for Malawians, powered by the Chakudya Nutrition Registry (CNR).</p>
+          </div>
+          <div class="lp-cta">
+            <a class="btn btn--primary btn--lg" href="${wa}" target="_blank" rel="noopener">Chat on WhatsApp</a>
+          </div>
+          <p class="lp-coach__note">Thanzi Coach gives general nutrition guidance. It does not replace advice from a qualified health professional.</p>
+        </div>
+      </section>
+    `);
+  }
+
   function audienceSection() {
     const a = [
       ["Everyone", "heart", "Look up what's in everyday Malawian meals, from nsima to relish, in familiar portions.", "#lp-try", "Try a lookup"],
@@ -428,6 +447,7 @@ const RenderLanding = (() => {
             <a href="https://x.com/edisontaimu" target="_blank" rel="noopener">X (Twitter)</a>
             <a href="https://www.facebook.com/share/1GixAae4hT/" target="_blank" rel="noopener">Facebook</a>
             <a href="https://minutriq.me" target="_blank" rel="noopener">Portfolio</a>
+            <a href="https://wa.me/265886295324" target="_blank" rel="noopener">WhatsApp: Thanzi Coach</a>
           </nav>
           <nav aria-label="Legal">
             <h3 class="lp-footer__h">Legal</h3>
@@ -478,6 +498,7 @@ const RenderLanding = (() => {
       statsSection(),
       aboutSection(),
       trySection(),
+      coachSection(),
       audienceSection(),
       usesSection(),
       devSection(),
