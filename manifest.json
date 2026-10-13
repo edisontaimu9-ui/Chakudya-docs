@@ -1,7 +1,7 @@
 {
   "name": "Chakudya Nutrition Registry",
   "short_name": "Chakudya",
-  "description": "Nutrition data and tools for healthier communities in Malawi: local food data, WHO growth assessment and clinical nutrition information.",
+  "description": "Nutrition data and tools for healthier communities in Malawi: food data, growth assessment, nutrition computation and clinical nutrition information.",
   "id": "./",
   "start_url": "./#/",
   "scope": "./",

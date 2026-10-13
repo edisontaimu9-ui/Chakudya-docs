@@ -231,3 +231,13 @@ body.is-landing .content { max-width: 1180px; padding: 24px 28px 0; }
   .lp-trust { grid-template-columns: 1fr; }
   .lp-cta .lp-cta__link { flex: 1 1 100%; text-align: center; padding: 6px 0; }
 }
+
+/* Connected-platform strip above the numbered cards */
+.lp-flow { list-style: none; margin: 0 0 22px; padding: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 8px 0; }
+.lp-flow li { position: relative; font-family: var(--font-mono); font-size: 11px; font-weight: 700; letter-spacing: .6px; text-transform: uppercase; color: var(--text-secondary); background: var(--surface); border: 1px solid var(--border-strong); border-radius: 999px; padding: 6px 12px; }
+.lp-flow li:not(:last-child) { margin-right: 22px; }
+.lp-flow li:not(:last-child)::after { content: ""; position: absolute; left: 100%; top: 50%; width: 22px; border-top: 1px dashed var(--accent); }
+@media (max-width: 640px) {
+  .lp-flow li:not(:last-child) { margin-right: 14px; }
+  .lp-flow li:not(:last-child)::after { width: 14px; }
+}

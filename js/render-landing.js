@@ -210,18 +210,25 @@ const RenderLanding = (() => {
 
   function aboutSection() {
     const pillars = [
-      ["leaf", "Local food data", "Nutrition information for Malawian foods, plus glycaemic index, food exchange lists and packaged foods, with international sources when a food isn't local.", epLink("GET", "/foods")],
-      ["child", "Growth assessment", "Compare measurements with WHO child and adolescent growth standards from birth to 19 years, with preterm infant charts and growth-speed tracking.", epLink("GET", "/growth/assess")],
-      ["steth", "Clinical nutrition", "Reference information for dietitians and clinicians: renal foods, tube-feeding formulas, drug-nutrient interactions, dietary reference intakes and meal analysis.", epLink("GET", "/drug-interactions")],
+      ["leaf", "Food composition & dietary data", "Explore nutritional composition of Malawian foods, packaged products, glycaemic index data, food exchange lists and other dietary references, with international data sources supporting broader coverage.", epLink("GET", "/foods")],
+      ["child", "Growth & anthropometric intelligence", "Support the interpretation of height, weight, BMI, MUAC and other anthropometric measurements using relevant growth references, age-specific indicators and assessment methods across different stages of life.", epLink("GET", "/growth/assess")],
+      ["calc", "Nutritional computation", "Access computational methods for estimating energy and protein requirements, analysing meals and recipes, comparing intake with dietary reference values, and supporting evidence-informed nutrition assessment.", epLink("POST", "/meals/analyze")],
+      ["steth", "Clinical & disease-specific nutrition", "Explore structured nutrition information for conditions requiring tailored dietary management, including renal disease, diabetes and other clinical nutrition applications.", epLink("GET", "/exchange")],
+      ["spark", "Nutrition intelligence & AI infrastructure", "Build applications that connect nutrition data, computational tools and structured knowledge. Chakudya provides a foundation for AI-assisted nutrition experiences, research tools and digital health solutions.", epLink("POST", "/rag/ask")],
+      ["network", "Open API & shared infrastructure", "Integrate nutrition data and capabilities into websites, applications, research workflows and digital health systems through a shared API, reducing the need to independently rebuild common nutrition datasets and computational logic.", "#/docs/getting-started"],
     ];
+    const flow = ["Food data", "Assessment", "Computation", "Clinical knowledge", "AI infrastructure", "Open API"];
     return el(`
       <section class="lp-section reveal" id="lp-about" aria-labelledby="lp-about-h">
         <div class="lp-head">
           <p class="lp-kicker">What is Chakudya?</p>
-          <h2 id="lp-about-h">What you can find on Chakudya</h2>
-          <p class="lp-sub">Chakudya means “food” in Chichewa. The Chakudya Nutrition Registry makes nutrition data and tools more accessible to support healthier communities in Malawi.</p>
-          <p class="lp-sub">Explore local food data, nutrition resources, growth assessment tools, and clinical nutrition information — all through one open platform.</p>
+          <h2 id="lp-about-h">A connected foundation for nutrition science and health intelligence.</h2>
+          <p class="lp-sub">Chakudya means \u201Cfood\u201D in Chichewa. The Chakudya Nutrition Registry is an open nutrition intelligence platform that connects food composition data, nutritional computation, anthropometric assessment, clinical knowledge and computational tools through a shared infrastructure.</p>
+          <p class="lp-sub">From understanding the nutritional value of local foods to assessing growth, estimating nutritional requirements and exploring disease-specific nutrition information, Chakudya brings essential data and practical capabilities together to support research, clinical practice, education and health innovation.</p>
         </div>
+        <ul class="lp-flow" aria-label="How the platform connects">
+          ${flow.map((t) => `<li>${t}</li>`).join("")}
+        </ul>
         <ol class="lp-pillars">
           ${pillars.map(([ic, t, d, href], i) => `
             <li>
@@ -347,7 +354,7 @@ const RenderLanding = (() => {
   function audienceSection() {
     const a = [
       ["Everyone", "heart", "Look up what's in everyday Malawian meals, from nsima to relish, in familiar portions.", "#lp-try", "Try a lookup"],
-      ["Students", "book", "Learn with real composition data, glycaemic index, exchange lists and WHO standards instead of textbook tables.", "#/docs/api-reference", "Browse the data"],
+      ["Students", "book", "Learn with real composition data, glycaemic index, exchange lists and growth references instead of textbook tables.", "#/docs/api-reference", "Browse the data"],
       ["Health professionals", "steth", "Support nutrition care with growth assessment and renal, tube-feeding and drug-interaction information.", epLink("GET", "/growth/assess"), "See growth assessment"],
       ["Researchers", "flask", "Find consistent, citable food and growth reference data with documented sources.", "openapi.json", "Download the data spec"],
       ["Food businesses", "store", "Standardised nutrition labels, barcode lookup and recipe nutrition totals for products and menus.", epLink("GET", "/foods/{id}/label"), "See label data"],
@@ -511,6 +518,9 @@ const RenderLanding = (() => {
       utensils: '<path d="M6 3v8M9 3v8M6 7h3M7.5 11v10M17 3c-2 2-2.5 5-2 8h2v10"/>',
       pulse: '<path d="M3 12h4l2-6 4 12 2-6h6"/>',
       fhir: '<path d="M12 3 4 7v6c0 4 3.4 7 8 8 4.6-1 8-4 8-8V7l-8-4Z"/><path d="m9 12 2 2 4-4"/>',
+      calc: '<rect x="5" y="3" width="14" height="18" rx="2"/><path d="M8 7h8M8 12h.01M12 12h.01M16 12h.01M8 16h.01M12 16h.01M16 16h.01"/>',
+      spark: '<path d="M12 3v5M12 16v5M3 12h5M16 12h5M6 6l3 3M15 15l3 3M18 6l-3 3M9 15l-3 3"/>',
+      network: '<circle cx="6" cy="12" r="2.2"/><circle cx="18" cy="6" r="2.2"/><circle cx="18" cy="18" r="2.2"/><path d="m8 11 8-4M8 13l8 4"/>',
       spark: '<path d="M12 3v4M12 17v4M3 12h4M17 12h4M6 6l2.5 2.5M15.5 15.5 18 18M18 6l-2.5 2.5M8.5 15.5 6 18"/>',
       key: '<circle cx="8" cy="15" r="4"/><path d="m11 12 9-9M16 7l3 3"/>',
       heart: '<path d="M12 20s-7-4.4-7-10a4 4 0 0 1 7-2 4 4 0 0 1 7 2c0 5.6-7 10-7 10Z"/>',
