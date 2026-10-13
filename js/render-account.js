@@ -80,24 +80,27 @@ const RenderAccount = (() => {
     });
   }
 
-  // ── Signed in ─────────────────────────────────────────────
-  const fmtDate = (v) => (v ? new Date(v).toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" }) : "never");
+  // ── Signed in: developer console ─────────────────────────
+  const fmtDay = (v) => new Date(v).toLocaleDateString("en-GB", { year: "numeric", month: "short", day: "numeric" });
+  const plural = (n, word) => `${Number(n).toLocaleString()} ${word}${Number(n) === 1 ? "" : "s"}`;
+  let closeMenus = null;
 
   async function renderSignedIn() {
     const s = DevAuth.session();
     const recovery = DevAuth.inRecovery();
     container.innerHTML = `
-      <section class="account">
+      <section class="account account--console">
         <p class="eyebrow">Developer account</p>
-        <h1 class="hero__title">Your API keys</h1>
-        <div class="account-bar"><span>Signed in as <strong>${esc(s?.email || "your account")}</strong></span><button class="btn btn--sm" id="acc-signout" type="button">Sign out</button></div>
+        <h1 class="hero__title">Developer Console</h1>
+        <h2 class="console-sub">Your API keys</h2>
+        <p class="hero__lead">Manage the credentials your applications use to access Chakudya's nutrition data, computational tools and clinical resources.</p>
+        <div class="account-bar"><span>Signed in as <strong id="acc-email">${esc(s?.email || "your account")}</strong></span><button class="btn btn--sm" id="acc-signout" type="button">Sign out</button></div>
         ${flashHtml()}
         ${recovery ? `<div class="account-card"><h2 class="account-card__title">Set a new password</h2>
           <form class="account-form" id="acc-newpass" novalidate><div class="field"><label class="field__label" for="np">New password</label>
           <input id="np" type="password" autocomplete="new-password" minlength="8" required /></div>
           <button class="btn btn--primary" type="submit">Save password</button></form></div>` : ""}
-        <div class="account-card" id="acc-keys"><div class="loading-state" style="padding:24px 0"><div class="spinner"></div><p>Loading your keys…</p></div></div>
-        <div class="callout"><strong>What a key gives you.</strong> Three times each public route's rate limit, tracked per key instead of per IP. Access to the <code>/fhir</code> clinical operations. A usage count for every key. Send it as <code>Authorization: Bearer YOUR_KEY</code>. A consumer key can only read and compute; it can never write data or reach admin routes.</div>
+        <div id="acc-keys"><div class="loading-state" style="padding:24px 0"><div class="spinner"></div><p>Loading your keys…</p></div></div>
       </section>`;
 
     container.querySelector("#acc-signout").addEventListener("click", async () => { await DevAuth.signOut(); newKey = null; setFlash("ok", "Signed out."); mode = "signin"; render(container); });
@@ -110,6 +113,33 @@ const RenderAccount = (() => {
     await loadKeys();
   }
 
+  const DOTS = '<svg width="18" height="18" viewBox="0 0 20 20" aria-hidden="true" fill="currentColor"><circle cx="4" cy="10" r="1.7"/><circle cx="10" cy="10" r="1.7"/><circle cx="16" cy="10" r="1.7"/></svg>';
+
+  function keyCard(k, maxWeek, showBar) {
+    const today = k.usage?.today ?? 0, week = k.usage?.last_7_days ?? 0;
+    const used = k.last_used_at ? `Last used ${fmtDay(k.last_used_at)}` : "Never used";
+    const pct = maxWeek > 0 ? Math.max(week > 0 ? 4 : 0, Math.round((week / maxWeek) * 100)) : 0;
+    return `
+      <article class="key-card">
+        <div class="key-card__head">
+          <div class="key-card__id">
+            <h3 class="key-card__label">${esc(k.label)}</h3>
+            <code class="key-card__prefix">${esc(k.key_prefix || "cnr_")}…</code>
+          </div>
+          <details class="key-menu">
+            <summary aria-label="Actions for ${esc(k.label)}">${DOTS}</summary>
+            <div class="key-menu__panel"><button type="button" class="key-menu__item" data-revoke="${esc(k.id)}">Revoke key</button></div>
+          </details>
+        </div>
+        <p class="key-card__meta">Created ${fmtDay(k.created_at)} · ${used}</p>
+        <dl class="key-card__stats">
+          <div><dt>Usage today</dt><dd>${plural(today, "request")}</dd></div>
+          <div><dt>Last 7 days</dt><dd>${plural(week, "request")}</dd></div>
+        </dl>
+        ${showBar ? `<div class="key-card__bar" role="img" aria-label="Share of the busiest key's activity over 7 days"><span style="width:${pct}%"></span></div>` : ""}
+      </article>`;
+  }
+
   async function loadKeys() {
     const box = container.querySelector("#acc-keys");
     let res;
@@ -119,34 +149,79 @@ const RenderAccount = (() => {
       box.innerHTML = `<div class="account-msg account-msg--err">${esc(err.message)}</div>`;
       return;
     }
+    if (res.email) { const em = container.querySelector("#acc-email"); if (em) em.textContent = res.email; }
     const keys = res.data || [];
     const max = res.max_keys || 3;
-    const rows = keys.map((k) => `
-      <div class="key-row"><div class="key-row__main">
-        <strong>${esc(k.label)}</strong> <span class="mono key-row__prefix">${esc(k.key_prefix || "cnr_")}…</span>
-        <span class="field__hint">Created ${fmtDate(k.created_at)} · last used ${fmtDate(k.last_used_at)} · ${k.usage?.today ?? 0} requests today, ${k.usage?.last_7_days ?? 0} in 7 days</span></div>
-        <button class="btn btn--sm" data-revoke="${esc(k.id)}" type="button">Revoke</button></div>`).join("");
+    const sumToday = keys.reduce((a, k) => a + (k.usage?.today ?? 0), 0);
+    const sumWeek = keys.reduce((a, k) => a + (k.usage?.last_7_days ?? 0), 0);
+    const maxWeek = keys.reduce((a, k) => Math.max(a, k.usage?.last_7_days ?? 0), 0);
+    const left = Math.max(0, max - keys.length);
+    const base = AppState.state.baseUrl;
+
     box.innerHTML = `
       ${newKey ? `<div class="key-reveal"><strong>Copy your new key now. It won't be shown again.</strong>
         <code class="key-reveal__key" id="acc-newkey"></code>
         <div class="key-reveal__actions"><button class="btn btn--sm btn--primary" id="acc-copy" type="button">Copy key</button>
         <button class="btn btn--sm" id="acc-use" type="button">Use in Try It</button><button class="btn btn--sm btn--ghost" id="acc-dismiss" type="button">I've saved it</button></div>
         <div class="code-block"><pre><code id="acc-curl"></code></pre></div></div>` : ""}
-      ${keys.length ? `<div class="key-list">${rows}</div>` : `<p class="field__hint">You don't have any keys yet.</p>`}
-      <h2 class="account-card__title">Create a key</h2>
-      ${keys.length >= max ? `<p class="field__hint">You've reached the limit of ${max} active keys. Revoke one to create another.</p>` : `
-      <form class="account-form account-form--inline" id="acc-create" novalidate>
-        <div class="field"><label class="field__label" for="acc-label">Label</label><input id="acc-label" type="text" maxlength="60" placeholder="e.g. Thanzi mobile app" required /></div>
-        <button class="btn btn--primary" type="submit">Create key</button></form>
-        <span class="field__hint">${keys.length} of ${max} keys in use.</span>`}`;
+
+      <div class="console-metrics">
+        <div class="metric"><span class="metric__label">Requests today</span><span class="metric__value">${sumToday.toLocaleString()}</span><span class="metric__note">Across all your keys</span></div>
+        <div class="metric"><span class="metric__label">Last 7 days</span><span class="metric__value">${sumWeek.toLocaleString()}</span><span class="metric__note">Across all your keys</span></div>
+        <div class="metric"><span class="metric__label">Keys in use</span><span class="metric__value">${keys.length} <small>of ${max}</small></span><span class="metric__note">${plural(left, "slot")} remaining</span></div>
+      </div>
+
+      <h2 class="console-h">Your keys</h2>
+      ${keys.length ? `<div class="key-grid">${keys.map((k) => keyCard(k, maxWeek, keys.length > 1)).join("")}</div>` : `<div class="account-card"><p class="field__hint" style="margin:0">You don't have any keys yet. Create your first one below.</p></div>`}
+
+      <div class="account-card">
+        <h2 class="account-card__title">Create an API key</h2>
+        <p class="console-text">Create a separate key for each application or integration so you can monitor usage and revoke access independently.</p>
+        ${keys.length >= max ? `<p class="field__hint" style="margin:0">You've reached the limit of ${max} active keys. Revoke one to create another.</p>` : `
+        <form class="account-form account-form--inline" id="acc-create" novalidate>
+          <div class="field"><label class="field__label" for="acc-label">Label</label>
+            <input id="acc-label" type="text" maxlength="60" placeholder="e.g. Thanzi WhatsApp assistant" required aria-describedby="acc-label-hint" />
+            <span class="field__hint" id="acc-label-hint">Choose a name that helps you identify where the key is used.</span></div>
+          <button class="btn btn--primary" type="submit">Create API key</button></form>
+        <span class="field__hint">${keys.length} of ${max} keys used · ${left} remaining</span>`}
+      </div>
+
+      <h2 class="console-h">Understanding API key access</h2>
+      <div class="access-grid">
+        <div class="access-card"><h3>More capacity</h3><p>Each API key receives three times the standard rate limit on public endpoints, subject to each endpoint's own limits.</p></div>
+        <div class="access-card"><h3>Usage tracking</h3><p>Requests are counted against the key used, helping you monitor activity across your integrations.</p></div>
+        <div class="access-card"><h3>Clinical resources</h3><p>Keys can use the clinical operations under <code>/fhir</code>. Audit events are never available to consumer keys, and every operation still applies its own validation.</p></div>
+        <div class="access-card"><h3>Read and compute access</h3><p>Consumer keys can retrieve data and run supported computations. They cannot modify registry data or reach administrative routes.</p></div>
+      </div>
+
+      <h2 class="console-h">Using your key</h2>
+      <div class="account-card">
+        <p class="console-text">Include your key in the <code>Authorization</code> header when making API requests:</p>
+        <div class="code-block"><pre><code>Authorization: Bearer YOUR_API_KEY</code></pre></div>
+        <div class="key-reveal__actions"><button class="btn btn--sm" id="acc-copy-header" type="button">Copy header</button></div>
+        <p class="console-text">Keep your key private. Store it securely, avoid embedding it in public client-side code, and revoke it if it is exposed or no longer needed.</p>
+        <ul class="next-steps">
+          <li><a href="#/docs/getting-started">Quick start <span aria-hidden="true">→</span></a></li>
+          <li><a href="#/docs/authentication">Authentication and rate limits <span aria-hidden="true">→</span></a></li>
+          <li><a href="#/docs/api-reference">Endpoint reference <span aria-hidden="true">→</span></a></li>
+          <li><a href="#/docs/examples">Request and response examples <span aria-hidden="true">→</span></a></li>
+        </ul>
+      </div>`;
 
     if (newKey) {
       box.querySelector("#acc-newkey").textContent = newKey;
-      box.querySelector("#acc-curl").textContent = `curl -H "Authorization: Bearer ${newKey}" \\\n  ${AppState.state.baseUrl}/foods/categories`;
+      box.querySelector("#acc-curl").textContent = `curl -H "Authorization: Bearer ${newKey}" \\\n  ${base}/foods/categories`;
       box.querySelector("#acc-copy").addEventListener("click", async () => CopyModule.toast((await CopyModule.copyText(newKey)) ? "Key copied" : "Couldn't copy - select it manually"));
       box.querySelector("#acc-use").addEventListener("click", () => { DevAuth.setTryItKey(newKey); CopyModule.toast("Try It will now send this key (until you close the tab)"); });
       box.querySelector("#acc-dismiss").addEventListener("click", () => { newKey = null; loadKeys(); });
     }
+    box.querySelector("#acc-copy-header")?.addEventListener("click", async () => CopyModule.toast((await CopyModule.copyText("Authorization: Bearer YOUR_API_KEY")) ? "Header copied" : "Couldn't copy - select it manually"));
+
+    // Key action menus close when you tap elsewhere.
+    if (closeMenus) document.removeEventListener("click", closeMenus);
+    closeMenus = (ev) => box.querySelectorAll("details.key-menu[open]").forEach((d) => { if (!d.contains(ev.target)) d.removeAttribute("open"); });
+    document.addEventListener("click", closeMenus);
+
     box.querySelectorAll("[data-revoke]").forEach((b) => b.addEventListener("click", async () => {
       if (!confirm("Revoke this key? Apps using it will stop working immediately.")) return;
       b.disabled = true;
