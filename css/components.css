@@ -469,6 +469,10 @@
 .install-btn { gap: 6px; display: inline-flex; align-items: center; }
 .install-btn[hidden] { display: none; }
 .toast--action { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; max-width: min(92vw, 380px); }
+.toast__body { flex: 1 1 100%; display: grid; gap: 3px; }
+.toast__title { color: var(--text-primary); font-size: 13.5px; line-height: 1.3; }
+.toast__text { color: var(--text-secondary); font-size: 12.5px; line-height: 1.45; }
+.toast--update .toast__btn { padding: 7px 14px; }
 .toast__btn {
   font: inherit; font-weight: 600; font-size: 12.5px; cursor: pointer; padding: 5px 10px;
   border-radius: var(--radius-sm, 6px); border: 1px solid var(--border-strong); background: transparent; color: var(--text-primary);

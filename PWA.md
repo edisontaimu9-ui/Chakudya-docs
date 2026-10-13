@@ -32,7 +32,7 @@ node tools/stamp-sw.mjs --check   # CI: fails if BUILD is stale or a listed file
 Skipping this means returning users keep the old shell. When you add a JS/CSS file, add it to `CORE` in `sw.js`; the stamp script fails if `index.html` uses a file that isn't precached.
 
 ## Updates
-A new `BUILD` installs in the background. Open tabs show "A new version of the docs is ready" with **Reload**. The page only reloads when the user clicks it, so old HTML never mixes with new JS.
+A new `BUILD` installs in the background. Open tabs show "Chakudya Nutrition Registry has been updated" with **Refresh site** and **Later**. The page only reloads when the user clicks it, so old HTML never mixes with new JS.
 
 ## Install
 - Android / desktop Chrome and Edge: use the **Install** button in the header, or the browser menu.

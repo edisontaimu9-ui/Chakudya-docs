@@ -13,9 +13,23 @@ const PwaModule = (() => {
     const el = document.createElement("div");
     el.className = "toast toast--action";
     el.setAttribute("role", "status");
-    const text = document.createElement("span");
-    text.textContent = message;
-    el.appendChild(text);
+    // `message` is a plain string, or { title, text } for a heading plus a short line.
+    if (message && typeof message === "object") {
+      const body = document.createElement("div");
+      body.className = "toast__body";
+      const title = document.createElement("strong");
+      title.className = "toast__title";
+      title.textContent = message.title;
+      const text = document.createElement("span");
+      text.className = "toast__text";
+      text.textContent = message.text;
+      body.append(title, text);
+      el.appendChild(body);
+    } else {
+      const text = document.createElement("span");
+      text.textContent = message;
+      el.appendChild(text);
+    }
     actions.forEach(({ label, primary, onClick }) => {
       const b = document.createElement("button");
       b.type = "button";
@@ -30,8 +44,8 @@ const PwaModule = (() => {
 
   function promptUpdate(worker) {
     if (document.querySelector(".toast--update")) return;
-    const el = actionToast("A new version of the docs is ready.", [
-      { label: "Reload", primary: true, onClick: () => { userInitiatedReload = true; worker.postMessage({ type: "SKIP_WAITING" }); } },
+    const el = actionToast({ title: "Chakudya Nutrition Registry has been updated", text: "There's an updated experience waiting for you on the Chakudya website." }, [
+      { label: "Refresh site", primary: true, onClick: () => { userInitiatedReload = true; worker.postMessage({ type: "SKIP_WAITING" }); } },
       { label: "Later" },
     ]);
     if (el) el.classList.add("toast--update");
