@@ -112,7 +112,7 @@ const RenderDocs = (() => {
     try { saved = localStorage.getItem(LANG_KEY); } catch (_) { /* ignore */ }
     const start = samples.some((s) => s.label === saved) ? saved : samples[0].label;
     samples.forEach((s) => {
-      const btn = el(`<button type="button" class="tab-btn" role="tab" data-lang="${esc(s.label)}"></button>`);
+      const btn = el(`<button type="button" class="tab-btn" role="tab" data-lang="${esc(s.label)}" tabindex="-1"></button>`);
       btn.textContent = s.label;
       tabs.appendChild(btn);
       const panel = el(`<div class="tab-panel" role="tabpanel" data-lang="${esc(s.label)}"></div>`);
@@ -123,7 +123,7 @@ const RenderDocs = (() => {
       wrap.querySelectorAll("[data-lang]").forEach((n) => {
         const on = n.dataset.lang === lang;
         n.classList.toggle("is-active", on);
-        if (n.matches(".tab-btn")) n.setAttribute("aria-selected", on ? "true" : "false");
+        if (n.matches(".tab-btn")) { n.setAttribute("aria-selected", on ? "true" : "false"); n.tabIndex = on ? 0 : -1; }
       });
       if (broadcast) {
         try { localStorage.setItem(LANG_KEY, lang); } catch (_) { /* ignore */ }
@@ -132,6 +132,16 @@ const RenderDocs = (() => {
         });
       }
     }
+    tabs.addEventListener("keydown", (e) => {
+      if (e.key !== "ArrowRight" && e.key !== "ArrowLeft") return;
+      const list = [...tabs.querySelectorAll(".tab-btn")];
+      const i = list.indexOf(document.activeElement);
+      if (i === -1) return;
+      e.preventDefault();
+      const next = list[(i + (e.key === "ArrowRight" ? 1 : list.length - 1)) % list.length];
+      select(next.dataset.lang, true);
+      next.focus();
+    });
     tabs.addEventListener("click", (e) => {
       const b = e.target.closest(".tab-btn");
       if (b) select(b.dataset.lang, true);

@@ -22,7 +22,6 @@ const RenderLanding = (() => {
     { key: "renal", path: "/renal", label: "Renal nutrition foods", note: "For renal dietary planning" },
     { key: "formulas", path: "/formulas", label: "Enteral formulas", note: "Clinical nutrition products" },
     { key: "drugs", path: "/drug-interactions", label: "Drug-nutrient interactions", note: "Known interactions" },
-    { key: "packaged", path: "/packaged", label: "Packaged products", note: "Barcode-linked foods" },
   ];
   // WHO growth reference tables: summed into one tile, and only shown when every table answers (a partial sum would understate it).
   const GROWTH_PATHS = ["/weight-for-age", "/length-height-for-age", "/weight-for-length-height", "/bmi-for-age", "/bmi-for-age-under-5", "/hc-for-age", "/muac-for-age", "/weight-velocity", "/length-velocity", "/hc-velocity"];
@@ -46,6 +45,12 @@ const RenderLanding = (() => {
     return `<img src="${IMG}${file}" alt="${esc(alt)}" width="${w}" height="${h}" ${eager ? 'fetchpriority="high"' : 'loading="lazy"'} decoding="async" onerror="this.remove()" />`;
   }
 
+  /** Hero photo: small file for phones, larger for desktop; the only eager image on the page. */
+  function heroImg() {
+    const alt = "A Malawian meal of nsima with fried fish, beans, greens and relish on a tray";
+    return `<img src="${IMG}hero-malawian-meal.webp" srcset="${IMG}hero-malawian-meal-600.webp 600w, ${IMG}hero-malawian-meal.webp 1000w" sizes="(max-width: 900px) 92vw, 560px" alt="${esc(alt)}" width="1000" height="750" fetchpriority="high" decoding="async" onerror="this.remove()" />`;
+  }
+
   /* ───────── live data ───────── */
 
   async function countOf(path) {
@@ -53,7 +58,8 @@ const RenderLanding = (() => {
       const url = ApiClient.buildUrl(AppState.state.baseUrl, path, {}, { limit: 1 });
       const r = await ApiClient.execute({ url, method: "GET", headers: {} });
       const n = r.ok && r.status === 200 ? r.bodyJson?.count : null;
-      return Number.isFinite(n) && n > 0 ? n : null;
+      // limit=1: a count of 1 can't be told apart from the API's fallback (rows returned), so it is never shown.
+      return Number.isFinite(n) && n > 1 ? n : null;
     } catch (_) { return null; }
   }
 
@@ -71,6 +77,7 @@ const RenderLanding = (() => {
     countsPromise = Promise.all([core, growth]).then(([rows, g]) => {
       const out = rows.filter(Boolean);
       if (g) out.splice(1, 0, g); // right after "Foods", so food + growth lead
+      if (!out.length) countsPromise = null; // allow a retry on the next visit
       return out;
     });
     return countsPromise;
@@ -147,11 +154,9 @@ const RenderLanding = (() => {
         </div>
         <div class="lp-hero__media">
           <figure class="lp-photo lp-photo--hero">
-            ${img("hero-malawian-meal.webp", "A Malawian meal of nsima with fried fish, beans, greens and relish on a tray", 1000, 750, { eager: true })}
+            ${heroImg()}
             <span class="lp-photo__ph" aria-hidden="true">${icon("plate", 64)}</span>
           </figure>
-          <div class="lp-float lp-float--a" aria-hidden="true">${icon("leaf", 18)}<span>Food composition</span></div>
-          <div class="lp-float lp-float--b" aria-hidden="true">${icon("child", 18)}<span>Growth &amp; clinical tools</span></div>
         </div>
       </section>
     `);
@@ -164,10 +169,10 @@ const RenderLanding = (() => {
         <div class="lp-head">
           <p class="lp-kicker">By the numbers</p>
           <h2 id="lp-stats-h">The platform at a glance</h2>
-          <p class="lp-sub">Counts below are read live from the Chakudya API the moment this page loads.</p>
+          <p class="lp-sub">Counts come straight from the Chakudya API when this page loads (the API caches list responses for up to an hour).</p>
         </div>
         <div class="lp-stat-grid" id="lp-stat-grid">
-          <div class="lp-stat"><div class="lp-stat__num" data-count="${endpoints.length}">0</div><div class="lp-stat__label">Documented endpoints</div><div class="lp-stat__note">Public, ready to call</div></div>
+          <div class="lp-stat"><div class="lp-stat__num" data-count="${endpoints.length}">0</div><div class="lp-stat__label">Documented endpoints</div><div class="lp-stat__note">Public routes in the spec</div></div>
           <div class="lp-stat"><div class="lp-stat__num" data-count="${groups.length}">0</div><div class="lp-stat__label">Resource groups</div><div class="lp-stat__note">Foods to FHIR</div></div>
           <div class="lp-stat lp-stat--text"><div class="lp-stat__num">v${esc(spec.info?.version || "?")}</div><div class="lp-stat__label">Current API version</div><div class="lp-stat__note">Per the OpenAPI spec</div></div>
           <div class="lp-stat lp-stat--loading" id="lp-stat-loading"><div class="lp-stat__num" aria-hidden="true">…</div><div class="lp-stat__label">Loading live counts</div><div class="lp-stat__note">Fetching from the API</div></div>
@@ -208,7 +213,7 @@ const RenderLanding = (() => {
   function aboutSection() {
     const pillars = [
       ["leaf", "Food data", "Malawian food composition, glycaemic index, exchange lists, packaged and branded foods, plus USDA, Open Food Facts and FatSecret when a food isn't local.", epLink("GET", "/foods")],
-      ["child", "Growth assessment", "WHO child and adolescent standards from birth to 19 years, growth velocity, Fenton preterm charts and a one-call combined assessment.", epLink("POST", "/growth/assess")],
+      ["child", "Growth assessment", "WHO child and adolescent standards from birth to 19 years, growth velocity, Fenton preterm charts and a one-call combined assessment.", epLink("GET", "/growth/assess")],
       ["steth", "Clinical nutrition", "Renal foods, enteral formulas, drug-nutrient interactions, dietary reference intakes, and meal analysis with clinical screening flags.", epLink("GET", "/drug-interactions")],
       ["fhir", "Care workflows", "A stateless FHIR R4 facade covering the Nutrition Care Process: screening, assessment, diagnosis, intervention, monitoring and ADIME documents.", epLink("GET", "/fhir/metadata")],
       ["spark", "AI-ready knowledge", "Retrieval-augmented nutrition answers and session memory, so assistants can ground their replies in real nutrition data.", epLink("POST", "/rag/ask")],
@@ -306,41 +311,11 @@ const RenderLanding = (() => {
     return sec;
   }
 
-  function featuresSection() {
-    const f = [
-      ["leaf", "Food composition", "Search Malawian foods and their nutrient values, compare foods, find substitutes, and fall back to USDA, Open Food Facts or FatSecret.", epLink("GET", "/foods")],
-      ["scan", "Packaged foods and labels", "Barcode lookup, community submissions, OCR-assisted capture and Codex-oriented nutrition labels.", epLink("GET", "/packaged")],
-      ["utensils", "Meals and recipes", "Turn free text like “2 eggs, 1 cup rice, 100g chicken” into structured data, then total the nutrition per serving.", epLink("POST", "/meals/analyze")],
-      ["child", "WHO growth standards", "Z-scores, percentiles and status bands from birth to 19 years, plus a one-call combined assessment. Screening aids, not diagnoses.", epLink("POST", "/growth/assess")],
-      ["pulse", "Clinical nutrition", "Glycaemic index, exchange lists, renal foods, enteral formulas, drug-nutrient interactions and dietary reference intakes.", epLink("GET", "/glycaemic-index")],
-      ["fhir", "FHIR R4 facade", "Stateless growth evaluation and the full Nutrition Care Process: screening, assessment, diagnosis, intervention, monitoring and ADIME documents.", epLink("GET", "/fhir/metadata")],
-      ["spark", "AI-ready knowledge", "Retrieval-augmented nutrition answers and session memory for assistants and chatbots.", epLink("POST", "/rag/ask")],
-      ["key", "Keys, OAuth and batching", "Self-service consumer keys with three times the public rate limit, OAuth 2.0 client credentials, and batched requests.", "#/account"],
-    ];
-    return el(`
-      <section class="lp-section reveal" id="lp-features" aria-labelledby="lp-feat-h">
-        <div class="lp-head">
-          <p class="lp-kicker">What you can do</p>
-          <h2 id="lp-feat-h">Everything nutrition software keeps needing, in one API</h2>
-        </div>
-        <div class="lp-feat-grid">
-          ${f.map(([ic, t, d, href]) => `
-            <a class="lp-feat" href="${href}">
-              <span class="lp-card__icon">${icon(ic, 22)}</span>
-              <h3>${t}</h3>
-              <p>${d}</p>
-              <span class="lp-feat__more">Explore <span aria-hidden="true">→</span></span>
-            </a>`).join("")}
-        </div>
-      </section>
-    `);
-  }
-
   function audienceSection() {
     const a = [
       ["Consumers", "heart", "Apps built on Chakudya can show what's really in everyday Malawian meals, from nsima to relish, in familiar portions.", "#lp-try", "Try a lookup"],
       ["Students", "book", "Learn with real composition data, glycaemic index, exchange lists and WHO standards instead of textbook tables.", "#/docs/api-reference", "Browse the data"],
-      ["Dietitians", "steth", "Support clinical decisions with growth assessment, renal, enteral and drug-interaction data, and FHIR-shaped output.", epLink("POST", "/growth/assess"), "See growth assessment"],
+      ["Dietitians", "steth", "Support clinical decisions with growth assessment, renal, enteral and drug-interaction data, and FHIR-shaped output.", epLink("GET", "/growth/assess"), "See growth assessment"],
       ["Researchers", "flask", "Pull consistent, citable food and growth reference data through a documented, versioned API.", "openapi.json", "Download the spec"],
       ["Food businesses", "store", "Standardised labels, barcode lookup and recipe nutrition totals for products and menus.", epLink("GET", "/foods/{id}/label"), "See label data"],
       ["Developers", "code", "Public routes, an OpenAPI spec, a live Try It console and self-service keys. Start building straight away.", "#/account", "Get an API key"],
@@ -400,7 +375,7 @@ const RenderLanding = (() => {
           <h2 id="lp-dev-h">Your first call takes one line</h2>
           <p class="lp-sub">Public routes need no key, and CORS is open, so you can call the API from a browser, a script or a phone terminal. Add a key later for higher limits and FHIR access.</p>
           <div class="lp-cta">
-            <a class="btn btn--primary" href="#/docs/api-reference">Read the docs</a>
+            <a class="btn btn--primary" href="#/docs/getting-started">Read the docs</a>
             <a class="btn" href="openapi.yaml" download>Download openapi.yaml</a>
           </div>
         </div>
@@ -420,7 +395,7 @@ const RenderLanding = (() => {
       <section class="lp-closing reveal" aria-labelledby="lp-close-h">
         <h2 id="lp-close-h">Better food data. Healthier Malawi.</h2>
         <div class="lp-cta lp-cta--center">
-          <a class="btn btn--primary btn--lg" href="#/docs/api-reference">Explore the API</a>
+          <a class="btn btn--primary btn--lg" href="#/docs/getting-started">Explore the API</a>
           ${showKey ? `<a class="btn btn--lg" href="#/account">Get an API key</a>` : ""}
         </div>
       </section>
@@ -430,7 +405,7 @@ const RenderLanding = (() => {
   function footer() {
     return el(`
       <footer class="lp-footer">
-        <img class="lp-footer__logo" src="assets/images/chakudya-logo.png" alt="Chakudya Nutrition Registry logo" width="120" height="120" loading="lazy" onerror="this.remove()" />
+        <img class="lp-footer__logo" src="assets/images/chakudya-logo-192.webp" alt="Chakudya Nutrition Registry logo" width="96" height="96" loading="lazy" onerror="this.remove()" />
         <p><strong>Chakudya Nutrition Registry</strong> · Better food data. Healthier Malawi.</p>
         <p class="lp-footer__note">Growth and clinical tools are screening aids, not diagnoses. Always confirm with a qualified health professional.</p>
         <nav aria-label="Footer"><a href="#/docs/getting-started">Docs</a><a href="#/account">API keys</a><a href="openapi.json" download>openapi.json</a><a href="https://github.com/edisontaimu9-ui/chakudya-api" target="_blank" rel="noopener">GitHub</a></nav>
@@ -473,7 +448,6 @@ const RenderLanding = (() => {
       statsSection(),
       aboutSection(),
       trySection(),
-      featuresSection(),
       audienceSection(),
       usesSection(),
       devSection(),
@@ -493,7 +467,13 @@ const RenderLanding = (() => {
     }));
 
     observe(root);
-    hydrateStats(root);
+    const statsEl = root.querySelector("#lp-stat-grid");
+    if (statsEl && "IntersectionObserver" in window) {
+      const io = new IntersectionObserver((es) => { if (es[0].isIntersecting) { io.disconnect(); hydrateStats(root); } }, { rootMargin: "400px" });
+      io.observe(statsEl);
+    } else {
+      hydrateStats(root);
+    }
     checkHealth().then((ok) => {
       const dot = root.querySelector("#lp-health-dot"), txt = root.querySelector("#lp-health-text");
       if (!dot || !dot.isConnected || !ok) return;

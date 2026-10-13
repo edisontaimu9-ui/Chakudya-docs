@@ -88,6 +88,9 @@
     sidebar.classList.contains("is-open") ? closeSidebar() : openSidebar();
   });
   scrim.addEventListener("click", closeSidebar);
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && sidebar.classList.contains("is-open")) { closeSidebar(); toggleBtn.focus(); }
+  });
 
   // ── Keep --header-h equal to the real header height (it changes on mobile, where the nav wraps to a second row)
   const headerEl = document.getElementById("app-header");

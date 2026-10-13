@@ -28,9 +28,17 @@ and `#/account` routes are untouched.
   Endpoints, groups and version come from `openapi.json`. Nothing is hard-coded; a failed
   request just omits that tile.
 - Images live in `assets/images/` (all optional - a missing file falls back to a tinted
-  placeholder): `hero-malawian-meal.webp` (1000x750), `food-staples.webp`,
-  `food-legumes-protein.webp`, `food-fruit-veg.webp`, `food-fish.webp` (480x600 each),
-  `chakudya-logo.png` and `og-chakudya.jpg` (1200x630, social preview).
+  placeholder): `hero-malawian-meal.webp` (1000x750) and `hero-malawian-meal-600.webp`
+  (600x450, served to phones via `srcset`), `food-staples.webp`, `food-legumes-protein.webp`,
+  `food-fruit-veg.webp`, `food-fish.webp` (480x600 each), `chakudya-logo.png` (master),
+  `chakudya-logo-192.webp` (footer) and `og-chakudya.jpg` (1200x630, social preview).
+  Only the hero is loaded eagerly (and preloaded on the landing route); everything else is lazy.
+- Live record counts are fetched when the stats section nears the viewport. A count of 1 is
+  never shown (with `limit=1` it can't be told apart from the API's fallback), and the growth
+  tile only appears when all 10 growth tables answer.
+
+PWA support is **not** implemented yet. See `PWA_READINESS.md` for the plan (manifest,
+service worker, icons, offline strategy, install requirements).
 
 ## Routes and documentation structure
 

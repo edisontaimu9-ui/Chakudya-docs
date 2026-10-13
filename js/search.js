@@ -33,7 +33,7 @@ const SearchModule = (() => {
 
     // "/" focuses search, like most dev-tool docs sites.
     document.addEventListener("keydown", (e) => {
-      if (e.key === "/" && document.activeElement.tagName !== "INPUT" && document.activeElement.tagName !== "TEXTAREA") {
+      if (e.key === "/" && !document.body.classList.contains("is-landing") && document.activeElement.tagName !== "INPUT" && document.activeElement.tagName !== "TEXTAREA") {
         e.preventDefault();
         headerInput.focus();
       }

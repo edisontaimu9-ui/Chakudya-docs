@@ -64,7 +64,7 @@ const TryIt = (() => {
             <div class="auth-row">
               <div class="field">
                 <label class="field__label">Authorization <span class="param-required">${endpoint.authMode === "admin" ? "required" : "optional"}</span></label>
-                <input type="text" data-role="auth" placeholder="Bearer token (ADMIN_API_KEY or a minted key)" autocomplete="off" spellcheck="false" />
+                <input type="text" data-role="auth" aria-label="Authorization bearer token" placeholder="Bearer token (ADMIN_API_KEY or a minted key)" autocomplete="off" spellcheck="false" />
                 <span class="field__hint">Kept in memory for this page only - never saved to storage or sent anywhere but the request below.</span>
               </div>
             </div>` : ""}
@@ -73,7 +73,7 @@ const TryIt = (() => {
           ${hasBody ? `
             <div class="field">
               <label class="field__label">Request body (JSON)</label>
-              <textarea data-role="body" spellcheck="false"></textarea>
+              <textarea data-role="body" aria-label="Request body (JSON)" spellcheck="false"></textarea>
               <span class="field__hint">Editable - this is a starting example, not the only valid shape.</span>
             </div>` : ""}
           <div>
@@ -93,7 +93,7 @@ const TryIt = (() => {
         const f = el(`
           <div class="field">
             <label class="field__label">${p.name}<span class="param-required">required</span></label>
-            <input type="text" data-path-param="${p.name}" autocomplete="off" spellcheck="false" placeholder="${p.name}" value="${RenderEndpoint.escapeHtml(String(sample ?? ""))}" />
+            <input type="text" data-path-param="${p.name}" aria-label="${p.name}" autocomplete="off" spellcheck="false" placeholder="${p.name}" value="${RenderEndpoint.escapeHtml(String(sample ?? ""))}" />
           </div>
         `);
         grid.appendChild(f);
@@ -109,7 +109,7 @@ const TryIt = (() => {
         const f = el(`
           <div class="field">
             <label class="field__label">${p.name}${p.required ? '<span class="param-required">required</span>' : ""}</label>
-            <input type="text" data-query-param="${p.name}" autocomplete="off" spellcheck="false"
+            <input type="text" data-query-param="${p.name}" aria-label="${p.name}" autocomplete="off" spellcheck="false"
               placeholder="${schema.default !== undefined ? schema.default : p.name}" value="${RenderEndpoint.escapeHtml(String(sample ?? ""))}" />
           </div>
         `);

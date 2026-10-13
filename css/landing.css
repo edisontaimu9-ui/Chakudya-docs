@@ -34,10 +34,10 @@ body.is-landing .content { max-width: 1180px; padding: 24px 28px 0; }
   align-items: center; padding: clamp(24px, 5vw, 56px) 0 8px;
 }
 .lp-hero__glow {
-  position: absolute; inset: -80px -40px auto -40px; height: 520px; z-index: -1; pointer-events: none;
+  position: absolute; inset: -60px -24px auto -24px; height: 460px; z-index: -1; pointer-events: none;
   background:
-    radial-gradient(520px 320px at 78% 30%, var(--accent-bg), transparent 70%),
-    radial-gradient(460px 300px at 8% 10%, var(--green-bg), transparent 70%);
+    radial-gradient(420px 280px at 76% 38%, var(--accent-bg), transparent 72%),
+    radial-gradient(380px 260px at 32% 12%, var(--green-bg), transparent 72%);
 }
 .lp-pill {
   display: inline-flex; align-items: center; gap: 9px; margin: 0 0 18px;
@@ -65,20 +65,9 @@ body.is-landing .content { max-width: 1180px; padding: 24px 28px 0; }
 }
 .lp-photo img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; z-index: 1; }
 .lp-photo__ph { position: absolute; inset: 0; display: grid; place-items: center; color: var(--accent); opacity: .5; }
-.lp-float {
-  position: absolute; z-index: 2; display: inline-flex; align-items: center; gap: 8px;
-  background: var(--bg-raised); color: var(--text-primary); border: 1px solid var(--border-strong);
-  padding: 9px 14px; border-radius: 999px; font-size: 12.5px; font-weight: 600; box-shadow: var(--shadow-md);
-  animation: lp-bob 6s ease-in-out infinite;
-}
-.lp-float svg { color: var(--accent); }
-.lp-float--a { left: -18px; bottom: 36px; }
-.lp-float--b { right: -10px; top: 28px; animation-delay: -3s; }
-@keyframes lp-bob { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-8px); } }
-
 /* ── Section heads ── */
 .lp-head { max-width: 760px; margin-bottom: 32px; }
-.lp-kicker { font-family: var(--font-mono); font-size: 11.5px; font-weight: 700; letter-spacing: 1.6px; text-transform: uppercase; color: var(--accent); margin: 0 0 12px; }
+.lp-kicker { font-family: var(--font-mono); font-size: 11.5px; font-weight: 700; letter-spacing: 1.6px; text-transform: uppercase; color: var(--accent-strong); margin: 0 0 12px; }
 .lp-head h2, .lp-dev h2, .lp-try h2 { font-size: clamp(26px, 3.6vw, 38px); line-height: 1.12; letter-spacing: -.5px; }
 .lp-sub { color: var(--text-secondary); font-size: 16px; line-height: 1.65; margin: 14px 0 0; }
 
@@ -96,9 +85,7 @@ body.is-landing .content { max-width: 1180px; padding: 24px 28px 0; }
 .lp-stat__offline { grid-column: 1 / -1; color: var(--text-tertiary); font-size: 13px; margin: 0; }
 
 /* ── Cards ── */
-.lp-cols, .lp-feat-grid, .lp-aud-grid { display: grid; gap: 16px; }
-.lp-cols { grid-template-columns: repeat(3, 1fr); }
-.lp-feat-grid { grid-template-columns: repeat(4, 1fr); }
+.lp-aud-grid { display: grid; gap: 16px; }
 .lp-aud-grid { grid-template-columns: repeat(3, 1fr); }
 .lp-card, .lp-feat, .lp-aud {
   display: flex; flex-direction: column; gap: 10px;
@@ -106,15 +93,15 @@ body.is-landing .content { max-width: 1180px; padding: 24px 28px 0; }
   box-shadow: var(--shadow-sm); text-decoration: none; color: inherit;
   transition: transform .25s ease, box-shadow .25s ease, border-color .25s ease;
 }
-.lp-feat:hover, .lp-aud:hover, .lp-card:hover { transform: translateY(-4px); box-shadow: var(--shadow-md); border-color: var(--border-strong); }
+.lp-feat:hover, .lp-aud:hover, .lp-card:hover { transform: translateY(-2px); box-shadow: var(--shadow-md); border-color: var(--border-strong); }
 .lp-card h3, .lp-feat h3, .lp-aud h3 { font-size: 19px; letter-spacing: -.2px; }
 .lp-card p, .lp-feat p, .lp-aud p { margin: 0; color: var(--text-secondary); font-size: 14.5px; line-height: 1.6; }
 .lp-card__icon {
   width: 44px; height: 44px; border-radius: 13px; display: grid; place-items: center; flex: none;
-  background: var(--accent-bg); color: var(--accent);
+  background: var(--accent-bg); color: var(--accent-strong);
 }
-.lp-feat__more, .lp-link { margin-top: auto; padding-top: 6px; font-size: 13px; font-weight: 700; color: var(--accent); text-decoration: none; }
-.lp-feat:hover .lp-feat__more, .lp-link:hover { color: var(--accent-strong); }
+.lp-feat__more, .lp-link { margin-top: auto; padding-top: 6px; font-size: 13px; font-weight: 700; color: var(--accent-strong); text-decoration: none; }
+.lp-link:hover { color: var(--text-primary); }
 .lp-link:hover { text-decoration: underline; }
 
 /* ── Live lookup ── */
@@ -136,7 +123,7 @@ body.is-landing .content { max-width: 1180px; padding: 24px 28px 0; }
   padding: 7px 14px; border-radius: 999px; border: 1px solid var(--border-strong);
   background: var(--bg-raised); color: var(--text-secondary);
 }
-.lp-chip:hover { color: var(--accent); border-color: var(--accent); }
+.lp-chip:hover { color: var(--accent-strong); border-color: var(--accent); }
 .lp-result { min-height: 150px; }
 .lp-result__msg { color: var(--text-secondary); margin: 0; font-size: 14.5px; }
 .lp-result__msg--err { color: var(--red); }
@@ -152,7 +139,7 @@ body.is-landing .content { max-width: 1180px; padding: 24px 28px 0; }
 .lp-nutrients dd { margin: 3px 0 0; font-family: var(--font-display); font-size: 22px; font-weight: 700; }
 .lp-nutrients small { font-family: var(--font-body); font-size: 12px; font-weight: 500; color: var(--text-secondary); margin-left: 3px; }
 .lp-food__src { margin: 14px 0 0; font-size: 12.5px; color: var(--text-tertiary); }
-.lp-food__src a { color: var(--accent); }
+.lp-food__src a { color: var(--accent-strong); }
 
 /* ── Gallery ── */
 .lp-gallery { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; }
@@ -161,7 +148,6 @@ body.is-landing .content { max-width: 1180px; padding: 24px 28px 0; }
   border: 1px solid var(--border); box-shadow: var(--shadow-sm);
   background: linear-gradient(150deg, var(--accent-bg), var(--green-bg)), var(--surface);
 }
-.lp-tile:nth-child(even) { transform: translateY(18px); }
 .lp-tile img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; transition: transform .8s ease; }
 .lp-tile:hover img { transform: scale(1.06); }
 .lp-tile figcaption {
@@ -185,27 +171,23 @@ body.is-landing .content { max-width: 1180px; padding: 24px 28px 0; }
 }
 .lp-closing h2 { font-size: clamp(26px, 4vw, 42px); max-width: 20ch; margin: 0 auto; letter-spacing: -.6px; line-height: 1.12; }
 .lp-footer { margin-top: 56px; padding: 28px 0 56px; border-top: 1px solid var(--border); color: var(--text-secondary); font-size: 13.5px; }
-.lp-footer__logo { display: block; width: 96px; height: auto; background: #fff; border-radius: 16px; padding: 8px; margin-bottom: 14px; border: 1px solid var(--border); }
+.lp-footer__logo { display: block; width: 96px; height: 96px; object-fit: contain; background: #fff; border-radius: 16px; padding: 8px; margin-bottom: 14px; border: 1px solid var(--border); }
 .lp-footer p { margin: 0 0 8px; }
 .lp-footer__note { color: var(--text-tertiary); }
 .lp-footer nav { display: flex; flex-wrap: wrap; gap: 8px 20px; margin-top: 14px; }
 .lp-footer a { color: var(--text-secondary); font-weight: 600; text-decoration: none; }
-.lp-footer a:hover { color: var(--accent); }
+.lp-footer a:hover { color: var(--accent-strong); }
 
 /* ── Responsive ── */
 @media (max-width: 1040px) {
-  .lp-feat-grid { grid-template-columns: repeat(2, 1fr); }
   .lp-gallery { grid-template-columns: repeat(2, 1fr); }
-  .lp-tile:nth-child(even) { transform: none; }
 }
 @media (max-width: 900px) {
   .lp-hero, .lp-dev { grid-template-columns: 1fr; }
-  .lp-cols, .lp-aud-grid { grid-template-columns: 1fr; }
-  .lp-float--a { left: 8px; } .lp-float--b { right: 8px; }
+  .lp-aud-grid { grid-template-columns: 1fr; }
 }
 @media (max-width: 560px) {
   body.is-landing .content { padding: 14px 16px 0; }
-  .lp-feat-grid { grid-template-columns: 1fr; }
   .lp-gallery { gap: 10px; }
   .lp-search { flex-direction: column; }
   .lp-search .btn { width: 100%; }
@@ -213,7 +195,7 @@ body.is-landing .content { max-width: 1180px; padding: 24px 28px 0; }
 }
 @media (prefers-reduced-motion: reduce) {
   .reveal { opacity: 1; transform: none; transition: none; }
-  .lp-float, .lp-pill__dot.is-ok { animation: none; }
+  .lp-pill__dot.is-ok { animation: none; }
   .lp-tile img, .lp-feat, .lp-aud, .lp-card { transition: none; }
 }
 

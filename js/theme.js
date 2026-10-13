@@ -3,6 +3,8 @@ const ThemeModule = (() => {
 
   function apply(theme) {
     document.documentElement.setAttribute("data-theme", theme);
+    const meta = document.querySelector('meta[name="theme-color"]');
+    if (meta) meta.setAttribute("content", theme === "light" ? "#f2f3ed" : "#0e1210");
     try { localStorage.setItem(KEY, theme); } catch (_) { /* storage unavailable - theme just won't persist */ }
   }
 
