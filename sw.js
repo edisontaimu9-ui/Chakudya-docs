@@ -16,7 +16,7 @@
  *   Run it before every deploy. A new BUILD installs a new cache in the background; the page
  *   then offers a "Reload" button (see js/pwa.js) so HTML and JS are never mixed across versions.
  */
-const BUILD = "53d35c0c8051";
+const BUILD = "5e8500f6d7b1";
 
 const SHELL_CACHE = "chakudya-shell-" + BUILD;
 const DATA_CACHE = "chakudya-data-v1";
@@ -183,7 +183,13 @@ self.addEventListener("fetch", (event) => {
   if (url.origin === self.location.origin) {
     if (!url.href.startsWith(scopeUrl)) return;
     if (url.pathname.endsWith("/sw.js")) return;
-    if (req.mode === "navigate") { event.respondWith(handleNavigation()); return; }
+    if (req.mode === "navigate") {
+      // Only the app itself gets the cached shell. Opening sitemap.xml, robots.txt, a
+      // verification file or the spec directly in a tab must reach the real file.
+      const appPaths = [new URL(scopeUrl).pathname, new URL(INDEX).pathname];
+      if (appPaths.includes(url.pathname)) event.respondWith(handleNavigation());
+      return;
+    }
     if (DATA_URLS.has(url.origin + url.pathname)) { event.respondWith(networkFirst(req)); return; }
     event.respondWith(cacheFirst(req));
     return;
