@@ -139,17 +139,17 @@ const RenderLanding = (() => {
         <div class="lp-hero__glow" aria-hidden="true"></div>
         <div class="lp-hero__copy">
           <p class="lp-pill"><span class="lp-pill__dot" id="lp-health-dot" aria-hidden="true"></span><span id="lp-health-text">Malawi's open nutrition registry</span></p>
-          <h1 id="lp-title" class="lp-title">The nutrition <em>intelligence</em> layer for Malawi.</h1>
-          <p class="lp-lead">Chakudya is far more than a food database. It joins local food composition with WHO growth assessment, clinical nutrition tools, FHIR care workflows and AI-ready knowledge, so apps, clinics and researchers can build on one shared, trustworthy foundation.</p>
+          <h1 id="lp-title" class="lp-title">Nutrition data and tools for a <em>healthier</em> Malawi.</h1>
+          <p class="lp-lead">Find the nutrients in Malawian foods, explore WHO growth standards and use clinical nutrition information, all in one free, open place for students, health professionals, researchers and everyone who cares about good nutrition.</p>
           <div class="lp-cta">
             <a class="btn btn--primary btn--lg" href="#lp-try" data-scroll="lp-try">Try a food lookup</a>
-            <a class="btn btn--lg" href="#/docs/getting-started">Explore the API</a>
+            <a class="btn btn--lg" href="#lp-dev" data-scroll="lp-dev">For developers</a>
             ${showKey ? `<a class="btn btn--lg btn--ghost" href="#/account">Get an API key</a>` : ""}
           </div>
           <ul class="lp-trust" aria-label="Highlights">
-            <li>Food data + growth + clinical care</li>
-            <li>FHIR R4 ready</li>
-            <li>Free public routes</li>
+            <li>Local food data</li>
+            <li>WHO growth standards</li>
+            <li>Free to explore</li>
           </ul>
         </div>
         <div class="lp-hero__media">
@@ -163,18 +163,14 @@ const RenderLanding = (() => {
   }
 
   function statsSection() {
-    const { endpoints, groups, spec } = AppState.state;
     return el(`
       <section class="lp-section lp-stats reveal" aria-labelledby="lp-stats-h">
         <div class="lp-head">
-          <p class="lp-kicker">By the numbers</p>
-          <h2 id="lp-stats-h">The platform at a glance</h2>
-          <p class="lp-sub">Counts come straight from the Chakudya API when this page loads (the API caches list responses for up to an hour).</p>
+          <p class="lp-kicker">At a glance</p>
+          <h2 id="lp-stats-h">Chakudya in numbers</h2>
+          <p class="lp-sub">Live record counts from the Chakudya registry, loaded when this page opens.</p>
         </div>
         <div class="lp-stat-grid" id="lp-stat-grid">
-          <div class="lp-stat"><div class="lp-stat__num" data-count="${endpoints.length}">0</div><div class="lp-stat__label">Documented endpoints</div><div class="lp-stat__note">Public routes in the spec</div></div>
-          <div class="lp-stat"><div class="lp-stat__num" data-count="${groups.length}">0</div><div class="lp-stat__label">Resource groups</div><div class="lp-stat__note">Foods to FHIR</div></div>
-          <div class="lp-stat lp-stat--text"><div class="lp-stat__num">v${esc(spec.info?.version || "?")}</div><div class="lp-stat__label">Current API version</div><div class="lp-stat__note">Per the OpenAPI spec</div></div>
           <div class="lp-stat lp-stat--loading" id="lp-stat-loading"><div class="lp-stat__num" aria-hidden="true">…</div><div class="lp-stat__label">Loading live counts</div><div class="lp-stat__note">Fetching from the API</div></div>
         </div>
       </section>
@@ -212,19 +208,17 @@ const RenderLanding = (() => {
 
   function aboutSection() {
     const pillars = [
-      ["leaf", "Food data", "Malawian food composition, glycaemic index, exchange lists, packaged and branded foods, plus USDA, Open Food Facts and FatSecret when a food isn't local.", epLink("GET", "/foods")],
-      ["child", "Growth assessment", "WHO child and adolescent standards from birth to 19 years, growth velocity, Fenton preterm charts and a one-call combined assessment.", epLink("GET", "/growth/assess")],
-      ["steth", "Clinical nutrition", "Renal foods, enteral formulas, drug-nutrient interactions, dietary reference intakes, and meal analysis with clinical screening flags.", epLink("GET", "/drug-interactions")],
-      ["fhir", "Care workflows", "A stateless FHIR R4 facade covering the Nutrition Care Process: screening, assessment, diagnosis, intervention, monitoring and ADIME documents.", epLink("GET", "/fhir/metadata")],
-      ["spark", "AI-ready knowledge", "Retrieval-augmented nutrition answers and session memory, so assistants can ground their replies in real nutrition data.", epLink("POST", "/rag/ask")],
-      ["code", "Developer platform", "Plain JSON, OpenAPI, open CORS, self-service keys, OAuth 2.0 client credentials and batched requests.", "#/account"],
+      ["leaf", "Local food data", "Nutrition information for Malawian foods, plus glycaemic index, food exchange lists and packaged foods, with international sources when a food isn't local.", epLink("GET", "/foods")],
+      ["child", "Growth assessment", "Compare measurements with WHO child and adolescent growth standards from birth to 19 years, with preterm infant charts and growth-speed tracking.", epLink("GET", "/growth/assess")],
+      ["steth", "Clinical nutrition", "Reference information for dietitians and clinicians: renal foods, tube-feeding formulas, drug-nutrient interactions, dietary reference intakes and meal analysis.", epLink("GET", "/drug-interactions")],
     ];
     return el(`
       <section class="lp-section reveal" id="lp-about" aria-labelledby="lp-about-h">
         <div class="lp-head">
           <p class="lp-kicker">What is Chakudya?</p>
-          <h2 id="lp-about-h">More than a food database</h2>
-          <p class="lp-sub">"Chakudya" means food in Chichewa, but the Chakudya Nutrition Registry (CNR) is a whole nutrition platform for Malawi. Food data is the foundation. On top of it sit growth assessment, clinical decision tools, care-record standards and AI, all behind one open API, so nobody has to rebuild the same tables or logic.</p>
+          <h2 id="lp-about-h">What you can find on Chakudya</h2>
+          <p class="lp-sub">Chakudya means “food” in Chichewa. The Chakudya Nutrition Registry makes nutrition data and tools more accessible to support healthier communities in Malawi.</p>
+          <p class="lp-sub">Explore local food data, nutrition resources, growth assessment tools, and clinical nutrition information — all through one open platform.</p>
         </div>
         <ol class="lp-pillars">
           ${pillars.map(([ic, t, d, href], i) => `
@@ -246,9 +240,9 @@ const RenderLanding = (() => {
       <section class="lp-section lp-try reveal" id="lp-try" aria-labelledby="lp-try-h">
         <div class="lp-try__panel">
           <div class="lp-try__copy">
-            <p class="lp-kicker">Live demo</p>
+            <p class="lp-kicker">Try it</p>
             <h2 id="lp-try-h">Look up a food, right now</h2>
-            <p class="lp-sub">This calls the real Chakudya API from your browser using <code>GET /foods/lookup</code>. Search a food and see the nutrients it returns.</p>
+            <p class="lp-sub">Type a food name to see its nutrients, straight from the Chakudya registry. Results are live, not a mock-up.</p>
           </div>
           <form class="lp-search" role="search" aria-label="Food lookup">
             <label class="sr-only" for="lp-food-q">Food name</label>
@@ -313,18 +307,18 @@ const RenderLanding = (() => {
 
   function audienceSection() {
     const a = [
-      ["Consumers", "heart", "Apps built on Chakudya can show what's really in everyday Malawian meals, from nsima to relish, in familiar portions.", "#lp-try", "Try a lookup"],
+      ["Everyone", "heart", "Look up what's in everyday Malawian meals, from nsima to relish, in familiar portions.", "#lp-try", "Try a lookup"],
       ["Students", "book", "Learn with real composition data, glycaemic index, exchange lists and WHO standards instead of textbook tables.", "#/docs/api-reference", "Browse the data"],
-      ["Dietitians", "steth", "Support clinical decisions with growth assessment, renal, enteral and drug-interaction data, and FHIR-shaped output.", epLink("GET", "/growth/assess"), "See growth assessment"],
-      ["Researchers", "flask", "Pull consistent, citable food and growth reference data through a documented, versioned API.", "openapi.json", "Download the spec"],
-      ["Food businesses", "store", "Standardised labels, barcode lookup and recipe nutrition totals for products and menus.", epLink("GET", "/foods/{id}/label"), "See label data"],
-      ["Developers", "code", "Public routes, an OpenAPI spec, a live Try It console and self-service keys. Start building straight away.", "#/account", "Get an API key"],
+      ["Health professionals", "steth", "Support nutrition care with growth assessment and renal, tube-feeding and drug-interaction information.", epLink("GET", "/growth/assess"), "See growth assessment"],
+      ["Researchers", "flask", "Find consistent, citable food and growth reference data with documented sources.", "openapi.json", "Download the data spec"],
+      ["Food businesses", "store", "Standardised nutrition labels, barcode lookup and recipe nutrition totals for products and menus.", epLink("GET", "/foods/{id}/label"), "See label data"],
+      ["Developers", "code", "Build apps on the same data with an open API, interactive docs and free keys.", "#lp-dev", "For developers"],
     ];
     return el(`
       <section class="lp-section reveal" id="lp-audience" aria-labelledby="lp-aud-h">
         <div class="lp-head">
           <p class="lp-kicker">Who it's for</p>
-          <h2 id="lp-aud-h">Made for people who work with food</h2>
+          <h2 id="lp-aud-h">Made for everyone who cares about nutrition</h2>
         </div>
         <div class="lp-aud-grid">
           ${a.map(([t, ic, d, href, cta]) => `
@@ -346,12 +340,12 @@ const RenderLanding = (() => {
       ["food-fruit-veg.webp", "Fresh fruit and vegetables", "Health & fitness apps"],
       ["food-fish.webp", "Fresh whole fish and fish steaks on ice", "Food & barcode scanners"],
     ];
-    const uses = ["Clinical decision support tools", "Nutrition research tools", "AI and RAG powered nutrition assistants", "Educational applications"];
+    const uses = ["Clinical decision support tools", "Nutrition research tools", "AI-powered nutrition assistants", "Educational applications"];
     return el(`
       <section class="lp-section reveal" id="lp-uses" aria-labelledby="lp-uses-h">
         <div class="lp-head">
           <p class="lp-kicker">Real-world uses</p>
-          <h2 id="lp-uses-h">What teams build with Chakudya</h2>
+          <h2 id="lp-uses-h">What Chakudya can power</h2>
         </div>
         <div class="lp-gallery">
           ${tiles.map(([file, alt, cap], i) => `
@@ -367,13 +361,21 @@ const RenderLanding = (() => {
 
   function devSection() {
     const base = AppState.state.baseUrl || "";
+    const { endpoints, groups, spec } = AppState.state;
+    const tech = [
+      `${endpoints.length} documented endpoints`, `${groups.length} resource groups`, `API v${spec.info?.version || "?"}`,
+      "OpenAPI spec", "Open CORS", "Self-service API keys", "OAuth 2.0 client credentials", "Batched requests",
+      "FHIR R4 care workflows", "AI-ready knowledge (retrieval-augmented answers)",
+    ];
     const curl = `curl "${base}/foods/lookup?q=nsima"`;
     const sec = el(`
       <section class="lp-section lp-dev reveal" id="lp-dev" aria-labelledby="lp-dev-h">
         <div class="lp-dev__copy">
           <p class="lp-kicker">For developers</p>
           <h2 id="lp-dev-h">Your first call takes one line</h2>
-          <p class="lp-sub">Public routes need no key, and CORS is open, so you can call the API from a browser, a script or a phone terminal. Add a key later for higher limits and FHIR access.</p>
+          <p class="lp-sub">Everything on this site is served by one open API. Public routes need no key, and CORS is open, so you can call it from a browser, a script or a terminal. Add a key later for higher limits and FHIR access.</p>
+          <p class="lp-dev__tech-label">Under the hood</p>
+          <div class="tag-list lp-dev__tech">${tech.map((t) => `<span>${esc(t)}</span>`).join("")}</div>
           <div class="lp-cta">
             <a class="btn btn--primary" href="#/docs/getting-started">Read the docs</a>
             <a class="btn" href="openapi.yaml" download>Download openapi.yaml</a>
@@ -395,8 +397,9 @@ const RenderLanding = (() => {
       <section class="lp-closing reveal" aria-labelledby="lp-close-h">
         <h2 id="lp-close-h">Better food data. Healthier Malawi.</h2>
         <div class="lp-cta lp-cta--center">
-          <a class="btn btn--primary btn--lg" href="#/docs/getting-started">Explore the API</a>
-          ${showKey ? `<a class="btn btn--lg" href="#/account">Get an API key</a>` : ""}
+          <a class="btn btn--primary btn--lg" href="#lp-try" data-scroll="lp-try">Try a food lookup</a>
+          <a class="btn btn--lg" href="#/docs/getting-started">Developer docs</a>
+          ${showKey ? `<a class="btn btn--lg btn--ghost" href="#/account">Get an API key</a>` : ""}
         </div>
       </section>
     `);

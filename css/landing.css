@@ -215,3 +215,8 @@ body.is-landing .content { max-width: 1180px; padding: 24px 28px 0; }
   .lp-footer__grid { grid-template-columns: 1fr 1fr; }
   .lp-footer__brand { grid-column: 1 / -1; }
 }
+
+/* Developer section: technical details live here */
+.lp-dev__tech-label { margin: 18px 0 8px; font-family: var(--font-mono); font-size: 10.5px; font-weight: 700; letter-spacing: 1.2px; text-transform: uppercase; color: var(--text-tertiary); }
+.lp-dev__tech { margin-bottom: 22px; }
+.lp-head .lp-sub + .lp-sub { margin-top: 12px; }
