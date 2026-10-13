@@ -418,6 +418,14 @@ const RenderLanding = (() => {
             <a href="openapi.json" download>OpenAPI spec</a>
             <a href="https://github.com/edisontaimu9-ui/chakudya-api" target="_blank" rel="noopener">GitHub</a>
           </nav>
+          <nav aria-label="Connect">
+            <h3 class="lp-footer__h">Connect</h3>
+            <a href="mailto:edisontaimu9@gmail.com">Email</a>
+            <a href="https://www.linkedin.com/in/edison-taimu-a37415367" target="_blank" rel="noopener">LinkedIn</a>
+            <a href="https://x.com/edisontaimu" target="_blank" rel="noopener">X (Twitter)</a>
+            <a href="https://www.facebook.com/share/1GixAae4hT/" target="_blank" rel="noopener">Facebook</a>
+            <a href="https://minutriq.me" target="_blank" rel="noopener">minutriq.me</a>
+          </nav>
           <nav aria-label="Legal">
             <h3 class="lp-footer__h">Legal</h3>
             <a href="#/legal/privacy">Privacy Policy</a>

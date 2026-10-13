@@ -26,7 +26,8 @@ const RenderLegal = (() => {
   const p = (html) => `<p class="endpoint-desc">${html}</p>`;
   const ul = (items) => `<ul class="legal-list">${items.map((i) => `<li>${i}</li>`).join("")}</ul>`;
   const note = (html, danger) => `<div class="callout${danger ? " callout--danger" : ""}">${html}</div>`;
-  const contact = `Questions? Open an issue on <a href="${ISSUES}" target="_blank" rel="noopener">GitHub</a>.`;
+  const EMAIL = "edisontaimu9@gmail.com";
+  const contact = `Questions or requests? Email <a href="mailto:${EMAIL}">${EMAIL}</a>, or open an issue on <a href="${ISSUES}" target="_blank" rel="noopener">GitHub</a>.`;
 
   /* ───────── content ───────── */
 

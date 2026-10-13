@@ -171,7 +171,7 @@ body.is-landing .content { max-width: 1180px; padding: 24px 28px 0; }
 }
 .lp-closing h2 { font-size: clamp(26px, 4vw, 42px); max-width: 20ch; margin: 0 auto; letter-spacing: -.6px; line-height: 1.12; }
 .lp-footer { margin-top: 56px; padding: 36px 0 48px; border-top: 1px solid var(--border); color: var(--text-secondary); font-size: 13.5px; }
-.lp-footer__grid { display: grid; grid-template-columns: 1.6fr 1fr 1fr; gap: 28px 40px; }
+.lp-footer__grid { display: grid; grid-template-columns: 1.5fr 1fr 1fr 1fr; gap: 28px 36px; }
 .lp-footer__logo { display: block; width: 72px; height: 72px; object-fit: contain; background: #fff; border-radius: 14px; padding: 6px; margin-bottom: 12px; border: 1px solid var(--border); }
 .lp-footer p { margin: 0; }
 .lp-footer__name { color: var(--text-primary); font-weight: 700; font-size: 15px; }
@@ -211,7 +211,7 @@ body.is-landing .content { max-width: 1180px; padding: 24px 28px 0; }
 @media (max-width: 900px) { .lp-pillars { grid-template-columns: 1fr; } }
 @media (min-width: 901px) and (max-width: 1040px) { .lp-pillars { grid-template-columns: repeat(2, 1fr); } }
 
-@media (max-width: 720px) {
+@media (max-width: 860px) {
   .lp-footer__grid { grid-template-columns: 1fr 1fr; }
   .lp-footer__brand { grid-column: 1 / -1; }
 }
