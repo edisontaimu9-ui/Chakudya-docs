@@ -424,7 +424,7 @@ const RenderLanding = (() => {
             <a href="https://www.linkedin.com/in/edison-taimu-a37415367" target="_blank" rel="noopener">LinkedIn</a>
             <a href="https://x.com/edisontaimu" target="_blank" rel="noopener">X (Twitter)</a>
             <a href="https://www.facebook.com/share/1GixAae4hT/" target="_blank" rel="noopener">Facebook</a>
-            <a href="https://minutriq.me" target="_blank" rel="noopener">minutriq.me</a>
+            <a href="https://minutriq.me" target="_blank" rel="noopener">Portfolio</a>
           </nav>
           <nav aria-label="Legal">
             <h3 class="lp-footer__h">Legal</h3>
