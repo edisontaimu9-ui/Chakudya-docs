@@ -27,12 +27,6 @@ const RenderNutriMind = (() => {
     t.innerHTML = html.trim();
     return t.content.firstElementChild;
   }
-  function newId() {
-    const a = new Uint8Array(12);
-    (window.crypto || {}).getRandomValues?.(a);
-    return "nm_" + Array.from(a, (b) => b.toString(16).padStart(2, "0")).join("") + Date.now().toString(36);
-  }
-
   // ── State (kept while you move around the site, saved in this browser) ──
   const state = load();
   let view = null;
@@ -44,20 +38,18 @@ const RenderNutriMind = (() => {
         return {
           messages: s.messages.filter((m) => m && typeof m.text === "string").slice(-MAX_SAVED),
           mode: MODES.some((m) => m[0] === s.mode) ? s.mode : "both",
-          sessionId: typeof s.sessionId === "string" ? s.sessionId : newId(),
           busy: false,
           stream: null,
         };
       }
     } catch { /* storage unavailable or corrupt: start fresh */ }
-    return { messages: [], mode: "both", sessionId: newId(), busy: false, stream: null };
+    return { messages: [], mode: "both", busy: false, stream: null };
   }
   function save() {
     try {
       localStorage.setItem(STORE, JSON.stringify({
         messages: state.messages.filter((m) => !m.error).slice(-MAX_SAVED),
         mode: state.mode,
-        sessionId: state.sessionId,
       }));
     } catch { /* ignore */ }
   }
@@ -231,7 +223,6 @@ const RenderNutriMind = (() => {
       if (state.stream) finishStream();
       if (state.busy) return;
       state.messages = [];
-      state.sessionId = newId();
       save();
       paint();
       view.input.focus();
@@ -378,16 +369,18 @@ const RenderNutriMind = (() => {
     return "NutriMind had a problem answering. Please try again.";
   }
 
+  // Citation markers in any bracket style the model uses: [1], [1, 2], 【1】, 【1†source】
+  const CITE_RE = /[\[\u3010\uFF3B]\s*(\d{1,2}(?:\s*[,\u3001\uFF0C]\s*\d{1,2})*)(?:\s*\u2020[^\]\u3011\uFF3D]*)?\s*[\]\u3011\uFF3D]/g;
+
   // Show sources only when the answer actually leans on them: greetings and small talk
   // get none, and each source appears once however many times it was cited.
   function shapeAnswer(data) {
     const raw = String(data.answer);
     const all = Array.isArray(data.sources) ? data.sources : [];
     const cited = new Set();
-    const marker = /\[(\d{1,2}(?:\s*,\s*\d{1,2})*)\]/g;
-    for (const m of raw.matchAll(marker)) m[1].split(",").forEach((n) => cited.add(parseInt(n, 10)));
+    for (const m of raw.matchAll(CITE_RE)) m[1].split(/[,\u3001\uFF0C]/).forEach((n) => cited.add(parseInt(n, 10)));
     const text = raw
-      .replace(/\s*\[\d{1,2}(?:\s*,\s*\d{1,2})*\]/g, "")
+      .replace(new RegExp("\\s*" + CITE_RE.source, "g"), "")
       .replace(/\s+([.,;:!?])/g, "$1")
       .replace(/([,;])\s*([.,;:!?])/g, "$2")
       .trim();
@@ -447,12 +440,29 @@ const RenderNutriMind = (() => {
     paint();
   }
 
+  // A short follow-up such as "What about 50g?" means nothing on its own, and the search
+  // can latch onto unrelated documents. Send it together with the question it follows.
+  const FOLLOW_UP = /^(and\b|what about\b|how about\b|what of\b|ok(ay)?\b)|^\d+(\.\d+)?\s*(g|kg|ml|l|cups?|spoons?|tbsp|tsp|pieces?|servings?|portions?)\b|\b\d+(\.\d+)?\s*(g|kg|ml|cups?|spoons?|tbsp|tsp)\b/i;
+  function contextualQuery(q) {
+    if (q.split(/\s+/).length > 9 || !FOLLOW_UP.test(q)) return q;
+    for (let i = state.messages.length - 1; i >= 0; i--) {
+      const m = state.messages[i];
+      if (m.role === "user") return `${m.apiText || m.text} ${q}`.slice(0, MAX_Q * 2);
+    }
+    return q;
+  }
+
+  // Never show a dosing answer to someone who did not ask about insulin or diabetes.
+  const DOSING = /units? of (?:rapid|short|long)?[- ]?(?:acting )?insulin|insulin dos(?:e|ing)|units of insulin/i;
+  const DIABETES_ASKED = /insulin|diabet|glucose|glycaem|glycem|carbohydrate counting|carb counting/i;
+
   async function ask(question) {
     const q = String(question).trim().slice(0, MAX_Q);
     if (!q) return;
     if (state.stream) finishStream();
     if (state.busy) return;
-    state.messages.push({ role: "user", text: q });
+    const apiQuery = contextualQuery(q);
+    state.messages.push({ role: "user", text: q, apiText: apiQuery });
     state.busy = true;
     save();
     paint(true);
@@ -465,14 +475,18 @@ const RenderNutriMind = (() => {
       const res = await fetch(base + "/rag/ask", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ query: q, context: state.mode, session_id: state.sessionId }),
+        body: JSON.stringify({ query: apiQuery, context: state.mode }),
         signal: ctrl.signal,
       });
       const body = await res.json().catch(() => null);
       const data = body && (body.data || body);
       if (res.ok && data && typeof data.answer === "string" && data.answer.trim()) {
-        const shaped = shapeAnswer(data);
-        reply = { role: "bot", text: shaped.text, sources: shaped.sources };
+        if (DOSING.test(data.answer) && !DIABETES_ASKED.test(apiQuery)) {
+          reply = { role: "bot", text: "I wasn't sure what you meant, so I haven't answered. Try again with the food name, for example \u201CHow many calories are in 50 g of nsima?\u201D", sources: [] };
+        } else {
+          const shaped = shapeAnswer(data);
+          reply = { role: "bot", text: shaped.text, sources: shaped.sources };
+        }
       } else {
         reply = { role: "bot", error: true, text: failText(res.status), retry: q };
       }
