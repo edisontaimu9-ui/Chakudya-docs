@@ -1,0 +1,252 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<meta name="robots" content="noindex, nofollow, noarchive" />
+<meta name="theme-color" content="#0e1210" />
+<title>Chakudya admin</title>
+<style>
+  :root {
+    --bg:#0e1210; --raised:#141a17; --surface:#1a211d; --border:#263029; --border2:#38443b;
+    --text:#eef1ec; --text2:#9fa89f; --accent:#e69214; --ok:#3fa66b; --bad:#e2574c; --warn:#d9a441;
+    --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin:0; background:var(--bg); color:var(--text); font:15px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, sans-serif; }
+  body { padding: env(safe-area-inset-top,0) 0 env(safe-area-inset-bottom,0); min-height:100vh; }
+  main { max-width: 960px; margin: 0 auto; padding: 16px 14px 48px; }
+  h1 { font-size: 20px; margin: 0; }
+  h2 { font-size: 12px; letter-spacing:.09em; text-transform:uppercase; color:var(--text2); margin: 26px 0 10px; border-top:3px solid var(--border2); padding-top:8px; }
+  .bar { display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap; }
+  .muted { color:var(--text2); font-size:13px; }
+  button, .btn { font:inherit; background:var(--surface); color:var(--text); border:1px solid var(--border2); border-radius:8px; padding:8px 12px; cursor:pointer; }
+  button:hover { background:#212a25; }
+  button.primary { background:var(--accent); color:#1a1205; border-color:var(--accent); font-weight:600; }
+  button:disabled { opacity:.55; cursor:default; }
+  input[type=email], input[type=password] { width:100%; font:inherit; color:var(--text); background:var(--raised); border:1px solid var(--border2); border-radius:8px; padding:10px 12px; margin:6px 0 12px; }
+  .card { background:var(--raised); border:1px solid var(--border); border-radius:12px; padding:14px; }
+  .login { max-width:380px; margin:12vh auto 0; }
+  .grid { display:grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap:10px; }
+  .stat { background:var(--raised); border:1px solid var(--border); border-radius:10px; padding:11px 12px; }
+  .stat b { display:block; font-size:22px; font-variant-numeric: tabular-nums; }
+  .stat span { color:var(--text2); font-size:12px; }
+  .stat.null b { color:var(--text2); }
+  .dot { display:inline-block; width:9px; height:9px; border-radius:50%; background:var(--text2); margin-right:7px; }
+  .dot.ok { background:var(--ok); } .dot.bad { background:var(--bad); } .dot.warn { background:var(--warn); }
+  .svc { display:flex; justify-content:space-between; padding:6px 0; border-bottom:1px solid var(--border); }
+  .svc:last-child { border-bottom:0; }
+  .wrap { overflow-x:auto; }
+  table { width:100%; border-collapse:collapse; font-size:14px; }
+  th, td { text-align:left; padding:8px 8px; border-bottom:1px solid var(--border); white-space:nowrap; }
+  th { color:var(--text2); font-weight:500; font-size:12px; text-transform:uppercase; letter-spacing:.06em; }
+  td.num, th.num { text-align:right; font-variant-numeric: tabular-nums; }
+  .pill { font-size:11px; padding:2px 7px; border-radius:99px; border:1px solid var(--border2); color:var(--text2); }
+  .err { border-color:var(--bad); color:#ffb4ad; }
+  .hide { display:none !important; }
+  label.chk { display:inline-flex; align-items:center; gap:6px; color:var(--text2); font-size:13px; }
+</style>
+</head>
+<body>
+<main>
+  <!-- Sign in -->
+  <section id="login" class="card login hide">
+    <h1>Chakudya admin</h1>
+    <p class="muted">Sign in with an approved admin account.</p>
+    <label class="muted" for="em">Email</label>
+    <input id="em" type="email" autocomplete="username" />
+    <label class="muted" for="pw">Password</label>
+    <input id="pw" type="password" autocomplete="current-password" />
+    <button id="go" class="primary" style="width:100%">Sign in</button>
+    <p id="loginMsg" class="muted" role="status"></p>
+    <p class="muted">Signed in with Google? Sign in on the docs site first, then reload this page.</p>
+  </section>
+
+  <!-- Dashboard -->
+  <section id="app" class="hide">
+    <div class="bar">
+      <div>
+        <h1>Chakudya admin</h1>
+        <div id="who" class="muted"></div>
+      </div>
+      <div class="bar" style="gap:8px">
+        <label class="chk"><input id="auto" type="checkbox" /> auto 60s</label>
+        <button id="refresh">Refresh</button>
+        <button id="out">Sign out</button>
+      </div>
+    </div>
+    <p id="status" class="muted" role="status"></p>
+    <div id="fatal" class="card err hide"></div>
+
+    <h2>Health</h2>
+    <div id="health" class="card muted">Loading…</div>
+
+    <h2>Registry records <span id="regTotal" class="muted"></span></h2>
+    <div id="registry" class="grid"></div>
+
+    <h2>Packaged food review</h2>
+    <div id="review" class="grid"></div>
+
+    <h2>RAG ingest jobs</h2>
+    <div id="jobs" class="grid"></div>
+
+    <h2>API keys and usage</h2>
+    <div id="keystats" class="grid"></div>
+    <div class="card wrap" style="margin-top:10px">
+      <table>
+        <thead><tr><th>Key</th><th>Role</th><th class="num">Today</th><th class="num">7 days</th><th>Last used</th></tr></thead>
+        <tbody id="keys"></tbody>
+      </table>
+    </div>
+    <p class="muted">Usage counters are approximate and cover keys only, not anonymous calls.</p>
+  </section>
+</main>
+
+<script src="../js/config.js"></script>
+<script>
+(() => {
+  "use strict";
+  const SESSION_KEY = "chakudya-docs:session"; // same key the docs site uses
+  const AUTH = window.CHAKUDYA_AUTH || {};
+  const API = window.CHAKUDYA_API || {};
+  const SB = String(AUTH.supabaseUrl || "").replace(/\/$/, "");
+  const GW = String(API.gatewayUrl || "").replace(/\/$/, "");
+  const $ = (id) => document.getElementById(id);
+  const nowSec = () => Math.floor(Date.now() / 1000);
+  let timer = null;
+
+  const loadSession = () => { try { return JSON.parse(localStorage.getItem(SESSION_KEY) || "null"); } catch (_) { return null; } };
+  const saveSession = (s) => { try { s ? localStorage.setItem(SESSION_KEY, JSON.stringify(s)) : localStorage.removeItem(SESSION_KEY); } catch (_) {} };
+
+  async function gotrue(path, body) {
+    const res = await fetch(SB + path, { method: "POST", headers: { apikey: AUTH.supabaseAnonKey, "Content-Type": "application/json" }, body: JSON.stringify(body) });
+    const j = await res.json().catch(() => null);
+    if (!res.ok) throw new Error(j?.msg || j?.error_description || j?.message || "Sign-in failed");
+    return j;
+  }
+  const fromToken = (r, email) => ({ access_token: r.access_token, refresh_token: r.refresh_token, expires_at: r.expires_at || nowSec() + (Number(r.expires_in) || 3600), email: r.user?.email || email || "" });
+
+  async function token() {
+    const s = loadSession();
+    if (!s) return null;
+    if (s.expires_at - nowSec() > 60) return s.access_token;
+    try {
+      const next = fromToken(await gotrue("/auth/v1/token?grant_type=refresh_token", { refresh_token: s.refresh_token }), s.email);
+      saveSession(next);
+      return next.access_token;
+    } catch (_) { saveSession(null); return null; }
+  }
+
+  async function call(path) {
+    const t = await token();
+    if (!t) return { status: 401 };
+    let res;
+    try { res = await fetch(GW + "/a" + path, { headers: { Authorization: "Bearer " + t } }); }
+    catch (_) { return { status: 0 }; }
+    const body = await res.json().catch(() => null);
+    return { status: res.status, body };
+  }
+
+  const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  const fmt = (n) => (typeof n === "number" ? n.toLocaleString() : "n/a");
+  const stat = (label, n) => `<div class="stat${typeof n === "number" ? "" : " null"}"><b>${fmt(n)}</b><span>${esc(label)}</span></div>`;
+  function ago(iso) {
+    if (!iso) return "never";
+    const s = Math.max(0, (Date.now() - new Date(iso).getTime()) / 1000);
+    if (s < 90) return "just now";
+    if (s < 5400) return Math.round(s / 60) + " min ago";
+    if (s < 129600) return Math.round(s / 3600) + " h ago";
+    return Math.round(s / 86400) + " d ago";
+  }
+
+  function show(view) {
+    $("login").classList.toggle("hide", view !== "login");
+    $("app").classList.toggle("hide", view !== "app");
+  }
+  function fatal(msg) { const f = $("fatal"); f.textContent = msg; f.classList.remove("hide"); }
+
+  function renderHealth(r) {
+    const el = $("health");
+    if (r.status !== 200 || !r.body) { el.innerHTML = `<span class="dot bad"></span>Health check failed (${r.status || "network"})`; return; }
+    const h = r.body;
+    const healthy = h.status === "healthy";
+    const rows = Object.entries(h.services || {}).map(([k, v]) => {
+      const st = v?.status || "unknown";
+      const cls = ["ok", "configured", "bound"].includes(st) ? "ok" : st === "error" ? "bad" : "warn";
+      return `<div class="svc"><span><span class="dot ${cls}"></span>${esc(k.replace(/_/g, " "))}</span><span class="muted">${esc(st)}</span></div>`;
+    }).join("");
+    el.innerHTML = `<div class="bar"><b><span class="dot ${healthy ? "ok" : "bad"}"></span>${esc(h.status || "unknown")}</b><span class="muted">API v${esc(h.version || "?")}</span></div>${rows}`;
+    el.classList.remove("muted");
+  }
+
+  function renderOverview(d) {
+    const reg = d.registry || [];
+    const total = reg.reduce((n, r) => n + (typeof r.count === "number" ? r.count : 0), 0);
+    $("regTotal").textContent = "· " + fmt(total) + " rows";
+    $("registry").innerHTML = reg.map((r) => stat(r.label, r.count)).join("");
+    const p = d.packaged_review || {};
+    $("review").innerHTML = stat("Pending review", p.pending) + stat("Approved", p.approved) + stat("Rejected", p.rejected);
+    const j = d.rag_ingest_jobs || {};
+    $("jobs").innerHTML = ["queued", "processing", "done", "failed"].map((k) => stat(k[0].toUpperCase() + k.slice(1), j[k])).join("");
+    const k = d.api_keys || {};
+    const roles = Object.entries(k.by_role || {}).map(([r, n]) => `${n} ${r}`).join(", ");
+    $("keystats").innerHTML = stat("Active keys", k.active) + stat("Total keys", k.total) + stat("Calls today", k.usage_today) + stat("Calls, 7 days", k.usage_last_7_days)
+      + `<div class="stat"><b style="font-size:15px">${esc(roles || "none")}</b><span>Active by role</span></div>`;
+    $("keys").innerHTML = (k.top || []).map((x) => `<tr><td>${esc(x.label)}</td><td><span class="pill">${esc(x.role)}</span></td><td class="num">${fmt(x.today)}</td><td class="num">${fmt(x.last_7_days)}</td><td>${esc(ago(x.last_used_at))}</td></tr>`).join("") || `<tr><td colspan="5" class="muted">No keys</td></tr>`;
+  }
+
+  async function load() {
+    $("fatal").classList.add("hide");
+    $("refresh").disabled = true;
+    $("status").textContent = "Refreshing…";
+    const [ov, hl] = await Promise.all([call("/admin/overview"), call("/health")]);
+    $("refresh").disabled = false;
+    if (ov.status === 401 || hl.status === 401) {
+      // 401 from the gateway = not signed in, or signed in with an email that is not on the admin list.
+      const email = loadSession()?.email || "this account";
+      fatal(`Not authorised. ${email} is not an approved admin, or the session expired. Sign out and use an approved account.`);
+      $("status").textContent = "";
+      return;
+    }
+    if (ov.status !== 200 || !ov.body?.data) {
+      fatal(ov.status === 0 ? "Couldn't reach the gateway. Check your connection." : `Overview failed (${ov.status}): ${ov.body?.error || ov.body?.message || "unknown error"}`);
+      $("status").textContent = "";
+      return;
+    }
+    renderHealth(hl);
+    renderOverview(ov.body.data);
+    $("status").textContent = "Updated " + new Date().toLocaleTimeString();
+  }
+
+  function setAuto(on) {
+    clearInterval(timer); timer = null;
+    if (on) timer = setInterval(() => { if (!document.hidden) load(); }, 60000);
+  }
+
+  async function start() {
+    const s = loadSession();
+    if (!s || !(await token())) { show("login"); return; }
+    show("app");
+    $("who").textContent = loadSession()?.email || "";
+    load();
+  }
+
+  $("go").addEventListener("click", async () => {
+    const email = $("em").value.trim(), password = $("pw").value;
+    if (!email || !password) { $("loginMsg").textContent = "Enter email and password."; return; }
+    $("go").disabled = true; $("loginMsg").textContent = "Signing in…";
+    try { saveSession(fromToken(await gotrue("/auth/v1/token?grant_type=password", { email, password }), email)); $("pw").value = ""; $("loginMsg").textContent = ""; start(); }
+    catch (e) { $("loginMsg").textContent = e.message; }
+    $("go").disabled = false;
+  });
+  $("pw").addEventListener("keydown", (e) => { if (e.key === "Enter") $("go").click(); });
+  $("refresh").addEventListener("click", load);
+  $("auto").addEventListener("change", (e) => setAuto(e.target.checked));
+  $("out").addEventListener("click", () => { saveSession(null); setAuto(false); show("login"); });
+
+  if (!SB || !GW) { show("login"); $("loginMsg").textContent = "Missing config. Check js/config.js."; }
+  else start();
+})();
+</script>
+</body>
+</html>
