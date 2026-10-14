@@ -63,6 +63,17 @@
   .q .acts { display:flex; gap:8px; flex-wrap:wrap; margin-top:8px; }
   .q .warn { color:var(--warn); font-size:13px; margin:6px 0 0; }
   button.ok { background:#16301f; border-color:#2c6b44; color:#9fe0b6; }
+  .trend { display:flex; align-items:flex-end; gap:6px; height:176px; padding-top:6px; }
+  .trend .col { flex:1; min-width:0; display:flex; flex-direction:column; justify-content:flex-end; align-items:center; height:100%; }
+  .trend .val { font-size:12px; font-variant-numeric:tabular-nums; color:var(--text2); margin-bottom:3px; }
+  .trend .bar1 { width:100%; max-width:56px; border-radius:6px 6px 0 0; background:var(--ok); flex-shrink:0; }
+  .trend .col.today .bar1 { background:var(--accent); }
+  .trend .col.today .val { color:var(--text); font-weight:600; }
+  .trend .day { font-size:11px; color:var(--text2); margin-top:6px; text-align:center; line-height:1.2; }
+  table.pk td.k, table.pk th.k { position:sticky; left:0; background:var(--raised); max-width:150px; overflow:hidden; text-overflow:ellipsis; }
+  table.pk td.c { text-align:center; font-variant-numeric:tabular-nums; min-width:44px; }
+  table.pk td.z { color:var(--border2); }
+  table.pk tr.sum td { border-top:2px solid var(--border2); font-weight:600; }
   label.chk { display:inline-flex; align-items:center; gap:6px; color:var(--text2); font-size:13px; }
 </style>
 </head>
@@ -121,6 +132,10 @@
 
     <h2>API keys and usage</h2>
     <div id="keystats" class="grid"></div>
+    <h2>Usage trend <span class="muted">· last 7 days, UTC</span></h2>
+    <div class="card"><div id="trend" class="muted">Loading…</div></div>
+    <div class="card wrap" style="margin-top:10px;padding:6px 10px"><table id="perKey" class="pk"></table></div>
+    <p id="trendNote" class="muted"></p>
     <h2>Access keys</h2>
     <div class="card" id="createBox">
       <b>Create a key</b>
@@ -238,6 +253,43 @@
     $("keystats").innerHTML = stat("Active keys", k.active) + stat("Total keys", k.total) + stat("Calls today", k.usage_today) + stat("Calls, 7 days", k.usage_last_7_days)
       + `<div class="stat"><b style="font-size:15px">${esc(roles || "none")}</b><span>Active by role</span></div>`;
     usage = Object.fromEntries((k.top || []).map((x) => [x.id, x]));
+    renderTrend(k);
+  }
+
+  // Usage trend: total calls per UTC day (bars) and calls per key per day (heat table).
+  // Needs api_keys.usage_daily and top[].daily from the API; older API versions only send totals.
+  function dayLabel(iso) {
+    const d = new Date(iso + "T00:00:00Z");
+    return d.toLocaleDateString(undefined, { weekday: "short", timeZone: "UTC" }) + "<br>" + d.getUTCDate();
+  }
+  function renderTrend(k) {
+    const days = Array.isArray(k.usage_daily) ? k.usage_daily : null;
+    const t = $("trend"), tbl = $("perKey"), note = $("trendNote");
+    if (!days || !days.length) {
+      t.textContent = "The daily trend needs the latest API deploy. Totals above still work.";
+      tbl.innerHTML = ""; note.textContent = ""; return;
+    }
+    const max = Math.max(1, ...days.map((d) => d.count));
+    const sum = days.reduce((n, d) => n + d.count, 0);
+    t.classList.remove("muted");
+    t.innerHTML = sum === 0
+      ? '<p class="muted" style="margin:0">No key calls recorded in the last 7 days.</p>'
+      : `<div class="trend">${days.map((d, i) => `<div class="col${i === days.length - 1 ? " today" : ""}"><span class="val">${fmt(d.count)}</span><div class="bar1" style="height:${Math.max(2, Math.round((d.count / max) * 110))}px"></div><span class="day">${dayLabel(d.day)}</span></div>`).join("")}</div>`;
+
+    const rows = (k.top || []).filter((x) => Array.isArray(x.daily));
+    const cellMax = Math.max(1, ...rows.flatMap((x) => x.daily));
+    const head = `<tr><th class="k">Key</th>${days.map((d) => `<th class="num" style="text-align:center">${dayLabel(d.day)}</th>`).join("")}<th class="num">7 days</th></tr>`;
+    const body = rows.map((x) => {
+      const cells = x.daily.map((n) => n
+        ? `<td class="c" style="background:rgba(230,146,20,${(0.1 + 0.55 * (n / cellMax)).toFixed(2)})">${fmt(n)}</td>`
+        : `<td class="c z">·</td>`).join("");
+      return `<tr><td class="k"><b>${esc(x.label)}</b> <span class="pill">${esc(x.role)}</span></td>${cells}<td class="num"><b>${fmt(x.last_7_days)}</b></td></tr>`;
+    }).join("");
+    const total = `<tr class="sum"><td class="k">All keys</td>${days.map((d) => `<td class="c">${fmt(d.count)}</td>`).join("")}<td class="num">${fmt(sum)}</td></tr>`;
+    tbl.innerHTML = rows.length ? head + body + total : "";
+    const shown = rows.length, active = typeof k.active === "number" ? k.active : shown;
+    note.textContent = "Counts are approximate, by UTC day, for active keys only (revoked keys and anonymous calls are not included)."
+      + (active > shown ? ` Showing the ${shown} busiest of ${active} active keys.` : "");
   }
 
   let usage = {};
