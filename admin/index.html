@@ -53,6 +53,16 @@
   button.danger { color:#ffb4ad; border-color:#5a2a26; }
   .reveal { margin-top:10px; padding:12px; border:1px solid var(--accent); border-radius:10px; background:#1f1a0e; }
   .reveal code { display:block; margin-top:8px; padding:10px; background:#0e1210; border-radius:8px; font-family:var(--mono); font-size:13px; word-break:break-all; user-select:all; }
+  .q { background:var(--raised); border:1px solid var(--border); border-radius:12px; padding:12px; margin-bottom:10px; }
+  .q.gone { opacity:.5; }
+  .q .head { display:flex; justify-content:space-between; gap:10px; flex-wrap:wrap; align-items:flex-start; }
+  .q .nut { display:grid; grid-template-columns: repeat(auto-fill, minmax(92px, 1fr)); gap:6px; margin:10px 0; }
+  .q .nut div { background:var(--surface); border:1px solid var(--border); border-radius:8px; padding:5px 8px; font-size:12px; color:var(--text2); }
+  .q .nut b { display:block; color:var(--text); font-size:14px; font-variant-numeric: tabular-nums; }
+  .q .ing { font-size:13px; color:var(--text2); margin:6px 0; max-height:4.4em; overflow:auto; }
+  .q .acts { display:flex; gap:8px; flex-wrap:wrap; margin-top:8px; }
+  .q .warn { color:var(--warn); font-size:13px; margin:6px 0 0; }
+  button.ok { background:#16301f; border-color:#2c6b44; color:#9fe0b6; }
   label.chk { display:inline-flex; align-items:center; gap:6px; color:var(--text2); font-size:13px; }
 </style>
 </head>
@@ -99,6 +109,12 @@
 
     <h2>Packaged food review</h2>
     <div id="review" class="grid"></div>
+    <div class="bar" style="gap:6px;margin:12px 0 8px" id="qFilter">
+      <button data-src="" class="chip on">All</button><button data-src="manual" class="chip">Manual</button><button data-src="ocr_ai" class="chip">Label scan</button>
+    </div>
+    <p id="qMsg" class="muted" role="status"></p>
+    <div id="queue"></div>
+    <button id="qMore" class="hide">Load more</button>
 
     <h2>RAG ingest jobs</h2>
     <div id="jobs" class="grid"></div>
@@ -295,7 +311,7 @@
   });
   $("doneKey").addEventListener("click", hideReveal);
 
-  async function load() {
+  async function load(keepQueue) {
     $("fatal").classList.add("hide");
     $("refresh").disabled = true;
     $("status").textContent = "Refreshing…";
@@ -317,12 +333,121 @@
     renderHealth(hl);
     renderOverview(ov.body.data);
     renderKeys();
+    if (keepQueue !== true) loadQueue(true);
     $("status").textContent = "Updated " + new Date().toLocaleTimeString();
   }
 
+  /* ───── packaged-food review queue ───── */
+  const Q_PAGE = 20;
+  let qSource = "";
+  let qOffset = 0;
+  let qLoaded = [];
+
+  const NUT = [
+    ["energy_kcal", "Energy", "kcal"], ["protein_g", "Protein", "g"], ["carbs_g", "Carbs", "g"], ["sugar_g", "Sugar", "g"],
+    ["fat_g", "Fat", "g"], ["saturated_fat_g", "Sat fat", "g"], ["fiber_g", "Fibre", "g"], ["sodium_mg", "Sodium", "mg"], ["salt_g", "Salt", "g"],
+    ["calcium_mg", "Calcium", "mg"], ["iron_mg", "Iron", "mg"], ["zinc_mg", "Zinc", "mg"], ["vitc_mg", "Vit C", "mg"],
+  ];
+
+  // Same idea as the API's own check: declared kcal should roughly match 4*protein + 4*carbs + 9*fat.
+  function macroHint(r) {
+    const k = Number(r.energy_kcal), p = Number(r.protein_g), c = Number(r.carbs_g), f = Number(r.fat_g);
+    if (![k, p, c, f].every(Number.isFinite) || k <= 0) return "";
+    const calc = 4 * p + 4 * c + 9 * f;
+    return Math.abs(calc - k) / k > 0.25
+      ? `Check the label: ${Math.round(k)} kcal declared, but protein, carbs and fat add up to about ${Math.round(calc)} kcal.`
+      : "";
+  }
+
+  function queueCard(r) {
+    const nut = NUT.filter(([k]) => r[k] !== null && r[k] !== undefined && r[k] !== "")
+      .map(([k, label, unit]) => `<div><b>${esc(r[k])}</b>${esc(label)} (${unit})</div>`).join("");
+    const hint = macroHint(r);
+    const src = r.source === "ocr_ai" ? "label scan" : r.source === "manual" ? "manual" : esc(r.source || "unknown");
+    const ing = r.ingredients_text ? `<div class="ing">${esc(r.ingredients_text)}</div>` : "";
+    const serving = r.serving_size ? ` · serving ${esc(r.serving_size)}` : "";
+    return `<div class="q" data-id="${esc(r.id)}">
+      <div class="head">
+        <div><b>${esc(r.product_name || "Unnamed product")}</b> <span class="pill">${src}</span>
+          <div class="muted">${esc(r.brand || "No brand")} · barcode ${esc(r.barcode || "none")}</div>
+          <div class="muted">Submitted ${esc(ago(r.submitted_at))}${serving} · values per 100 g or ml</div></div>
+      </div>
+      <div class="nut">${nut || '<span class="muted">No nutrient values.</span>'}</div>
+      ${ing}
+      ${hint ? `<p class="warn">${esc(hint)}</p>` : ""}
+      <div class="acts"><button class="ok" data-approve="${esc(r.id)}">Approve</button><button class="danger" data-reject="${esc(r.id)}">Reject</button></div>
+    </div>`;
+  }
+
+  function renderQueue() {
+    $("queue").innerHTML = qLoaded.map(queueCard).join("");
+    if (!qLoaded.length && !$("qMsg").textContent) $("qMsg").textContent = "Nothing waiting for review.";
+  }
+
+  async function loadQueue(reset) {
+    if (reset) { qOffset = 0; qLoaded = []; }
+    $("qMsg").textContent = "Loading submissions…";
+    const qs = `?limit=${Q_PAGE}&offset=${qOffset}` + (qSource ? "&source=" + encodeURIComponent(qSource) : "");
+    const r = await call("/packaged/pending" + qs);
+    if (r.status !== 200 || !Array.isArray(r.body?.data)) {
+      $("qMsg").textContent = r.status === 403 ? "The gateway has not enabled the review queue yet." : "Couldn't load the queue (" + (r.status || "network") + ").";
+      $("qMore").classList.add("hide");
+      return;
+    }
+    qLoaded = qLoaded.concat(r.body.data);
+    qOffset += r.body.data.length;
+    $("qMsg").textContent = qLoaded.length ? `Showing ${qLoaded.length}, oldest first.` : "";
+    $("qMore").classList.toggle("hide", r.body.data.length < Q_PAGE);
+    renderQueue();
+  }
+
+  async function review(id, action, body) {
+    const card = document.querySelector(`.q[data-id="${CSS.escape(String(id))}"]`);
+    card?.querySelectorAll("button").forEach((b) => (b.disabled = true));
+    const r = await call(`/packaged/${encodeURIComponent(id)}/${action}`, { method: "POST", body });
+    if (r.status === 200) {
+      qLoaded = qLoaded.filter((x) => String(x.id) !== String(id));
+      qOffset = Math.max(0, qOffset - 1);
+      $("qMsg").textContent = action === "approve" ? "Approved." : "Rejected.";
+      renderQueue();
+      load(true);
+    } else {
+      card?.querySelectorAll("button").forEach((b) => (b.disabled = false));
+      alert(r.status === 403 ? "Admin writes are switched off on the gateway."
+        : r.status === 404 ? "That submission no longer exists."
+        : r.status === 401 ? "Session expired. Sign in again."
+        : (r.body?.error || r.body?.message || "Couldn't save (" + (r.status || "network") + ")."));
+    }
+  }
+
+  document.addEventListener("click", (e) => {
+    const f = e.target.closest("#qFilter [data-src]");
+    if (f) {
+      qSource = f.dataset.src;
+      document.querySelectorAll("#qFilter .chip").forEach((c) => c.classList.toggle("on", c === f));
+      loadQueue(true);
+      return;
+    }
+    const ap = e.target.closest("[data-approve]");
+    if (ap) {
+      const r = qLoaded.find((x) => String(x.id) === ap.dataset.approve);
+      if (r && confirm(`Approve "${r.product_name || "this product"}"? It becomes visible in packaged food search.`)) review(ap.dataset.approve, "approve");
+      return;
+    }
+    const rj = e.target.closest("[data-reject]");
+    if (rj) {
+      const r = qLoaded.find((x) => String(x.id) === rj.dataset.reject);
+      const reason = prompt(`Why reject "${r?.product_name || "this product"}"? (required, kept as the audit trail)`);
+      if (reason === null) return;
+      if (!reason.trim()) { alert("A reason is required."); return; }
+      review(rj.dataset.reject, "reject", { reason: reason.trim() });
+    }
+  });
+  $("qMore").addEventListener("click", () => loadQueue(false));
+
   function setAuto(on) {
     clearInterval(timer); timer = null;
-    if (on) timer = setInterval(() => { if (!document.hidden) load(); }, 60000);
+    if (on) timer = setInterval(() => { if (!document.hidden) load(true); }, 60000);
   }
 
   async function start() {
@@ -360,7 +485,7 @@
     $("forgot").disabled = false;
   });
   $("pw").addEventListener("keydown", (e) => { if (e.key === "Enter") $("go").click(); });
-  $("refresh").addEventListener("click", load);
+  $("refresh").addEventListener("click", () => load());
   $("auto").addEventListener("change", (e) => setAuto(e.target.checked));
   $("out").addEventListener("click", () => { hideReveal(); saveSession(null); setAuto(false); show("login"); });
 
