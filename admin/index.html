@@ -44,6 +44,15 @@
   .pill { font-size:11px; padding:2px 7px; border-radius:99px; border:1px solid var(--border2); color:var(--text2); }
   .err { border-color:var(--bad); color:#ffb4ad; }
   .hide { display:none !important; }
+  input[type=text], select { font:inherit; color:var(--text); background:var(--raised); border:1px solid var(--border2); border-radius:8px; padding:10px 12px; }
+  input[type=text] { width:100%; }
+  .chip.on { background:var(--accent); color:#1a1205; border-color:var(--accent); font-weight:600; }
+  .key { background:var(--raised); border:1px solid var(--border); border-radius:12px; padding:12px; margin-bottom:8px; }
+  .key.revoked { opacity:.6; }
+  .key .row { display:flex; justify-content:space-between; gap:10px; align-items:flex-start; flex-wrap:wrap; }
+  button.danger { color:#ffb4ad; border-color:#5a2a26; }
+  .reveal { margin-top:10px; padding:12px; border:1px solid var(--accent); border-radius:10px; background:#1f1a0e; }
+  .reveal code { display:block; margin-top:8px; padding:10px; background:#0e1210; border-radius:8px; font-family:var(--mono); font-size:13px; word-break:break-all; user-select:all; }
   label.chk { display:inline-flex; align-items:center; gap:6px; color:var(--text2); font-size:13px; }
 </style>
 </head>
@@ -96,12 +105,26 @@
 
     <h2>API keys and usage</h2>
     <div id="keystats" class="grid"></div>
-    <div class="card wrap" style="margin-top:10px">
-      <table>
-        <thead><tr><th>Key</th><th>Role</th><th class="num">Today</th><th class="num">7 days</th><th>Last used</th></tr></thead>
-        <tbody id="keys"></tbody>
-      </table>
+    <h2>Access keys</h2>
+    <div class="card" id="createBox">
+      <b>Create a key</b>
+      <p class="muted" style="margin:4px 0 8px">Reviewer keys can only review packaged foods. Admin keys have full access. Developer keys are created by developers themselves.</p>
+      <input id="kLabel" type="text" maxlength="80" placeholder="Name, e.g. Grace - reviewer" />
+      <div class="bar" style="gap:8px;margin-top:8px">
+        <select id="kRole"><option value="reviewer">Reviewer</option><option value="admin">Admin (full access)</option></select>
+        <button id="kCreate" class="primary">Create key</button>
+      </div>
+      <p id="kMsg" class="muted" role="status"></p>
+      <div id="reveal" class="reveal hide">
+        <div><b>Copy this key now. It is shown once and cannot be recovered.</b></div>
+        <code id="revealKey"></code>
+        <div class="bar" style="gap:8px;margin-top:8px"><button id="copyKey">Copy</button><button id="doneKey">I saved it</button></div>
+      </div>
     </div>
+    <div class="bar" style="gap:6px;margin:12px 0 8px" id="keyFilter">
+      <button data-f="active" class="chip on">Active</button><button data-f="revoked" class="chip">Revoked</button><button data-f="all" class="chip">All</button>
+    </div>
+    <div id="keyList"></div>
     <p class="muted">Usage counters are approximate and cover keys only, not anonymous calls.</p>
   </section>
 </main>
@@ -141,11 +164,13 @@
     } catch (_) { saveSession(null); return null; }
   }
 
-  async function call(path) {
+  async function call(path, opts = {}) {
     const t = await token();
     if (!t) return { status: 401 };
     let res;
-    try { res = await fetch(GW + "/a" + path, { headers: { Authorization: "Bearer " + t } }); }
+    const headers = { Authorization: "Bearer " + t };
+    if (opts.body) headers["Content-Type"] = "application/json";
+    try { res = await fetch(GW + "/a" + path, { method: opts.method || "GET", headers, body: opts.body ? JSON.stringify(opts.body) : undefined }); }
     catch (_) { return { status: 0 }; }
     const body = await res.json().catch(() => null);
     return { status: res.status, body };
@@ -196,14 +221,86 @@
     const roles = Object.entries(k.by_role || {}).map(([r, n]) => `${n} ${r}`).join(", ");
     $("keystats").innerHTML = stat("Active keys", k.active) + stat("Total keys", k.total) + stat("Calls today", k.usage_today) + stat("Calls, 7 days", k.usage_last_7_days)
       + `<div class="stat"><b style="font-size:15px">${esc(roles || "none")}</b><span>Active by role</span></div>`;
-    $("keys").innerHTML = (k.top || []).map((x) => `<tr><td>${esc(x.label)}</td><td><span class="pill">${esc(x.role)}</span></td><td class="num">${fmt(x.today)}</td><td class="num">${fmt(x.last_7_days)}</td><td>${esc(ago(x.last_used_at))}</td></tr>`).join("") || `<tr><td colspan="5" class="muted">No keys</td></tr>`;
+    usage = Object.fromEntries((k.top || []).map((x) => [x.id, x]));
   }
+
+  let usage = {};
+  let keyRows = [];
+  let keyFilter = "active";
+
+  function renderKeys() {
+    const rows = keyRows.filter((k) => keyFilter === "all" || (keyFilter === "revoked" ? k.revoked_at : !k.revoked_at));
+    $("keyList").innerHTML = rows.map((k) => {
+      const u = usage[k.id];
+      const who = k.owner_email ? ` · ${esc(k.owner_email)}` : "";
+      const meta = k.revoked_at
+        ? `Revoked ${esc(ago(k.revoked_at))}`
+        : `Today ${u ? fmt(u.today) : "–"} · 7 days ${u ? fmt(u.last_7_days) : "–"} · last used ${esc(ago(k.last_used_at))}`;
+      const prefix = k.key_prefix ? ` · <span style="font-family:var(--mono)">${esc(k.key_prefix)}…</span>` : "";
+      const btn = k.revoked_at ? "" : `<button class="danger" data-revoke="${Number(k.id)}">Revoke</button>`;
+      return `<div class="key${k.revoked_at ? " revoked" : ""}"><div class="row"><div><b>${esc(k.label)}</b> <span class="pill">${esc(k.role || "admin")}</span><div class="muted">#${Number(k.id)}${who}${prefix}</div><div class="muted">${meta}</div></div>${btn}</div></div>`;
+    }).join("") || `<p class="muted">No ${keyFilter === "all" ? "" : keyFilter + " "}keys.</p>`;
+  }
+
+  async function loadKeys() {
+    const r = await call("/admin/keys");
+    if (r.status === 200 && Array.isArray(r.body?.data)) { keyRows = r.body.data; renderKeys(); }
+  }
+
+  document.addEventListener("click", async (e) => {
+    const f = e.target.closest("#keyFilter [data-f]");
+    if (f) {
+      keyFilter = f.dataset.f;
+      document.querySelectorAll("#keyFilter .chip").forEach((c) => c.classList.toggle("on", c === f));
+      renderKeys();
+      return;
+    }
+    const rv = e.target.closest("[data-revoke]");
+    if (rv) {
+      const id = Number(rv.dataset.revoke);
+      const k = keyRows.find((x) => Number(x.id) === id);
+      if (!k) return;
+      const recent = k.last_used_at && Date.now() - new Date(k.last_used_at).getTime() < 86400000;
+      const warn = recent ? "\n\nThis key was used in the last 24 hours. Anything using it will stop working." : "";
+      if (!confirm(`Revoke "${k.label}" (${k.role || "admin"})? This cannot be undone.${warn}`)) return;
+      rv.disabled = true;
+      const r = await call("/admin/keys/" + id, { method: "DELETE" });
+      if (r.status === 200) { $("status").textContent = `Revoked "${k.label}".`; await load(); }
+      else { rv.disabled = false; alert(r.status === 403 ? "Admin writes are switched off on the gateway." : "Couldn't revoke (" + (r.status || "network") + ").") }
+    }
+  });
+
+  function hideReveal() { $("revealKey").textContent = ""; $("reveal").classList.add("hide"); }
+
+  $("kCreate").addEventListener("click", async () => {
+    const label = $("kLabel").value.trim(), role = $("kRole").value;
+    if (!label) { $("kMsg").textContent = "Give the key a name."; return; }
+    if (role === "admin" && !confirm(`Create a FULL-ACCESS admin key named "${label}"? It can change registry data and read everything. Only for people you trust completely.`)) return;
+    $("kCreate").disabled = true; $("kMsg").textContent = "Creating…"; hideReveal();
+    const r = await call("/admin/keys", { method: "POST", body: { label, role } });
+    $("kCreate").disabled = false;
+    if (r.status === 200 && r.body?.key) {
+      $("kMsg").textContent = `Created "${label}" (${role}).`;
+      $("kLabel").value = "";
+      $("revealKey").textContent = r.body.key;
+      $("reveal").classList.remove("hide");
+      load();
+    } else {
+      $("kMsg").textContent = r.status === 403 ? "Admin writes are switched off on the gateway." : (r.body?.error || r.body?.message || "Couldn't create the key (" + (r.status || "network") + ").");
+    }
+  });
+  $("copyKey").addEventListener("click", async () => {
+    try { await navigator.clipboard.writeText($("revealKey").textContent); $("copyKey").textContent = "Copied"; setTimeout(() => ($("copyKey").textContent = "Copy"), 1500); }
+    catch (_) { const r = document.createRange(); r.selectNodeContents($("revealKey")); const sel = getSelection(); sel.removeAllRanges(); sel.addRange(r); $("copyKey").textContent = "Selected - copy it"; }
+  });
+  $("doneKey").addEventListener("click", hideReveal);
 
   async function load() {
     $("fatal").classList.add("hide");
     $("refresh").disabled = true;
     $("status").textContent = "Refreshing…";
     const [ov, hl] = await Promise.all([call("/admin/overview"), call("/health")]);
+    if (ov.status === 200) await loadKeys();
     $("refresh").disabled = false;
     if (ov.status === 401 || hl.status === 401) {
       // 401 from the gateway = not signed in, or signed in with an email that is not on the admin list.
@@ -219,6 +316,7 @@
     }
     renderHealth(hl);
     renderOverview(ov.body.data);
+    renderKeys();
     $("status").textContent = "Updated " + new Date().toLocaleTimeString();
   }
 
@@ -264,7 +362,7 @@
   $("pw").addEventListener("keydown", (e) => { if (e.key === "Enter") $("go").click(); });
   $("refresh").addEventListener("click", load);
   $("auto").addEventListener("change", (e) => setAuto(e.target.checked));
-  $("out").addEventListener("click", () => { saveSession(null); setAuto(false); show("login"); });
+  $("out").addEventListener("click", () => { hideReveal(); saveSession(null); setAuto(false); show("login"); });
 
   if (!SB || !GW) { show("login"); $("loginMsg").textContent = "Missing config. Check js/config.js."; }
   else start();
