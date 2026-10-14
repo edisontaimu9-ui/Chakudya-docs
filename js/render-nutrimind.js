@@ -364,6 +364,7 @@ const RenderNutriMind = (() => {
   }
 
   function failText(status) {
+    if (status === 401) return "NutriMind can't reach the registry right now. Please try again later.";
     if (status === 429) return "NutriMind is very busy right now. Please wait a minute and try again.";
     if (status === 400) return "I couldn't read that question. Try rephrasing it.";
     return "NutriMind had a problem answering. Please try again.";
@@ -474,7 +475,7 @@ const RenderNutriMind = (() => {
     try {
       const res = await fetch(base + "/rag/ask", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...ApiClient.siteAuthHeaders(base + "/rag/ask") },
         body: JSON.stringify({ query: apiQuery, context: state.mode }),
         signal: ctrl.signal,
       });

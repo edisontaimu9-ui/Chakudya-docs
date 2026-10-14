@@ -21,15 +21,30 @@ const ApiClient = (() => {
   }
 
   /**
+   * The docs site's own key (window.CHAKUDYA_API.siteKey), as a header object. Empty when no key
+   * is configured or when the URL is not the configured API, so the key never goes to a custom
+   * base URL a visitor typed in.
+   */
+  function siteAuthHeaders(url) {
+    const cfg = window.CHAKUDYA_API || {};
+    if (!cfg.siteKey || !cfg.baseUrl) return {};
+    try {
+      return new URL(url).origin === new URL(cfg.baseUrl).origin ? { Authorization: `Bearer ${cfg.siteKey}` } : {};
+    } catch (_) { return {}; }
+  }
+
+  /**
    * Executes the request and returns a normalized result. Never throws -
    * network/CORS failures come back as { ok:false, networkError:true }.
    */
   async function execute({ url, method, headers, body }) {
     const startedAt = performance.now();
     try {
+      // A key the visitor supplied (Try It) wins; otherwise fall back to the site's own key.
+      const hasAuth = headers && Object.keys(headers).some((h) => h.toLowerCase() === "authorization");
       const res = await fetch(url, {
         method,
-        headers,
+        headers: hasAuth ? headers : { ...(headers || {}), ...siteAuthHeaders(url) },
         body: body !== undefined ? body : undefined,
       });
       const durationMs = Math.round(performance.now() - startedAt);
@@ -61,5 +76,5 @@ const ApiClient = (() => {
     }
   }
 
-  return { buildUrl, buildHeaders, execute };
+  return { buildUrl, buildHeaders, execute, siteAuthHeaders };
 })();
