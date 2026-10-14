@@ -75,6 +75,15 @@
   table.pk td.z { color:var(--border2); }
   table.pk tr.sum td { border-top:2px solid var(--border2); font-weight:600; }
   label.chk { display:inline-flex; align-items:center; gap:6px; color:var(--text2); font-size:13px; }
+  .pill.ok { color:#9fe0b6; border-color:#2c6b44; } .pill.bad { color:#ffb4ad; border-color:#5a2a26; } .pill.warn { color:var(--warn); border-color:#5a4a22; } .pill.run { color:var(--accent); border-color:#6b4a10; }
+  .ev { background:var(--raised); border:1px solid var(--border); border-radius:12px; padding:10px 12px; margin-bottom:8px; }
+  .ev .head { display:flex; justify-content:space-between; gap:10px; flex-wrap:wrap; align-items:baseline; }
+  .ev .op { font-family:var(--mono); font-size:13px; word-break:break-all; margin:4px 0; }
+  .ev .err-text { color:#ffb4ad; font-size:13px; margin:6px 0 0; word-break:break-word; }
+  .ev details { margin-top:6px; } .ev summary { cursor:pointer; color:var(--text2); font-size:12px; }
+  .ev pre { margin:6px 0 0; padding:8px; background:var(--bg); border-radius:8px; font:12px/1.4 var(--mono); overflow:auto; max-height:260px; }
+  .filters { display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin:12px 0 8px; }
+  .filters input[type=text] { width:auto; flex:1 1 160px; min-width:140px; }
 </style>
 </head>
 <body>
@@ -129,6 +138,30 @@
 
     <h2>RAG ingest jobs</h2>
     <div id="jobs" class="grid"></div>
+    <div class="bar" style="gap:6px;margin:12px 0 8px" id="jFilter">
+      <button data-st="" class="chip on">All</button><button data-st="queued" class="chip">Queued</button><button data-st="processing" class="chip">Processing</button><button data-st="done" class="chip">Done</button><button data-st="failed" class="chip">Failed</button>
+    </div>
+    <p id="jMsg" class="muted" role="status"></p>
+    <div id="jobList"></div>
+    <button id="jMore" class="hide">Load more</button>
+    <p class="muted">Read-only. Upload and retry go through the API (<code>POST /rag/upload</code>, <code>POST /rag/enqueue</code>).</p>
+
+    <h2>FHIR audit log</h2>
+    <div class="filters" id="aFilters">
+      <select id="aOutcome" aria-label="Outcome">
+        <option value="">All outcomes</option><option value="0">Success</option><option value="4">Denied or client error</option><option value="8">Server error</option><option value="12">Major failure</option>
+      </select>
+      <select id="aSince" aria-label="Period">
+        <option value="1">Last 24 hours</option><option value="7" selected>Last 7 days</option><option value="30">Last 30 days</option><option value="0">All time</option>
+      </select>
+      <input id="aOp" type="text" maxlength="80" placeholder="Route contains, e.g. $diagnose" aria-label="Route contains" />
+      <input id="aAgent" type="text" maxlength="120" placeholder="Exact key label, or anonymous" aria-label="Key label" />
+      <button id="aGo" class="primary">Search</button>
+    </div>
+    <p id="aMsg" class="muted" role="status"></p>
+    <div id="auditList"></div>
+    <button id="aMore" class="hide">Load more</button>
+    <p class="muted">One entry per audited /fhir request: who, which route, when, outcome. Never request bodies or query strings. Needs <code>FHIR_AUDIT_STORE=true</code> on the API.</p>
 
     <h2>API keys and usage</h2>
     <div id="keystats" class="grid"></div>
@@ -385,7 +418,8 @@
     renderHealth(hl);
     renderOverview(ov.body.data);
     renderKeys();
-    if (keepQueue !== true) loadQueue(true);
+    loadJobs(true);
+    if (keepQueue !== true) { loadQueue(true); loadAudit(true); }
     $("status").textContent = "Updated " + new Date().toLocaleTimeString();
   }
 
@@ -497,6 +531,125 @@
   });
   $("qMore").addEventListener("click", () => loadQueue(false));
 
+  /* ───── RAG ingest jobs ───── */
+  const J_PAGE = 20;
+  let jStatus = "";
+  let jLoaded = [];
+  let jTotal = null;
+  const JOB_CLS = { queued: "warn", processing: "run", done: "ok", failed: "bad" };
+
+  function jobCard(j) {
+    const cls = JOB_CLS[j.status] || "";
+    const chunks = typeof j.chunk_count === "number" ? ` · ${fmt(j.chunk_count)} chunks` : "";
+    const tries = j.attempts ? ` · ${Number(j.attempts)} attempt${Number(j.attempts) === 1 ? "" : "s"}` : "";
+    const rep = j.replace ? ' <span class="pill">replaces existing</span>' : "";
+    return `<div class="ev"><div class="head"><div><b>${esc(j.file_name || "Unnamed file")}</b> <span class="pill ${cls}">${esc(j.status)}</span> <span class="pill">${esc(j.context || "both")}</span>${rep}</div>
+      <span class="muted">${esc(ago(j.created_at))}</span></div>
+      <div class="muted" style="word-break:break-word">${esc(j.source || "")}</div>
+      <div class="muted">Updated ${esc(ago(j.updated_at))}${chunks}${tries} · <span style="font-family:var(--mono)">${esc(String(j.id || "").slice(0, 8))}</span></div>
+      ${j.error ? `<p class="err-text">${esc(j.error)}</p>` : ""}</div>`;
+  }
+
+  function renderJobs() {
+    $("jobList").innerHTML = jLoaded.map(jobCard).join("");
+    const more = typeof jTotal === "number" ? jLoaded.length < jTotal : false;
+    $("jMore").classList.toggle("hide", !more);
+    $("jMsg").textContent = jLoaded.length
+      ? `Showing ${jLoaded.length}${typeof jTotal === "number" ? " of " + fmt(jTotal) : ""}, newest first.`
+      : "No ingest jobs" + (jStatus ? " with status " + jStatus : "") + ".";
+  }
+
+  // reset = true: reload from the first page, keeping as many rows as are already shown (so auto refresh doesn't collapse the list).
+  async function loadJobs(reset) {
+    const limit = reset ? Math.min(100, Math.max(J_PAGE, jLoaded.length)) : J_PAGE;
+    const offset = reset ? 0 : jLoaded.length;
+    const qs = `?limit=${limit}&offset=${offset}` + (jStatus ? "&status=" + jStatus : "");
+    const r = await call("/rag/jobs" + qs);
+    if (r.status !== 200 || !Array.isArray(r.body?.data)) {
+      $("jMsg").textContent = r.status === 403 ? "The gateway has not enabled the ingest job list yet (add /rag/jobs to ADMIN_GET_PATHS)." : "Couldn't load ingest jobs (" + (r.status || "network") + ").";
+      $("jMore").classList.add("hide");
+      return;
+    }
+    jLoaded = reset ? r.body.data : jLoaded.concat(r.body.data);
+    // Older API versions return no total: fall back to "more if the page was full".
+    jTotal = typeof r.body.total === "number" ? r.body.total : (r.body.data.length >= limit ? jLoaded.length + 1 : jLoaded.length);
+    renderJobs();
+  }
+
+  /* ───── FHIR audit log ───── */
+  const A_PAGE = 25;
+  let aLoaded = [];
+  let aTotal = null;
+  let aQuery = "";
+  const A_OUT = { "0": ["Success", "ok"], "4": ["Denied or client error", "warn"], "8": ["Server error", "bad"], "12": ["Major failure", "bad"] };
+  const A_ACT = { C: "Create", R: "Read", U: "Update", D: "Delete", E: "Execute" };
+
+  function auditCard(e) {
+    const [label, cls] = A_OUT[e.outcome] || ["Outcome " + e.outcome, ""];
+    const ag = e.agent?.[0] || {};
+    const ip = ag.network?.address ? ` · ${esc(ag.network.address)}` : "";
+    const when = e.recorded ? new Date(e.recorded).toLocaleString() : "unknown time";
+    return `<div class="ev"><div class="head"><div><span class="pill ${cls}">${esc(label)}</span> <span class="pill">${esc(A_ACT[e.action] || e.action || "")}</span></div>
+      <span class="muted">${esc(when)} · ${esc(ago(e.recorded))}</span></div>
+      <div class="op">${esc(e.entity?.[0]?.name || "")}</div>
+      <div class="muted">${esc(ag.name || "anonymous")}${ip}${e.outcomeDesc ? " · " + esc(e.outcomeDesc) : ""}</div>
+      <details><summary>Raw AuditEvent</summary><pre>${esc(JSON.stringify(e, null, 2))}</pre></details></div>`;
+  }
+
+  function renderAudit() {
+    $("auditList").innerHTML = aLoaded.map(auditCard).join("");
+    const more = typeof aTotal === "number" ? aLoaded.length < aTotal : false;
+    $("aMore").classList.toggle("hide", !more);
+    $("aMsg").textContent = aLoaded.length
+      ? `Showing ${aLoaded.length}${typeof aTotal === "number" ? " of " + fmt(aTotal) : ""}, newest first.`
+      : "No audit events match.";
+  }
+
+  function auditQuery() {
+    const p = new URLSearchParams();
+    if ($("aOutcome").value) p.set("outcome", $("aOutcome").value);
+    const days = Number($("aSince").value);
+    if (days > 0) p.set("date", "ge" + new Date(Date.now() - days * 86400000).toISOString());
+    const op = $("aOp").value.trim(); if (op) p.set("operation", op);
+    const ag = $("aAgent").value.trim(); if (ag) p.set("agent-name", ag);
+    return p;
+  }
+
+  async function loadAudit(reset) {
+    if (reset) { aLoaded = []; aTotal = null; aQuery = auditQuery().toString(); $("auditList").innerHTML = ""; }
+    $("aMsg").textContent = "Loading audit events…";
+    const r = await call(`/fhir/AuditEvent?${aQuery}&_count=${A_PAGE}&_offset=${aLoaded.length}`);
+    const b = r.body;
+    if (r.status !== 200 || b?.resourceType !== "Bundle") {
+      const why = b?.issue?.[0]?.diagnostics || b?.error || b?.message;
+      $("aMsg").textContent = r.status === 403 ? "The gateway has not enabled the audit log yet (add /fhir/AuditEvent to ADMIN_GET_PATHS)."
+        : r.status === 501 ? "Audit storage is off. Set FHIR_AUDIT_STORE=true on the API and run sql/028."
+        : `Couldn't load the audit log (${r.status || "network"})${why ? ": " + why : ""}`;
+      $("aMore").classList.add("hide");
+      return;
+    }
+    const events = (b.entry || []).map((x) => x.resource).filter(Boolean);
+    aLoaded = aLoaded.concat(events);
+    aTotal = typeof b.total === "number" ? b.total : (events.length >= A_PAGE ? aLoaded.length + 1 : aLoaded.length);
+    renderAudit();
+  }
+
+  document.addEventListener("click", (e) => {
+    const f = e.target.closest("#jFilter [data-st]");
+    if (!f) return;
+    jStatus = f.dataset.st;
+    document.querySelectorAll("#jFilter .chip").forEach((c) => c.classList.toggle("on", c === f));
+    jLoaded = []; jTotal = null;
+    loadJobs(true);
+  });
+  $("jMore").addEventListener("click", () => loadJobs(false));
+  $("aGo").addEventListener("click", () => loadAudit(true));
+  $("aMore").addEventListener("click", () => loadAudit(false));
+  $("aOp").addEventListener("keydown", (e) => { if (e.key === "Enter") loadAudit(true); });
+  $("aAgent").addEventListener("keydown", (e) => { if (e.key === "Enter") loadAudit(true); });
+  $("aOutcome").addEventListener("change", () => loadAudit(true));
+  $("aSince").addEventListener("change", () => loadAudit(true));
+
   function setAuto(on) {
     clearInterval(timer); timer = null;
     if (on) timer = setInterval(() => { if (!document.hidden) load(true); }, 60000);
@@ -539,7 +692,7 @@
   $("pw").addEventListener("keydown", (e) => { if (e.key === "Enter") $("go").click(); });
   $("refresh").addEventListener("click", () => load());
   $("auto").addEventListener("change", (e) => setAuto(e.target.checked));
-  $("out").addEventListener("click", () => { hideReveal(); saveSession(null); setAuto(false); show("login"); });
+  $("out").addEventListener("click", () => { hideReveal(); saveSession(null); setAuto(false); jLoaded = []; aLoaded = []; $("jobList").innerHTML = ""; $("auditList").innerHTML = ""; show("login"); });
 
   if (!SB || !GW) { show("login"); $("loginMsg").textContent = "Missing config. Check js/config.js."; }
   else start();
