@@ -12,8 +12,8 @@ it's a separate, deployable-on-its-own frontend.
 
 Everything documented here was verified against the actual repository
 (`src/index.js`'s router and `routePolicy()`, the `src/fhir*.js` modules,
-`src/ragPipeline.js`, `src/oauth.js` and `wrangler.toml`) - nothing here was
-invented. Currently in line with API **v1.32.0**.
+`src/ragPipeline.js` and `wrangler.toml`) - nothing here was
+invented. Currently in line with API **v1.36.0**.
 
 ---
 
@@ -47,7 +47,7 @@ service worker, icons, offline strategy, install requirements).
 | `#/` | Consumer landing page (no sidebar) |
 | `#/docs/getting-started` | Getting Started: base URL, first request, live status |
 | `#/docs/endpoints` | API Endpoints: what the API provides, by resource |
-| `#/docs/authentication` | Authentication: public routes, consumer keys, OAuth 2.0, rate limits |
+| `#/docs/authentication` | Authentication: key types, open routes, consumer keys, rate limits |
 | `#/docs/examples` | Request & Response Examples: envelope, pagination, runnable examples |
 | `#/docs/schemas` | Data Schemas: every `components.schemas` entry in the spec |
 | `#/docs/errors` | Error Handling: status codes, headers, retries |
@@ -209,16 +209,18 @@ of the OpenAPI document - they're read out of `routePolicy()` in
 
 ---
 
-## 6. Endpoints documented (163 of 163)
+## 6. Endpoints documented (159 of 159)
 
 Every route the Worker actually serves is documented - nothing was skipped.
 `/manufacturers`, `/products`, and `/nutrition` were removed from the API in
-v1.15.0-v1.16.0 and no longer appear here. The list below matches API v1.32.0.
+v1.15.0-v1.16.0 and no longer appear here. The list below matches API v1.36.0.
 
-This list covers the whole spec (`openapi.json`). The portal UI deliberately
-renders only public routes (see `js/spec-loader.js`), so admin-gated routes
-such as key management, bulk inserts and `/rag/ingest` are in the spec but
-not shown in the sidebar.
+The portal UI renders **every** route in `openapi.json`: public, API-key, admin,
+root-only, login-token and webhook routes alike. Each endpoint page carries a
+badge for the credential it needs (`authMode` in `js/spec-loader.js`: `public`,
+`optional`, `key`, `admin`, `login`, `secret`). Admin routes are marked from
+`requiredRole` in `data/endpoint-metadata.json` or an "(admin)" / "(root key
+only)" summary in the spec.
 
 **Meta**
 - `GET /` - API metadata
@@ -233,13 +235,7 @@ not shown in the sidebar.
 - `GET /admin/keys` - List API keys (root key only)
 - `POST /admin/keys` - Create a new API key (root key only)
 - `DELETE /admin/keys/{id}` - Revoke an API key (root key only)
-
-**OAuth** (client_credentials for machine-to-machine callers; the client secret is exchanged for a 1-hour bearer token)
-- `POST /oauth/token` - OAuth 2.0 token endpoint (client_credentials)
-- `GET /.well-known/oauth-authorization-server` - OAuth 2.0 authorization server metadata (RFC 8414)
-- `GET /admin/oauth-clients` - List OAuth clients (root key only)
-- `POST /admin/oauth-clients` - Create an OAuth client (root key only)
-- `DELETE /admin/oauth-clients/{id}` - Revoke an OAuth client (root key only)
+- `GET /admin/overview` - Admin monitor snapshot (root key only)
 
 **Developer keys** (self-service consumer keys; authenticate with a developer login token, not an API key)
 - `GET /developer/keys` - List your consumer API keys

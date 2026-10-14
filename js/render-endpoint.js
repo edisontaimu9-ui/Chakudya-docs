@@ -26,15 +26,23 @@ const RenderEndpoint = (() => {
   }
 
   function authPill(endpoint) {
-    if (endpoint.authMode === "admin") {
-      const role = endpoint.meta?.requiredRole;
-      const label = role === "root" ? "Root key required" : role === "reviewer" ? "Admin (reviewer+)" : "Admin key required";
-      return `<span class="pill pill--auth-admin">🔒 ${label}</span>`;
+    switch (endpoint.authMode) {
+      case "admin": {
+        const role = endpoint.meta?.requiredRole;
+        const label = role === "root" ? "Root key required" : role === "reviewer" ? "Admin (reviewer+)" : "Admin key required";
+        return `<span class="pill pill--auth-admin">🔒 ${label}</span>`;
+      }
+      case "key":
+        return `<span class="pill pill--auth-admin">🔑 API key required</span>`;
+      case "login":
+        return `<span class="pill pill--auth-admin">🔑 Login token required</span>`;
+      case "secret":
+        return `<span class="pill pill--auth-admin">🔒 Webhook secret</span>`;
+      case "optional":
+        return `<span class="pill">Bearer optional</span>`;
+      default:
+        return `<span class="pill pill--auth-public">Public</span>`;
     }
-    if (endpoint.authMode === "optional") {
-      return `<span class="pill">Bearer optional</span>`;
-    }
-    return `<span class="pill pill--auth-public">Public</span>`;
   }
 
   function rateLimitPill(endpoint) {
@@ -246,7 +254,9 @@ const RenderEndpoint = (() => {
     const url = base.replace(/\/$/, "") + path + (queryEx ? `?${queryEx}` : "");
 
     const lines = [`curl -X ${endpoint.method} "${url}"`];
-    if (endpoint.authMode !== "public") lines.push(`  -H "Authorization: Bearer <API_KEY>"`);
+    if (endpoint.authMode === "secret") lines.push(`  -H "x-webhook-secret: <WEBHOOK_SECRET>"`);
+    else if (endpoint.authMode === "login") lines.push(`  -H "Authorization: Bearer <LOGIN_TOKEN>"`);
+    else if (endpoint.authMode !== "public") lines.push(`  -H "Authorization: Bearer <API_KEY>"`);
     const body = SchemaExample.forRequestBody(spec, endpoint.requestBody);
     if (body !== null && body !== undefined) {
       lines.push(`  -H "Content-Type: application/json"`);

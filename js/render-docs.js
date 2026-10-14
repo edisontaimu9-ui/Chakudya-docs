@@ -15,7 +15,7 @@ const RenderDocs = (() => {
   const SECTIONS = [
     { id: "getting-started", title: "Getting Started", blurb: "Base URL, your first request and live API status." },
     { id: "endpoints", title: "API Endpoints", blurb: "What the API provides, grouped by resource." },
-    { id: "authentication", title: "Authentication", blurb: "Public routes, consumer keys, OAuth and rate limits." },
+    { id: "authentication", title: "Authentication", blurb: "API keys, key types, open routes and rate limits." },
     { id: "examples", title: "Request & Response Examples", blurb: "Response format, pagination and runnable examples." },
     { id: "schemas", title: "Data Schemas", blurb: "Shared response and object shapes from the spec." },
     { id: "errors", title: "Error Handling", blurb: "Status codes, error bodies, retries and request IDs." },
@@ -154,6 +154,11 @@ const RenderDocs = (() => {
   }
 
   function sampleSet(req) {
+    // Show the Authorization header on any route that needs a key, unless the caller set `auth` itself.
+    if (req.auth === undefined) {
+      const ep = epFor(req.method, req.path);
+      req = { ...req, auth: !!ep && ["key", "admin", "optional"].includes(ep.authMode) };
+    }
     return snippets([
       { label: "curl", lang: "bash", code: toCurl(req) },
       { label: "JavaScript", lang: "js", code: toJs(req) },
@@ -265,8 +270,8 @@ const RenderDocs = (() => {
     const baseBlock = RenderEndpoint.codeBlock("Base URL", base(), { lang: "text" });
     const steps = el(`
       <ol class="doc-steps">
-        <li><strong>Call a public route.</strong> Reads and a handful of specific write routes need no key at all. Try the request below.</li>
-        <li><strong>Get an API key when you need more.</strong> <a href="#/account">Sign in</a> for a self-service key with three times the public rate limit and FHIR access.</li>
+        <li><strong>Get an API key.</strong> <a href="#/account">Sign in</a> and create a self-service key. Only <code>GET /</code>, <code>GET /health</code> and the FHIR conformance reads work without one.</li>
+        <li><strong>Send it as a bearer token.</strong> Add <code>Authorization: Bearer YOUR_API_KEY</code> to each request. Consumer keys get three times the standard rate limit and FHIR access.</li>
         <li><strong>Explore the reference.</strong> Every endpoint has parameters, example requests and responses, and a live <em>Try it</em> console in the <a href="#/docs/api-reference">API Reference</a>.</li>
         <li><strong>Use the spec.</strong> Download <a href="openapi.yaml" download>openapi.yaml</a> or <a href="openapi.json" download>openapi.json</a> to generate clients or import into any OpenAPI 3 tool.</li>
       </ol>`);
@@ -280,10 +285,10 @@ const RenderDocs = (() => {
       </div>`);
 
     return page("getting-started",
-      `The Chakudya Nutrition Registry (CNR) API is a JSON-over-HTTPS API for Malawian food data, WHO growth assessment, clinical nutrition tools, a FHIR R4 facade and AI-ready knowledge. It currently documents <strong>${endpoints.length}</strong> public endpoints (v${esc(spec.info?.version || "?")}).`,
+      `The Chakudya Nutrition Registry (CNR) API is a JSON-over-HTTPS API for Malawian food data, WHO growth assessment, clinical nutrition tools, a FHIR R4 facade and AI-ready knowledge. It currently documents <strong>${endpoints.length}</strong> endpoints (v${esc(spec.info?.version || "?")}).`,
       [
         section("start", "Quick start", p("All requests go to one base URL. Responses are JSON and cross-origin requests are allowed, so you can call it from a browser, a script or a phone terminal."), baseBlock, steps),
-        section("first", "Make your first request", p(`Search the local food database for <em>nsima</em>. This uses ${epLink("GET", "/foods")} and needs no key.`), sampleSet({ method: "GET", path: "/foods", query: "search=nsima&limit=5" })),
+        section("first", "Make your first request", p(`Search the local food database for <em>nsima</em>. This uses ${epLink("GET", "/foods")} and needs your API key.`), sampleSet({ method: "GET", path: "/foods", query: "search=nsima&limit=5", auth: true })),
         section("live", "Live API status", p("Checked against <code>GET /health</code> when this page loads, then every minute while it is open. This is current status only, not a history."), status),
         section("demo", "See it in action", p("Real responses from the production API."), demo),
         section("next", "Where to next", next),
@@ -319,7 +324,6 @@ const RenderDocs = (() => {
         <li><span><strong>RAG powered nutrition knowledge</strong> (<code>/rag/ask</code>, <code>/rag/retrieve</code>). Retrieve relevant knowledge or ask a question directly. Admins can add documents with <code>/rag/ingest</code> or upload files for automatic ingestion with <code>/rag/upload</code>.</span></li>
         <li><span><strong>Session memory</strong> (<code>/memory/write</code>, <code>/memory/recall</code>, <code>/memory/consolidate</code>). Store, consolidate, and recall contextual information for AI assisted applications.</span></li>
         <li><span><strong>Consumer API keys</strong> (<a href="#/account">sign in to get one</a>). Self-service keys with three times the public rate limit, access to the FHIR operations and per-key usage counts.</span></li>
-        <li><span><strong>OAuth 2.0 client credentials</strong> (<code>/oauth/token</code>). Machine-to-machine services exchange a revocable client secret for a one-hour bearer token instead of holding an admin key.</span></li>
         <li><span><strong>Batch requests</strong> (<code>/batch</code>). Fan out several calls in one round trip through the same auth/rate-limit pipeline as a normal request.</span></li>
       </ul>`);
 
@@ -372,42 +376,26 @@ const RenderDocs = (() => {
 
   function authentication() {
     const keyReq = { method: "GET", path: "/foods", query: "search=nsima&limit=5", auth: true };
-    const tokenCurl = [
-      `curl -X POST "${base()}/oauth/token" \\`,
-      `  -u "$CLIENT_ID:$CLIENT_SECRET" \\`,
-      `  -d "grant_type=client_credentials"`,
-      `# -> {"access_token":"eyJ...","token_type":"Bearer","expires_in":3600,"scope":"admin"}`,
-    ].join("\n");
-    const tokenJs = [
-      "let cached = { token: null, exp: 0 };",
-      "",
-      "async function getToken(clientId, clientSecret) {",
-      "  // Reuse the token until shortly before it expires.",
-      "  if (cached.token && Date.now() < cached.exp - 60_000) return cached.token;",
-      `  const res = await fetch("${base()}/oauth/token", {`,
-      '    method: "POST",',
-      "    headers: {",
-      '      Authorization: "Basic " + btoa(clientId + ":" + clientSecret),',
-      '      "Content-Type": "application/x-www-form-urlencoded",',
-      "    },",
-      '    body: "grant_type=client_credentials",',
-      "  });",
-      '  if (!res.ok) throw new Error("token request failed: " + res.status);',
-      "  const { access_token, expires_in } = await res.json();",
-      "  cached = { token: access_token, exp: Date.now() + expires_in * 1000 };",
-      "  return access_token;",
-      "}",
-    ].join("\n");
-
     const bearer = RenderEndpoint.codeBlock("Authorization header", "Authorization: Bearer YOUR_API_KEY", { lang: "text" });
     const rl = rateLimitTable();
 
     return page("authentication",
-      `Most of the API is public. Add a key when you want higher rate limits or FHIR access, and use OAuth 2.0 for server-to-server integrations.`,
+      `Almost every route needs an API key. Create your own on the account page, send it as a bearer token, and use the key types below to see which routes you can reach.`,
       [
-        section("public", "Public routes",
-          p("Every route documented here is public and needs no key: <code>GET</code> reads plus a handful of specific write routes (community submissions, RAG retrieve/ask, memory write/recall). They are rate-limited by IP address."),
-          p("Routes that change reference data, review submissions or manage keys need an admin or reviewer credential issued by the API maintainers. They are not part of this public documentation.")),
+        section("public", "Routes that need no key",
+          p("Only <code>GET /</code>, <code>GET /health</code> and the FHIR conformance reads (<code>GET /fhir/metadata</code>, <code>CodeSystem</code>, <code>OperationDefinition</code>, <code>StructureDefinition</code>, <code>ConceptMap</code> and <code>Questionnaire</code>) work without a key. They are rate-limited by IP address."),
+          p("Every other route returns <code>401</code> with the code <code>api_key_required</code> when no key is sent. Each endpoint page shows a badge for the credential it needs.")),
+        section("roles", "Key types and access",
+          table(["Badge", "Credential", "Reaches"], [
+            ["Public", "None", "The open routes above."],
+            ["API key required", "Any valid key: consumer, reviewer or admin", "Reads, growth and clinical tools, FHIR operations, recipes and meals, RAG ask and retrieve, memory, food log, favorites and history."],
+            ["Admin key required", "Admin key", "Registry writes (foods, exchange, renal, formulas, drug interactions, glycaemic index, reference tables), bulk inserts, packaged review, RAG ingest and uploads, FHIR AuditEvent."],
+            ["Admin (reviewer+)", "Reviewer or admin key", "Packaged-food review queue."],
+            ["Root key required", "Root key only", "API key management and the admin monitor snapshot."],
+            ["Login token required", "Developer login token", "Managing your own consumer keys at <code>/developer/keys</code>."],
+            ["Webhook secret", "Shared secret in <code>x-webhook-secret</code>", "The storage trigger webhook, <code>POST /rag/webhook</code>."],
+          ]),
+          p("Admin, reviewer and root keys are issued by the API maintainers. A consumer key is refused on those routes.")),
         section("keys", "Consumer API keys",
           p("Anyone can create their own key on the <a href=\"#/account\">account page</a> (email and password, or Google). Send it as a bearer token:"),
           bearer,
@@ -420,16 +408,9 @@ const RenderDocs = (() => {
             ["FHIR", "Consumer keys can call the <code>/fhir</code> operations."],
             ["Visibility", "A key is shown <strong>once</strong>, when you create it. The account page lists your active keys with last-used time and usage counts."],
           ]),
-          callout("<strong>Keep keys private.</strong> Don't put a key in front-end code that other people can open. Call the API from a server, or use public routes from the browser.")),
+          callout("<strong>Keep keys private.</strong> Don't put a key in front-end code that other people can open. Call the API from a server rather than from browser code.")),
         section("login", "Login tokens vs API keys",
           p("The account page signs you in with Supabase Auth and uses that <em>login</em> access token only for managing your keys (<code>/developer/keys</code>). It is not an API key and is not accepted anywhere else. The docs site handles this for you.")),
-        section("oauth", "OAuth 2.0 (server to server)",
-          p(`Services that call the API on their own behalf can use the <strong>client_credentials</strong> flow instead of holding a long-lived key. Exchange a client ID and secret at ${epLink("POST", "/oauth/token")} for a bearer token that lasts <strong>one hour</strong>, then send it like an API key. Credentials are issued by the API maintainers; discovery metadata (RFC 8414) is at ${epLink("GET", "/.well-known/oauth-authorization-server")}.`),
-          snippets([
-            { label: "curl", lang: "bash", code: tokenCurl },
-            { label: "JavaScript", lang: "js", code: tokenJs },
-          ]),
-          p("Asking for a broader <code>scope</code> than the client's role returns <code>invalid_scope</code>. The token endpoint is limited to 10 requests per minute per IP, so cache the token until shortly before it expires.")),
         section("limits", "Rate limits",
           p("Limits are applied per route. When you exceed one the API answers <code>429</code> with a <code>Retry-After</code> header (see <a href=\"#/docs/errors\">Error Handling</a>). Current limits for the documented routes:"),
           rl),
@@ -700,8 +681,6 @@ const RenderDocs = (() => {
         section("batch", "Batching requests",
           p(`${epLink("POST", "/batch")} runs up to 20 sub-requests in one round trip through the same auth and rate-limit pipeline as a normal request. Each sub-request still counts against its own route's limit, and the batch itself is limited to 10 per minute per IP. Pass an <code>id</code> on each item to match results to requests.`),
           sampleSet({ method: "POST", path: "/batch", body: batchBody })),
-        section("machine", "Service-to-service",
-          p("For servers and bots that call the API on their own behalf, use <a href=\"#/docs/authentication\">OAuth 2.0 client credentials</a> instead of a long-lived key.")),
       ]);
   }
 
@@ -761,7 +740,7 @@ const RenderDocs = (() => {
     apply("");
 
     return page("api-reference",
-      `All ${endpoints.length} documented public routes in ${groups.length} resource groups. Open any route for its parameters, example requests and responses, and a live <em>Try it</em> console. Use <kbd>←</kbd> and <kbd>→</kbd> on a route page to step through them.`,
+      `All ${endpoints.length} documented routes in ${groups.length} resource groups. Open any route for its parameters, example requests and responses, and a live <em>Try it</em> console. Use <kbd>←</kbd> and <kbd>→</kbd> on a route page to step through them.`,
       [
         section("routes", "Routes", filter, wrap, empty),
         section("spec", "Machine-readable spec",

@@ -24,15 +24,29 @@ const SpecLoader = (() => {
     return (params || []).map((p) => deref(spec, p));
   }
 
-  /** true = requires a bearer token, false = public, per this operation's `security`. */
-  function isAdminAuth(security) {
-    if (!Array.isArray(security)) return false;
-    // bearerAuth = admin/consumer API key; loginToken = developer login session (only used by /developer/keys)
-    return security.some((req) => req && (Object.prototype.hasOwnProperty.call(req, "bearerAuth") || Object.prototype.hasOwnProperty.call(req, "loginToken")));
+  /**
+   * How a route is authenticated, from its `security` list (op-level, else the spec default):
+   *  public   - no credential (security: [] or no security at all)
+   *  optional - works without a key, a bearer key is also accepted
+   *  login    - developer login token (/developer/keys)
+   *  secret   - shared webhook secret (POST /rag/webhook)
+   *  key      - any valid API key (consumer, reviewer or admin)
+   *  admin    - needs an admin/reviewer/root key (set by the caller from metadata or the summary)
+   */
+  function authModeFor(security) {
+    if (!Array.isArray(security) || !security.length) return "public";
+    const open = security.some((req) => req && Object.keys(req).length === 0);
+    const has = (name) => security.some((req) => req && Object.prototype.hasOwnProperty.call(req, name));
+    if (has("bearerAuth")) return open ? "optional" : "key";
+    if (has("loginToken")) return "login";
+    if (has("webhookSecret")) return "secret";
+    return open ? "public" : "key";
   }
-  function isPublicAllowed(security) {
-    if (!Array.isArray(security)) return true;
-    return security.some((req) => req && Object.keys(req).length === 0);
+
+  /** Routes the spec marks "(admin)" or "(root key only)" refuse consumer keys. */
+  function isAdminOnly(op, meta) {
+    if (meta && meta.requiredRole) return true;
+    return /\((admin|root key only)[^)]*\)/i.test(op.summary || "");
   }
 
   function findMetadata(metadata, method, path) {
@@ -57,9 +71,9 @@ const SpecLoader = (() => {
         if (!op) continue;
 
         const security = op.security !== undefined ? op.security : spec.security;
-        const admin = isAdminAuth(security);
-        const publicOk = isPublicAllowed(security);
-        const authMode = admin && !publicOk ? "admin" : admin && publicOk ? "optional" : "public";
+        const meta = findMetadata(metadata, method.toUpperCase(), path);
+        let authMode = authModeFor(security);
+        if (authMode === "key" && isAdminOnly(op, meta)) authMode = "admin";
 
         endpoints.push({
           id: `${method.toUpperCase()} ${path}`,
@@ -74,15 +88,14 @@ const SpecLoader = (() => {
           parameters: resolveParams(spec, op.parameters),
           requestBody: op.requestBody ? deref(spec, op.requestBody) : null,
           responses: op.responses || {},
-          meta: findMetadata(metadata, method.toUpperCase(), path),
+          meta,
         });
       }
     }
 
-    // Public docs only ship public, unauthenticated routes - admin-gated
-    // and bearer-optional operations are dropped here so they never show
-    // up in the sidebar, search, routing, or the endpoint list below.
-    const publicEndpoints = endpoints.filter((e) => e.authMode === "public");
+    // Every operation in the spec is documented - key-gated and admin routes included.
+    // Each one carries an `authMode` so the UI can label what credential it needs.
+    const publicEndpoints = endpoints;
 
     // Stable order: as declared in the spec's tags list, "Other" last.
     const tagOrder = (spec.tags || []).map((t) => t.name);

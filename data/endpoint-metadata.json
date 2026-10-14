@@ -74,64 +74,6 @@
       "note": "Root ADMIN_API_KEY only."
     },
     {
-      "method": "POST",
-      "path": "/oauth/token",
-      "auth": "public",
-      "rateLimit": {
-        "limit": 10,
-        "windowSeconds": 60,
-        "scope": "ip"
-      },
-      "note": "Public because the client secret IS the credential; capped tightly per IP to blunt secret-guessing. client_credentials grant, 1-hour HS256 JWT carrying the client's role."
-    },
-    {
-      "method": "GET",
-      "path": "/.well-known/oauth-authorization-server",
-      "auth": "public",
-      "rateLimit": {
-        "limit": 60,
-        "windowSeconds": 60,
-        "scope": "ip"
-      },
-      "note": "RFC 8414 discovery metadata."
-    },
-    {
-      "method": "GET",
-      "path": "/admin/oauth-clients",
-      "auth": "admin",
-      "requiredRole": "root",
-      "rateLimit": {
-        "limit": 30,
-        "windowSeconds": 60,
-        "scope": "admin"
-      },
-      "note": "Root ADMIN_API_KEY only. The client_secret is shown once; revoking also blocks already-issued tokens (KV denylist)."
-    },
-    {
-      "method": "POST",
-      "path": "/admin/oauth-clients",
-      "auth": "admin",
-      "requiredRole": "root",
-      "rateLimit": {
-        "limit": 30,
-        "windowSeconds": 60,
-        "scope": "admin"
-      },
-      "note": "Root ADMIN_API_KEY only. The client_secret is shown once; revoking also blocks already-issued tokens (KV denylist)."
-    },
-    {
-      "method": "DELETE",
-      "path": "/admin/oauth-clients/{id}",
-      "auth": "admin",
-      "requiredRole": "root",
-      "rateLimit": {
-        "limit": 30,
-        "windowSeconds": 60,
-        "scope": "admin"
-      },
-      "note": "Root ADMIN_API_KEY only. The client_secret is shown once; revoking also blocks already-issued tokens (KV denylist)."
-    },
-    {
       "method": "GET",
       "path": "/developer/keys",
       "auth": "public",
@@ -1711,6 +1653,18 @@
         "scope": "admin"
       },
       "note": "Also runs automatically every hour via a cron trigger, bypassing HTTP auth entirely."
+    },
+    {
+      "method": "GET",
+      "path": "/admin/overview",
+      "auth": "admin",
+      "requiredRole": "root",
+      "rateLimit": {
+        "limit": 30,
+        "windowSeconds": 60,
+        "scope": "admin"
+      },
+      "note": "Root ADMIN_API_KEY only - read-only snapshot for the admin monitor."
     }
   ]
 }

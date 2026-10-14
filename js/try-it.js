@@ -63,8 +63,8 @@ const TryIt = (() => {
           ${endpoint.authMode !== "public" ? `
             <div class="auth-row">
               <div class="field">
-                <label class="field__label">Authorization <span class="param-required">${endpoint.authMode === "admin" ? "required" : "optional"}</span></label>
-                <input type="text" data-role="auth" aria-label="Authorization bearer token" placeholder="Bearer token (ADMIN_API_KEY or a minted key)" autocomplete="off" spellcheck="false" />
+                <label class="field__label">Authorization <span class="param-required">${endpoint.authMode === "optional" ? "optional" : "required"}</span></label>
+                <input type="text" data-role="auth" aria-label="Authorization bearer token" placeholder="${endpoint.authMode === "secret" ? "Webhook secret (x-webhook-secret)" : endpoint.authMode === "login" ? "Developer login access token" : endpoint.authMode === "admin" ? "Admin, reviewer or root API key" : "Your API key (create one on the account page)"}" autocomplete="off" spellcheck="false" />
                 <span class="field__hint">Kept in memory for this page only - never saved to storage or sent anywhere but the request below.</span>
               </div>
             </div>` : ""}
@@ -168,8 +168,8 @@ const TryIt = (() => {
     const authInput = panel.querySelector('[data-role="auth"]');
     // Admin routes use the token field; public routes send the visitor's own consumer key
     // (only if they chose "Use in Try It" on the account page) so they see their higher limits.
-    const authToken = authInput ? authInput.value.trim() : (endpoint.authMode === "public" ? DevAuth.getTryItKey() : ""); 
-    if (endpoint.authMode === "admin" && !authToken) {
+    const authToken = authInput ? (authInput.value.trim() || (endpoint.authMode === "key" || endpoint.authMode === "optional" ? DevAuth.getTryItKey() : "")) : (endpoint.authMode === "public" ? DevAuth.getTryItKey() : ""); 
+    if (["admin", "key", "login", "secret"].includes(endpoint.authMode) && !authToken) {
       errorBox.textContent = "This endpoint requires a bearer token.";
       errorBox.classList.add("is-visible");
       return;
@@ -191,7 +191,9 @@ const TryIt = (() => {
     }
 
     const url = ApiClient.buildUrl(baseUrl, endpoint.path, pathParams, queryParams);
-    const headers = ApiClient.buildHeaders({ hasBody: body !== undefined, authToken });
+    const secretMode = endpoint.authMode === "secret";
+    const headers = ApiClient.buildHeaders({ hasBody: body !== undefined, authToken: secretMode ? "" : authToken });
+    if (secretMode && authToken) headers["x-webhook-secret"] = authToken;
     const bodyText = body !== undefined ? JSON.stringify(body, null, 2) : undefined;
 
     btn.disabled = true;

@@ -423,16 +423,17 @@ const RenderLanding = (() => {
     const { endpoints, groups, spec } = AppState.state;
     const tech = [
       `${endpoints.length} documented endpoints`, `${groups.length} resource groups`, `API v${spec.info?.version || "?"}`,
-      "OpenAPI spec", "Open CORS", "Self-service API keys", "OAuth 2.0 client credentials", "Batched requests",
+      "OpenAPI spec", "Open CORS", "Self-service API keys", "Batched requests",
       "FHIR R4 care workflows", "AI-ready knowledge (retrieval-augmented answers)",
     ];
-    const curl = `curl "${base}/foods/lookup?q=nsima"`;
+    const curl = `curl "${base}/foods/lookup?q=nsima" \\
+  -H "Authorization: Bearer YOUR_API_KEY"`;
     const sec = el(`
       <section class="lp-section lp-dev reveal" id="lp-dev" aria-labelledby="lp-dev-h">
         <div class="lp-dev__copy">
           <p class="lp-kicker">For developers</p>
           <h2 id="lp-dev-h">Your first call takes one line</h2>
-          <p class="lp-sub">Everything on this site is served by one open API. Public routes need no key, and CORS is open, so you can call it from a browser, a script or a terminal. Add a key later for higher limits and FHIR access.</p>
+          <p class="lp-sub">Everything on this site is served by one API. Create a free key on the account page, send it as a bearer token, and CORS is open so you can call it from a browser, a script or a terminal.</p>
           <p class="lp-dev__tech-label">Under the hood</p>
           <div class="tag-list lp-dev__tech">${tech.map((t) => `<span>${esc(t)}</span>`).join("")}</div>
           <div class="lp-cta">
