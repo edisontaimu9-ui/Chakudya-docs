@@ -1677,6 +1677,18 @@
         "scope": "admin"
       },
       "note": "Root ADMIN_API_KEY only - recent admin actions for the admin monitor."
+    },
+    {
+      "method": "GET",
+      "path": "/admin/monitoring",
+      "auth": "admin",
+      "requiredRole": "root",
+      "rateLimit": {
+        "limit": 30,
+        "windowSeconds": 60,
+        "scope": "admin"
+      },
+      "note": "Root ADMIN_API_KEY only - failed calls and slow endpoints for the admin monitor."
     }
   ]
 }

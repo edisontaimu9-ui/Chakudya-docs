@@ -3,7 +3,7 @@
   "info": {
     "title": "Chakudya Nutrition Registry API (CNR)",
     "description": "Chakudya is a Malawi focused nutrition data and intelligence API. It provides structured, searchable nutrition information for health applications, researchers, students, dietitians, and developers building tools for clinical or public health nutrition work. The API combines local food composition data with international sources such as USDA FoodData Central, Open Food Facts, and FatSecret, and adds retrieval augmented question answering and session memory for AI assisted applications.\n\nIt also covers clinical growth assessment (WHO child growth standards from birth to 19 years, Fenton preterm charts, and a combined `/growth/assess` call), recipe and meal nutrition analysis, dietary reference intakes, and a stateless FHIR R4 facade that exposes growth evaluation and the full Nutrition Care Process (screening, assessment, diagnosis, intervention, monitoring and ADIME documents).\n\nPeople can sign in on the docs site and create their own consumer API keys (higher rate limits, FHIR access, usage counts) with `/developer/keys`.\n\nEvery operational route needs `Authorization: Bearer YOUR_API_KEY` (a consumer key from the developer console, or an admin or reviewer key). The only routes that work without a key are `GET /`, `GET /health` and the FHIR conformance reads (`GET /fhir/metadata`, `CodeSystem`, `OperationDefinition`, `StructureDefinition`, `ConceptMap`, `Questionnaire`). `/developer/keys` takes your Supabase login token instead of an API key, and `POST /rag/webhook` takes a shared secret. Privileged registry writes (foods, exchange, renal, formulas, drug interactions, glycaemic index, reference tables, packaged CRUD and review, RAG ingest, bulk inserts) and key management need an admin key; a consumer key is refused there. Anonymous calls receive 401 with the code `api_key_required`. OAuth 2.0 was removed in v1.34.0.\n",
-    "version": "1.37.0",
+    "version": "1.38.0",
     "contact": {
       "name": "Edison Taimu",
       "x-location": "Blantyre, Malawi"
@@ -298,6 +298,115 @@
           },
           "429": {
             "$ref": "#/components/responses/RateLimited"
+          }
+        }
+      }
+    },
+    "/admin/monitoring": {
+      "get": {
+        "tags": [
+          "API Keys"
+        ],
+        "summary": "Failed calls and slow endpoints (root key only)",
+        "description": "Summary of failed and slow requests for the admin monitor. Only failures (5xx, 429 and 4xx other than 401 and 404) and slow calls (at or above `REQUEST_LOG_SLOW_MS`, default 1500 ms) are stored, so this shows what is breaking and what is slow, not an overall error rate. Rows hold the method, a route with ids replaced, status, duration and request id - never query strings, bodies, tokens or IPs. Storage is off unless `REQUEST_LOG_STORE=true` (run `sql/031_add_request_log.sql` first). When the table cannot be read the response has `available` false and a note. Needs the root key.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "hours",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "default": 24,
+              "maximum": 168
+            },
+            "description": "Look-back window in hours."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Failed and slow request summary",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/Success"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "type": "object",
+                          "properties": {
+                            "generated_at": {
+                              "type": "string",
+                              "format": "date-time"
+                            },
+                            "window_hours": {
+                              "type": "integer"
+                            },
+                            "available": {
+                              "type": "boolean"
+                            },
+                            "storage_enabled": {
+                              "type": "boolean"
+                            },
+                            "slow_ms": {
+                              "type": "integer"
+                            },
+                            "truncated": {
+                              "type": "boolean"
+                            },
+                            "totals": {
+                              "type": "object",
+                              "description": "failed, slow and by_status counts."
+                            },
+                            "failing_endpoints": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "description": "method, route, count, statuses and last_at."
+                              }
+                            },
+                            "slow_endpoints": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "description": "method, route, count, avg_ms, max_ms and last_at."
+                              }
+                            },
+                            "recent": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "description": "at, request_id, method, route, status, duration_ms and kind."
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "description": "Not the root key",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
           }
         }
       }
