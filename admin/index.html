@@ -56,8 +56,12 @@
     <label class="muted" for="em">Email</label>
     <input id="em" type="email" autocomplete="username" />
     <label class="muted" for="pw">Password</label>
-    <input id="pw" type="password" autocomplete="current-password" />
+    <div style="position:relative">
+      <input id="pw" type="password" autocomplete="current-password" style="padding-right:64px" />
+      <button id="eye" type="button" aria-label="Show password" style="position:absolute;right:6px;top:10px;padding:4px 10px;font-size:13px">Show</button>
+    </div>
     <button id="go" class="primary" style="width:100%">Sign in</button>
+    <button id="forgot" type="button" style="width:100%;margin-top:8px;background:none;border-color:transparent;color:var(--text2);text-decoration:underline">Forgot password? Email me a reset link</button>
     <p id="loginMsg" class="muted" role="status"></p>
     <p class="muted">Signed in with Google? Sign in on the docs site first, then reload this page.</p>
   </section>
@@ -238,6 +242,24 @@
     try { saveSession(fromToken(await gotrue("/auth/v1/token?grant_type=password", { email, password }), email)); $("pw").value = ""; $("loginMsg").textContent = ""; start(); }
     catch (e) { $("loginMsg").textContent = e.message; }
     $("go").disabled = false;
+  });
+  $("eye").addEventListener("click", () => {
+    const show = $("pw").type === "password";
+    $("pw").type = show ? "text" : "password";
+    $("eye").textContent = show ? "Hide" : "Show";
+    $("eye").setAttribute("aria-label", show ? "Hide password" : "Show password");
+  });
+  $("forgot").addEventListener("click", async () => {
+    const email = $("em").value.trim();
+    if (!email) { $("loginMsg").textContent = "Type your email above first."; return; }
+    $("forgot").disabled = true; $("loginMsg").textContent = "Sending…";
+    try {
+      // The reset link lands on the docs site (already an allowed redirect), where you set the new password.
+      const back = new URL("../", location.href).href;
+      const res = await fetch(SB + "/auth/v1/recover?redirect_to=" + encodeURIComponent(back), { method: "POST", headers: { apikey: AUTH.supabaseAnonKey, "Content-Type": "application/json" }, body: JSON.stringify({ email }) });
+      $("loginMsg").textContent = res.ok ? "If that account exists, a reset link is on its way. Open it, set a new password, then come back here." : "Couldn't send the link. Try again in a minute.";
+    } catch (_) { $("loginMsg").textContent = "Couldn't reach the sign-in service."; }
+    $("forgot").disabled = false;
   });
   $("pw").addEventListener("keydown", (e) => { if (e.key === "Enter") $("go").click(); });
   $("refresh").addEventListener("click", load);
