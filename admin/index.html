@@ -127,6 +127,15 @@
     <h2>Registry records <span id="regTotal" class="muted"></span></h2>
     <div id="registry" class="grid"></div>
 
+    <h2>Recent admin actions</h2>
+    <div class="bar" style="gap:6px;margin:0 0 8px" id="actFilter">
+      <button data-g="" class="chip on">All</button><button data-g="key" class="chip">Keys</button><button data-g="packaged" class="chip">Reviews</button>
+    </div>
+    <p id="actMsg" class="muted" role="status"></p>
+    <div id="actList"></div>
+    <button id="actMore" class="hide">Show more</button>
+    <p class="muted">Keys created and revoked, and packaged foods approved or rejected. Key changes show no person because the API does not record one; reviews show the reviewer.</p>
+
     <h2>Packaged food review</h2>
     <div id="review" class="grid"></div>
     <div class="bar" style="gap:6px;margin:12px 0 8px" id="qFilter">
@@ -419,9 +428,61 @@
     renderOverview(ov.body.data);
     renderKeys();
     loadJobs(true);
+    loadActivity();
     if (keepQueue !== true) { loadQueue(true); loadAudit(true); }
     $("status").textContent = "Updated " + new Date().toLocaleTimeString();
   }
+
+  /* ───── recent admin actions ───── */
+  const ACT_PAGE = 15;
+  let actRows = [];
+  let actGroup = "";
+  let actShown = ACT_PAGE;
+  const ACT_LABEL = {
+    key_created: ["Key created", "ok"], key_revoked: ["Key revoked", "bad"],
+    packaged_approved: ["Food approved", "ok"], packaged_rejected: ["Food rejected", "bad"],
+  };
+
+  function actCard(e) {
+    const [label, cls] = ACT_LABEL[e.type] || [e.type, ""];
+    const when = e.at ? new Date(e.at).toLocaleString() : "unknown time";
+    const by = e.actor ? ` · by ${esc(e.actor)}` : "";
+    return `<div class="ev"><div class="head"><div><span class="pill ${cls}">${esc(label)}</span></div>
+      <span class="muted">${esc(when)} · ${esc(ago(e.at))}</span></div>
+      <div class="op">${esc(e.subject || "")}</div>
+      <div class="muted">${esc(e.detail || "")}${by}</div></div>`;
+  }
+
+  function renderActivity() {
+    const rows = actRows.filter((e) => !actGroup || e.type.startsWith(actGroup));
+    $("actList").innerHTML = rows.slice(0, actShown).map(actCard).join("");
+    $("actMore").classList.toggle("hide", rows.length <= actShown);
+    $("actMsg").textContent = rows.length ? `Showing ${Math.min(actShown, rows.length)} of ${rows.length}, newest first.` : "No admin actions yet.";
+  }
+
+  async function loadActivity() {
+    const r = await call("/admin/activity?limit=100");
+    if (r.status !== 200 || !Array.isArray(r.body?.data?.events)) {
+      $("actMsg").textContent = r.status === 403 ? "The gateway has not enabled admin actions yet (add /admin/activity to ADMIN_GET_PATHS)."
+        : r.status === 404 ? "The API does not have /admin/activity yet. Deploy API v1.37.0."
+        : `Couldn't load admin actions (${r.status || "network"}).`;
+      $("actList").innerHTML = "";
+      $("actMore").classList.add("hide");
+      return;
+    }
+    actRows = r.body.data.events;
+    renderActivity();
+  }
+
+  document.addEventListener("click", (e) => {
+    const f = e.target.closest("#actFilter [data-g]");
+    if (f) {
+      actGroup = f.dataset.g; actShown = ACT_PAGE;
+      document.querySelectorAll("#actFilter .chip").forEach((c) => c.classList.toggle("on", c === f));
+      renderActivity();
+    }
+  });
+  $("actMore").addEventListener("click", () => { actShown += ACT_PAGE; renderActivity(); });
 
   /* ───── packaged-food review queue ───── */
   const Q_PAGE = 20;
@@ -692,7 +753,7 @@
   $("pw").addEventListener("keydown", (e) => { if (e.key === "Enter") $("go").click(); });
   $("refresh").addEventListener("click", () => load());
   $("auto").addEventListener("change", (e) => setAuto(e.target.checked));
-  $("out").addEventListener("click", () => { hideReveal(); saveSession(null); setAuto(false); jLoaded = []; aLoaded = []; $("jobList").innerHTML = ""; $("auditList").innerHTML = ""; show("login"); });
+  $("out").addEventListener("click", () => { hideReveal(); saveSession(null); setAuto(false); jLoaded = []; aLoaded = []; actRows = []; $("actList").innerHTML = ""; $("jobList").innerHTML = ""; $("auditList").innerHTML = ""; show("login"); });
 
   if (!SB || !GW) { show("login"); $("loginMsg").textContent = "Missing config. Check js/config.js."; }
   else start();

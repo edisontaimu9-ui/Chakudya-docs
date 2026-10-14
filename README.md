@@ -13,7 +13,7 @@ it's a separate, deployable-on-its-own frontend.
 Everything documented here was verified against the actual repository
 (`src/index.js`'s router and `routePolicy()`, the `src/fhir*.js` modules,
 `src/ragPipeline.js` and `wrangler.toml`) - nothing here was
-invented. Currently in line with API **v1.36.0**.
+invented. Currently in line with API **v1.37.0**.
 
 ---
 
@@ -209,11 +209,11 @@ of the OpenAPI document - they're read out of `routePolicy()` in
 
 ---
 
-## 6. Endpoints documented (159 of 159)
+## 6. Endpoints documented (160 of 160)
 
 Every route the Worker actually serves is documented - nothing was skipped.
 `/manufacturers`, `/products`, and `/nutrition` were removed from the API in
-v1.15.0-v1.16.0 and no longer appear here. The list below matches API v1.36.0.
+v1.15.0-v1.16.0 and no longer appear here. The list below matches API v1.37.0.
 
 The portal UI renders **every** route in `openapi.json`: public, API-key, admin,
 root-only, login-token and webhook routes alike. Each endpoint page carries a
@@ -236,6 +236,7 @@ only)" summary in the spec.
 - `POST /admin/keys` - Create a new API key (root key only)
 - `DELETE /admin/keys/{id}` - Revoke an API key (root key only)
 - `GET /admin/overview` - Admin monitor snapshot (root key only)
+- `GET /admin/activity` - Recent admin actions (root key only)
 
 **Developer keys** (self-service consumer keys; authenticate with a developer login token, not an API key)
 - `GET /developer/keys` - List your consumer API keys

@@ -3,7 +3,7 @@
   "info": {
     "title": "Chakudya Nutrition Registry API (CNR)",
     "description": "Chakudya is a Malawi focused nutrition data and intelligence API. It provides structured, searchable nutrition information for health applications, researchers, students, dietitians, and developers building tools for clinical or public health nutrition work. The API combines local food composition data with international sources such as USDA FoodData Central, Open Food Facts, and FatSecret, and adds retrieval augmented question answering and session memory for AI assisted applications.\n\nIt also covers clinical growth assessment (WHO child growth standards from birth to 19 years, Fenton preterm charts, and a combined `/growth/assess` call), recipe and meal nutrition analysis, dietary reference intakes, and a stateless FHIR R4 facade that exposes growth evaluation and the full Nutrition Care Process (screening, assessment, diagnosis, intervention, monitoring and ADIME documents).\n\nPeople can sign in on the docs site and create their own consumer API keys (higher rate limits, FHIR access, usage counts) with `/developer/keys`.\n\nEvery operational route needs `Authorization: Bearer YOUR_API_KEY` (a consumer key from the developer console, or an admin or reviewer key). The only routes that work without a key are `GET /`, `GET /health` and the FHIR conformance reads (`GET /fhir/metadata`, `CodeSystem`, `OperationDefinition`, `StructureDefinition`, `ConceptMap`, `Questionnaire`). `/developer/keys` takes your Supabase login token instead of an API key, and `POST /rag/webhook` takes a shared secret. Privileged registry writes (foods, exchange, renal, formulas, drug interactions, glycaemic index, reference tables, packaged CRUD and review, RAG ingest, bulk inserts) and key management need an admin key; a consumer key is refused there. Anonymous calls receive 401 with the code `api_key_required`. OAuth 2.0 was removed in v1.34.0.\n",
-    "version": "1.36.0",
+    "version": "1.37.0",
     "contact": {
       "name": "Edison Taimu",
       "x-location": "Blantyre, Malawi"
@@ -298,6 +298,112 @@
           },
           "429": {
             "$ref": "#/components/responses/RateLimited"
+          }
+        }
+      }
+    },
+    "/admin/activity": {
+      "get": {
+        "tags": [
+          "API Keys"
+        ],
+        "summary": "Recent admin actions (root key only)",
+        "description": "Newest-first list of recent admin actions for the admin monitor page - API keys created and revoked, and packaged foods approved or rejected (with the reviewer and rejection reason). Built from existing tables, so nothing extra is stored. Key changes carry no actor because the API does not record one. Developer self-service keys are left out. Never returns a raw key or its hash. Needs the root key.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "default": 30,
+              "maximum": 100
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Recent admin actions",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/Success"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "type": "object",
+                          "properties": {
+                            "generated_at": {
+                              "type": "string",
+                              "format": "date-time"
+                            },
+                            "sources": {
+                              "type": "object",
+                              "description": "Whether each source answered (api_keys, packaged_reviews)."
+                            },
+                            "events": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "type": {
+                                    "type": "string",
+                                    "enum": [
+                                      "key_created",
+                                      "key_revoked",
+                                      "packaged_approved",
+                                      "packaged_rejected"
+                                    ]
+                                  },
+                                  "at": {
+                                    "type": "string",
+                                    "format": "date-time"
+                                  },
+                                  "actor": {
+                                    "type": "string",
+                                    "nullable": true
+                                  },
+                                  "subject": {
+                                    "type": "string"
+                                  },
+                                  "detail": {
+                                    "type": "string"
+                                  },
+                                  "ref": {
+                                    "type": "string"
+                                  }
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "description": "Not the root key",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
           }
         }
       }

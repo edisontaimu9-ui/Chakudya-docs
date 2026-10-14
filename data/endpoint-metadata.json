@@ -1665,6 +1665,18 @@
         "scope": "admin"
       },
       "note": "Root ADMIN_API_KEY only - read-only snapshot for the admin monitor."
+    },
+    {
+      "method": "GET",
+      "path": "/admin/activity",
+      "auth": "admin",
+      "requiredRole": "root",
+      "rateLimit": {
+        "limit": 30,
+        "windowSeconds": 60,
+        "scope": "admin"
+      },
+      "note": "Root ADMIN_API_KEY only - recent admin actions for the admin monitor."
     }
   ]
 }
