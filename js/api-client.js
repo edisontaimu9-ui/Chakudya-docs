@@ -21,16 +21,29 @@ const ApiClient = (() => {
   }
 
   /**
-   * The docs site's own key (window.CHAKUDYA_API.siteKey), as a header object. Empty when no key
-   * is configured or when the URL is not the configured API, so the key never goes to a custom
-   * base URL a visitor typed in.
+   * Route a call made on the docs site's own behalf (no visitor key). When
+   * window.CHAKUDYA_API.gatewayUrl is set, calls to the API go through the gateway Worker,
+   * which holds the site key server-side, so no key ships to the browser. Without a
+   * gatewayUrl it falls back to the older browser-side siteKey. Returns { url, headers }.
+   * Calls to any other origin (e.g. a custom base URL) are left untouched.
    */
-  function siteAuthHeaders(url) {
+  function siteRequest(url) {
     const cfg = window.CHAKUDYA_API || {};
-    if (!cfg.siteKey || !cfg.baseUrl) return {};
     try {
-      return new URL(url).origin === new URL(cfg.baseUrl).origin ? { Authorization: `Bearer ${cfg.siteKey}` } : {};
-    } catch (_) { return {}; }
+      if (cfg.baseUrl && new URL(url).origin === new URL(cfg.baseUrl).origin) {
+        if (cfg.gatewayUrl) {
+          const u = new URL(url);
+          return { url: cfg.gatewayUrl.replace(/\/$/, "") + "/p" + u.pathname + u.search, headers: {} };
+        }
+        if (cfg.siteKey) return { url, headers: { Authorization: `Bearer ${cfg.siteKey}` } };
+      }
+    } catch (_) { /* fall through */ }
+    return { url, headers: {} };
+  }
+
+  /** Header-only view of siteRequest (kept for callers that build their own fetch). */
+  function siteAuthHeaders(url) {
+    return siteRequest(url).headers;
   }
 
   /**
@@ -40,11 +53,13 @@ const ApiClient = (() => {
   async function execute({ url, method, headers, body }) {
     const startedAt = performance.now();
     try {
-      // A key the visitor supplied (Try It) wins; otherwise fall back to the site's own key.
+      // A key the visitor supplied (Try It) goes straight to the API; otherwise the call
+      // goes through the site gateway (or the legacy site key).
       const hasAuth = headers && Object.keys(headers).some((h) => h.toLowerCase() === "authorization");
-      const res = await fetch(url, {
+      const site = hasAuth ? { url, headers: {} } : siteRequest(url);
+      const res = await fetch(site.url, {
         method,
-        headers: hasAuth ? headers : { ...(headers || {}), ...siteAuthHeaders(url) },
+        headers: { ...(headers || {}), ...site.headers },
         body: body !== undefined ? body : undefined,
       });
       const durationMs = Math.round(performance.now() - startedAt);
@@ -76,5 +91,5 @@ const ApiClient = (() => {
     }
   }
 
-  return { buildUrl, buildHeaders, execute, siteAuthHeaders };
+  return { buildUrl, buildHeaders, execute, siteRequest, siteAuthHeaders };
 })();

@@ -473,9 +473,10 @@ const RenderNutriMind = (() => {
     const ctrl = new AbortController();
     const timer = setTimeout(() => ctrl.abort(), 45000);
     try {
-      const res = await fetch(base + "/rag/ask", {
+      const site = ApiClient.siteRequest(base + "/rag/ask");
+      const res = await fetch(site.url, {
         method: "POST",
-        headers: { "Content-Type": "application/json", ...ApiClient.siteAuthHeaders(base + "/rag/ask") },
+        headers: { "Content-Type": "application/json", ...site.headers },
         body: JSON.stringify({ query: apiQuery, context: state.mode }),
         signal: ctrl.signal,
       });

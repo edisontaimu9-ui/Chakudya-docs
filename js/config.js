@@ -9,12 +9,13 @@ window.CHAKUDYA_AUTH = {
   googleEnabled: true, // Google provider is enabled in Supabase
 };
 
-// API access for the docs site itself (live stats, food demo, NutriMind, Try It).
-// siteKey is a consumer key created for this site in the Developer Console. It ships to the
-// browser, so treat it as public: give it its own label ("Chakudya docs site"), never reuse it
-// elsewhere, and revoke it if it is abused. It is only sent to baseUrl's origin.
-// Leave it empty to call the API without a key (works while the API is not in key-required mode).
+// API access for the docs site itself (live stats, food demo, NutriMind, Try It without a key).
+// gatewayUrl is the chakudya-gateway Worker. Site traffic goes to <gatewayUrl>/p/<api path>; the
+// Worker attaches the site's consumer key server-side, so NO key ships to the browser.
+// Try It with a visitor's own key still calls baseUrl directly.
+// siteKey is the older browser-side fallback, only used when gatewayUrl is empty. Leave it empty.
 window.CHAKUDYA_API = {
   baseUrl: "https://chakudya-api.edisontaimu9.workers.dev",
-  siteKey: "cnr_PASTE_KEY",
+  gatewayUrl: "https://chakudya-gateway.edisontaimu9.workers.dev",
+  siteKey: "",
 };
