@@ -13,7 +13,7 @@ it's a separate, deployable-on-its-own frontend.
 Everything documented here was verified against the actual repository
 (`src/index.js`'s router and `routePolicy()`, the `src/fhir*.js` modules,
 `src/ragPipeline.js` and `wrangler.toml`) - nothing here was
-invented. Currently in line with API **v1.42.0**.
+invented. Currently in line with API **v1.43.0**.
 
 ---
 
@@ -213,7 +213,7 @@ of the OpenAPI document - they're read out of `routePolicy()` in
 
 Every route the Worker actually serves is documented - nothing was skipped.
 `/manufacturers`, `/products`, and `/nutrition` were removed from the API in
-v1.15.0-v1.16.0 and no longer appear here. The list below matches API v1.42.0.
+v1.15.0-v1.16.0 and no longer appear here. The list below matches API v1.43.0.
 
 The portal UI renders **every** route in `openapi.json`: public, API-key, admin,
 root-only, login-token and webhook routes alike. Each endpoint page carries a
@@ -362,7 +362,7 @@ only)" summary in the spec.
 - `GET /growth/assess` - Combined WHO growth assessment (every applicable indicator in one call)
 
 **Energy** (Krause ch. 2 equations, pure calculation)
-- `POST /energy/requirements` - Energy requirement estimate (REE, stress, activity, IOM equations)
+- `POST /energy/requirements` - Energy requirement estimate (REE, stress, activity, IOM equations); accepts an `activity_log` looked up in the activity table
 - `POST /energy/food-energy` - Food energy from macronutrients or an alcoholic drink
 - `GET /energy/factors` - Energy engine factors and reference tables
 - `GET /activity-energy` - Physical activity energy table (kcal per hour by body weight), read from the database

@@ -3,7 +3,7 @@
   "info": {
     "title": "Chakudya Nutrition Registry API (CNR)",
     "description": "Chakudya is a Malawi focused nutrition data and intelligence API. It provides structured, searchable nutrition information for health applications, researchers, students, dietitians, and developers building tools for clinical or public health nutrition work. The API combines local food composition data with international sources such as USDA FoodData Central, Open Food Facts, and FatSecret, and adds retrieval augmented question answering and session memory for AI assisted applications.\n\nIt also covers clinical growth assessment (WHO child growth standards from birth to 19 years, Fenton preterm charts, and a combined `/growth/assess` call), recipe and meal nutrition analysis, dietary reference intakes, and a stateless FHIR R4 facade that exposes growth evaluation and the full Nutrition Care Process (screening, assessment, diagnosis, intervention, monitoring and ADIME documents).\n\nPeople can sign in on the docs site and create their own consumer API keys (higher rate limits, FHIR access, usage counts) with `/developer/keys`.\n\nEvery operational route needs `Authorization: Bearer YOUR_API_KEY` (a consumer key from the developer console, or an admin or reviewer key). The only routes that work without a key are `GET /`, `GET /health` and the FHIR conformance reads (`GET /fhir/metadata`, `CodeSystem`, `OperationDefinition`, `StructureDefinition`, `ConceptMap`, `Questionnaire`). `/developer/keys` takes your Supabase login token instead of an API key, and `POST /rag/webhook` takes a shared secret. Privileged registry writes (foods, exchange, renal, formulas, drug interactions, glycaemic index, reference tables, packaged CRUD and review, RAG ingest, bulk inserts) and key management need an admin key; a consumer key is refused there. Anonymous calls receive 401 with the code `api_key_required`. OAuth 2.0 was removed in v1.34.0.\n",
-    "version": "1.42.0",
+    "version": "1.43.0",
     "contact": {
       "name": "Edison Taimu",
       "x-location": "Blantyre, Malawi"
@@ -5788,6 +5788,31 @@
                       }
                     }
                   },
+                  "activity_log": {
+                    "type": "array",
+                    "maxItems": 50,
+                    "description": "Activities looked up in the database (Krause Appendix 10, see GET /activity-energy). Each item has activity, type (when the activity has more than one) and minutes or hours. kcal per hour at weight_kg is converted to METs (kcal per hour / kg), then to delta PAL per hour as (METs - 1) / 17.5, the relation Table 2.4 follows, and added to the PAL used by the IOM equations. It can be combined with activities. List your everyday activities as well (Table 2.4 ids in activities), otherwise the PAL is low. weight_kg must be 20-250 for a log. The reply adds an activity_log block with every step.",
+                    "items": {
+                      "type": "object",
+                      "required": [
+                        "activity"
+                      ],
+                      "properties": {
+                        "activity": {
+                          "type": "string"
+                        },
+                        "type": {
+                          "type": "string"
+                        },
+                        "minutes": {
+                          "type": "number"
+                        },
+                        "hours": {
+                          "type": "number"
+                        }
+                      }
+                    }
+                  },
                   "bmi_for_age_percentile": {
                     "type": "number",
                     "description": "For children 3-18. Above 85 selects the overweight equation. Optional - when left out and the child has weight_kg and height_cm, the API looks it up in the WHO tables (exact from L, M, S for 36-60 months; interpolated between the -3 to +3 SD cut-offs for 5-19 years) and reports the source in inputs_used."
@@ -5892,6 +5917,11 @@
                             },
                             "activity": {
                               "type": "object"
+                            },
+                            "activity_log": {
+                              "type": "object",
+                              "nullable": true,
+                              "description": "Present only when activity_log was sent. Each activity with kcal, METs and delta PAL, the method, total kcal and minutes, warnings and notes."
                             },
                             "estimates": {
                               "type": "array",
