@@ -1701,6 +1701,28 @@
         "scope": "admin"
       },
       "note": "Root ADMIN_API_KEY only - calls per endpoint for the admin monitor."
+    },
+    {
+      "method": "POST",
+      "path": "/energy/requirements",
+      "auth": "key",
+      "rateLimit": {
+        "limit": 100,
+        "windowSeconds": 60,
+        "scope": "ip"
+      },
+      "note": "Pure calculation from the Krause ch. 2 equations. Nothing is stored."
+    },
+    {
+      "method": "GET",
+      "path": "/energy/factors",
+      "auth": "key",
+      "rateLimit": {
+        "limit": 100,
+        "windowSeconds": 60,
+        "scope": "ip"
+      },
+      "note": "Factor registries and reference tables behind the energy engine."
     }
   ]
 }
