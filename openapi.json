@@ -3,7 +3,7 @@
   "info": {
     "title": "Chakudya Nutrition Registry API (CNR)",
     "description": "Chakudya is a Malawi focused nutrition data and intelligence API. It provides structured, searchable nutrition information for health applications, researchers, students, dietitians, and developers building tools for clinical or public health nutrition work. The API combines local food composition data with international sources such as USDA FoodData Central, Open Food Facts, and FatSecret, and adds retrieval augmented question answering and session memory for AI assisted applications.\n\nIt also covers clinical growth assessment (WHO child growth standards from birth to 19 years, Fenton preterm charts, and a combined `/growth/assess` call), recipe and meal nutrition analysis, dietary reference intakes, and a stateless FHIR R4 facade that exposes growth evaluation and the full Nutrition Care Process (screening, assessment, diagnosis, intervention, monitoring and ADIME documents).\n\nPeople can sign in on the docs site and create their own consumer API keys (higher rate limits, FHIR access, usage counts) with `/developer/keys`.\n\nEvery operational route needs `Authorization: Bearer YOUR_API_KEY` (a consumer key from the developer console, or an admin or reviewer key). The only routes that work without a key are `GET /`, `GET /health` and the FHIR conformance reads (`GET /fhir/metadata`, `CodeSystem`, `OperationDefinition`, `StructureDefinition`, `ConceptMap`, `Questionnaire`). `/developer/keys` takes your Supabase login token instead of an API key, and `POST /rag/webhook` takes a shared secret. Privileged registry writes (foods, exchange, renal, formulas, drug interactions, glycaemic index, reference tables, packaged CRUD and review, RAG ingest, bulk inserts) and key management need an admin key; a consumer key is refused there. Anonymous calls receive 401 with the code `api_key_required`. OAuth 2.0 was removed in v1.34.0.\n",
-    "version": "1.41.0",
+    "version": "1.42.0",
     "contact": {
       "name": "Edison Taimu",
       "x-location": "Blantyre, Malawi"
@@ -6107,6 +6107,243 @@
                 }
               }
             }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      }
+    },
+    "/activity-energy": {
+      "get": {
+        "tags": [
+          "Energy"
+        ],
+        "summary": "Physical activity energy table (kcal per hour by body weight)",
+        "description": "Browse or search the activity table stored in the database (Krause and Mahan, 16th ed., Appendix 10: kcal per hour at 110 to 250 lb). Without a weight, each row returns its eight printed values and any printed value flagged as a likely misprint (suspect_weights_lb). With weight_kg or weight_lb, each row returns kcal per hour at that weight (printed value, interpolated, or scaled outside 110-250 lb) and how it was obtained.\n",
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Text to find in the activity or type, for example run or butterfly."
+          },
+          {
+            "name": "activity",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Exact activity name, for example Swim."
+          },
+          {
+            "name": "weight_kg",
+            "in": "query",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "weight_lb",
+            "in": "query",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Matching activities",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Success"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid weight",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      }
+    },
+    "/activity-energy/calculate": {
+      "post": {
+        "tags": [
+          "Energy"
+        ],
+        "summary": "Energy spent on one or more activities",
+        "description": "Send body weight and a list of activities with minutes or hours. Each activity is found in the database table by name (case-insensitive) and type; send type when an activity has more than one. kcal per hour is taken at the given weight (printed value, linear interpolation between printed weights, or proportional scaling outside 110-250 lb, which is flagged). Printed cells flagged as likely misprints are left out of the interpolation and the response says so. The source does not say whether resting energy is included. The table was built for adult weights. Nothing is stored.\n",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "activities"
+                ],
+                "properties": {
+                  "weight_kg": {
+                    "type": "number",
+                    "description": "Body weight in kg (20-250). Use this or weight_lb."
+                  },
+                  "weight_lb": {
+                    "type": "number"
+                  },
+                  "activities": {
+                    "type": "array",
+                    "maxItems": 50,
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "activity": {
+                          "type": "string"
+                        },
+                        "type": {
+                          "type": "string"
+                        },
+                        "minutes": {
+                          "type": "number"
+                        },
+                        "hours": {
+                          "type": "number",
+                          "description": "Use minutes or hours, not both."
+                        }
+                      }
+                    }
+                  }
+                }
+              },
+              "example": {
+                "weight_kg": 68,
+                "activities": [
+                  {
+                    "activity": "Run",
+                    "type": "6 mph, 10 min/mile",
+                    "minutes": 30
+                  },
+                  {
+                    "activity": "Walk",
+                    "type": "3 mph, 20 min/mile",
+                    "hours": 1
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "kcal per activity and in total",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/Success"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "type": "object",
+                          "properties": {
+                            "weight": {
+                              "type": "object"
+                            },
+                            "activities": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "description": "activity, type, minutes, kcal_per_hour, kcal, method and notes."
+                              }
+                            },
+                            "total": {
+                              "type": "object",
+                              "description": "kcal, kj and minutes."
+                            },
+                            "warnings": {
+                              "type": "array",
+                              "items": {
+                                "type": "string"
+                              }
+                            },
+                            "notes": {
+                              "type": "array",
+                              "items": {
+                                "type": "string"
+                              }
+                            },
+                            "sources": {
+                              "type": "array",
+                              "items": {
+                                "type": "string"
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Missing or invalid input, or unknown activity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      }
+    },
+    "/activity-energy/bulk": {
+      "post": {
+        "tags": [
+          "Energy"
+        ],
+        "summary": "Bulk-create activity energy rows (admin)",
+        "description": "Seed file scripts/activity_energy_seed.json (130 rows). A unique (activity, type) constraint rejects re-seeding.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BulkRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/BulkSuccess"
           },
           "401": {
             "$ref": "#/components/responses/Unauthorized"

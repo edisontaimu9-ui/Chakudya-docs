@@ -1734,6 +1734,38 @@
         "scope": "ip"
       },
       "note": "Atwater factors and alcohol drink energy. Pure calculation, nothing is stored."
+    },
+    {
+      "method": "GET",
+      "path": "/activity-energy",
+      "auth": "key",
+      "rateLimit": {
+        "limit": 100,
+        "windowSeconds": 60,
+        "scope": "ip"
+      },
+      "note": "Activity energy table (kcal per hour by body weight) read from the database."
+    },
+    {
+      "method": "POST",
+      "path": "/activity-energy/calculate",
+      "auth": "key",
+      "rateLimit": {
+        "limit": 100,
+        "windowSeconds": 60,
+        "scope": "ip"
+      },
+      "note": "Reads one reference table and calculates. Nothing is stored."
+    },
+    {
+      "method": "POST",
+      "path": "/activity-energy/bulk",
+      "auth": "admin",
+      "rateLimit": {
+        "limit": 10,
+        "windowSeconds": 60,
+        "scope": "admin"
+      }
     }
   ]
 }
