@@ -1723,6 +1723,17 @@
         "scope": "ip"
       },
       "note": "Factor registries and reference tables behind the energy engine."
+    },
+    {
+      "method": "POST",
+      "path": "/energy/food-energy",
+      "auth": "key",
+      "rateLimit": {
+        "limit": 100,
+        "windowSeconds": 60,
+        "scope": "ip"
+      },
+      "note": "Atwater factors and alcohol drink energy. Pure calculation, nothing is stored."
     }
   ]
 }
