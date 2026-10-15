@@ -136,6 +136,17 @@
     <button id="actMore" class="hide">Show more</button>
     <p class="muted">Keys created and revoked, and packaged foods approved or rejected. Key changes show no person because the API does not record one; reviews show the reviewer.</p>
 
+    <h2>Usage by endpoint</h2>
+    <div class="bar" style="gap:6px;margin:0 0 8px" id="useFilter">
+      <button data-d="1" class="chip">Today</button><button data-d="7" class="chip on">7 days</button><button data-d="30" class="chip">30 days</button>
+    </div>
+    <p id="useMsg" class="muted" role="status"></p>
+    <div id="useStats" class="grid"></div>
+    <div id="useTrend" style="margin:12px 0"></div>
+    <div id="useList"></div>
+    <button id="useMore" class="hide">Show more</button>
+    <p class="muted">Calls per endpoint, counted per UTC day. Ids in paths are grouped (<code>/foods/:id</code>). The root page, <code>/health</code> and admin routes are not counted. Needs <code>ROUTE_USAGE_STORE=true</code> and <code>sql/032</code> on the API.</p>
+
     <h2>Errors and latency</h2>
     <div class="bar" style="gap:6px;margin:0 0 8px" id="monFilter">
       <button data-h="24" class="chip on">24 hours</button><button data-h="72" class="chip">3 days</button><button data-h="168" class="chip">7 days</button>
@@ -445,6 +456,7 @@
     loadJobs(true);
     loadActivity();
     loadMonitoring();
+    loadUsage();
     if (keepQueue !== true) { loadQueue(true); loadAudit(true); }
     $("status").textContent = "Updated " + new Date().toLocaleTimeString();
   }
@@ -499,6 +511,58 @@
     }
   });
   $("actMore").addEventListener("click", () => { actShown += ACT_PAGE; renderActivity(); });
+
+  /* ───── usage by endpoint ───── */
+  let useDays = 7;
+  let useTop = [];
+  let useShown = 10;
+
+  function useRow(e, i) {
+    const w = Math.max(2, Math.min(100, e.share));
+    return `<div class="ev"><div class="head"><div class="op">${i + 1}. ${esc(e.method)} ${esc(e.route)}</div><span class="pill run">${fmt(e.calls)}</span></div>
+      <div style="height:6px;border-radius:3px;background:var(--border);margin:6px 0"><div style="height:6px;border-radius:3px;background:var(--accent);width:${w}%"></div></div>
+      <div class="muted">${esc(e.share)}% of calls · avg ${esc(msFmt(e.avg_ms))} · ${e.errors ? `<span class="pill bad">${fmt(e.errors)} failed (${esc(e.error_rate)}%)</span>` : "no failures"}</div></div>`;
+  }
+
+  function renderUseList() {
+    $("useList").innerHTML = useTop.slice(0, useShown).map(useRow).join("") || '<p class="muted">No calls recorded in this period.</p>';
+    $("useMore").classList.toggle("hide", useTop.length <= useShown);
+  }
+
+  async function loadUsage() {
+    const r = await call(`/admin/usage?days=${useDays}`);
+    const d = r.body?.data;
+    const clear = () => { ["useStats", "useTrend", "useList"].forEach((id) => ($(id).innerHTML = "")); $("useMore").classList.add("hide"); };
+    if (r.status !== 200 || !d) {
+      $("useMsg").textContent = r.status === 403 ? "The gateway has not enabled usage yet (add /admin/usage to ADMIN_GET_PATHS)."
+        : r.status === 404 ? "The API does not have /admin/usage yet. Deploy API v1.39.0."
+        : `Couldn't load usage (${r.status || "network"}).`;
+      clear(); return;
+    }
+    if (!d.available) { $("useMsg").textContent = d.note || "Usage storage is not ready."; clear(); return; }
+    const t = d.totals || {};
+    $("useMsg").textContent = (d.storage_enabled ? "" : "Counting is off on the API (ROUTE_USAGE_STORE is not true). ")
+      + (t.calls ? "" : "No calls counted yet. Counting starts once the API is deployed and sql/032 is run.")
+      + (d.truncated ? " Very busy period: only part of the data is summarised." : "");
+    $("useStats").innerHTML = stat("Calls", t.calls || 0) + stat("Endpoints used", t.routes || 0) + stat("Failed calls", t.errors || 0);
+    const days = d.daily || [];
+    const max = Math.max(1, ...days.map((x) => x.count));
+    $("useTrend").innerHTML = days.length > 1 && (t.calls || 0) > 0
+      ? `<div class="trend">${days.map((x, i) => `<div class="col${i === days.length - 1 ? " today" : ""}"><span class="val">${fmt(x.count)}</span><div class="bar1" style="height:${Math.max(2, Math.round((x.count / max) * 110))}px"></div><span class="day">${dayLabel(x.day)}</span></div>`).join("")}</div>`
+      : "";
+    useTop = d.top || [];
+    renderUseList();
+  }
+
+  document.addEventListener("click", (e) => {
+    const f = e.target.closest("#useFilter [data-d]");
+    if (f) {
+      useDays = Number(f.dataset.d); useShown = 10;
+      document.querySelectorAll("#useFilter .chip").forEach((c) => c.classList.toggle("on", c === f));
+      loadUsage();
+    }
+  });
+  $("useMore").addEventListener("click", () => { useShown += 10; renderUseList(); });
 
   /* ───── errors and latency ───── */
   let monHours = 24;
@@ -834,7 +898,7 @@
   $("pw").addEventListener("keydown", (e) => { if (e.key === "Enter") $("go").click(); });
   $("refresh").addEventListener("click", () => load());
   $("auto").addEventListener("change", (e) => setAuto(e.target.checked));
-  $("out").addEventListener("click", () => { hideReveal(); saveSession(null); setAuto(false); jLoaded = []; aLoaded = []; actRows = []; $("actList").innerHTML = ""; monRecent = []; $("monRecent").innerHTML = ""; $("jobList").innerHTML = ""; $("auditList").innerHTML = ""; show("login"); });
+  $("out").addEventListener("click", () => { hideReveal(); saveSession(null); setAuto(false); jLoaded = []; aLoaded = []; actRows = []; $("actList").innerHTML = ""; monRecent = []; $("monRecent").innerHTML = ""; useTop = []; $("useList").innerHTML = ""; $("jobList").innerHTML = ""; $("auditList").innerHTML = ""; show("login"); });
 
   if (!SB || !GW) { show("login"); $("loginMsg").textContent = "Missing config. Check js/config.js."; }
   else start();

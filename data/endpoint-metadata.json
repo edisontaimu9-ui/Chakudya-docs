@@ -1689,6 +1689,18 @@
         "scope": "admin"
       },
       "note": "Root ADMIN_API_KEY only - failed calls and slow endpoints for the admin monitor."
+    },
+    {
+      "method": "GET",
+      "path": "/admin/usage",
+      "auth": "admin",
+      "requiredRole": "root",
+      "rateLimit": {
+        "limit": 30,
+        "windowSeconds": 60,
+        "scope": "admin"
+      },
+      "note": "Root ADMIN_API_KEY only - calls per endpoint for the admin monitor."
     }
   ]
 }
