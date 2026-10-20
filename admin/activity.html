@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<meta name="robots" content="noindex, nofollow, noarchive" />
+<meta name="theme-color" content="#0e1210" />
+<title>Chakudya admin · Admin actions</title>
+<link rel="stylesheet" href="admin.css" />
+</head>
+<body>
+<main id="root"></main>
+
+<template id="tpl">
+  <h2>Recent admin actions</h2>
+  <div class="bar" style="gap:6px;margin:0 0 8px" id="actFilter">
+    <button data-g="" class="chip on">All</button><button data-g="key" class="chip">Keys</button><button data-g="packaged" class="chip">Reviews</button>
+  </div>
+  <p id="actMsg" class="muted" role="status"></p>
+  <div id="actList"></div>
+  <button id="actMore" class="hide">Show more</button>
+  <p class="muted">Keys created and revoked, and packaged foods approved or rejected. Key changes show no person because the API does not record one; reviews show the reviewer.</p>
+</template>
+
+<script src="../js/config.js"></script>
+<script src="admin.js"></script>
+<script>
+(() => {
+  "use strict";
+  const { $, esc, ago, call } = Admin;
+  const ACT_PAGE = 15;
+  let actRows = [];
+  let actGroup = "";
+  let actShown = ACT_PAGE;
+  const ACT_LABEL = {
+    key_created: ["Key created", "ok"], key_revoked: ["Key revoked", "bad"],
+    packaged_approved: ["Food approved", "ok"], packaged_rejected: ["Food rejected", "bad"],
+  };
+
+  function actCard(e) {
+    const [label, cls] = ACT_LABEL[e.type] || [e.type, ""];
+    const when = e.at ? new Date(e.at).toLocaleString() : "unknown time";
+    const by = e.actor ? ` · by ${esc(e.actor)}` : "";
+    return `<div class="ev"><div class="head"><div><span class="pill ${cls}">${esc(label)}</span></div>
+      <span class="muted">${esc(when)} · ${esc(ago(e.at))}</span></div>
+      <div class="op">${esc(e.subject || "")}</div>
+      <div class="muted">${esc(e.detail || "")}${by}</div></div>`;
+  }
+
+  function renderActivity() {
+    const rows = actRows.filter((e) => !actGroup || e.type.startsWith(actGroup));
+    $("actList").innerHTML = rows.slice(0, actShown).map(actCard).join("");
+    $("actMore").classList.toggle("hide", rows.length <= actShown);
+    $("actMsg").textContent = rows.length ? `Showing ${Math.min(actShown, rows.length)} of ${rows.length}, newest first.` : "No admin actions yet.";
+  }
+
+  async function loadActivity() {
+    const r = await call("/admin/activity?limit=100");
+    if (Admin.authFail(r)) { $("actMsg").textContent = ""; return; }
+    if (r.status !== 200 || !Array.isArray(r.body?.data?.events)) {
+      $("actMsg").textContent = r.status === 403 ? "The gateway has not enabled admin actions yet (add /admin/activity to ADMIN_GET_PATHS)."
+        : r.status === 404 ? "The API does not have /admin/activity yet. Deploy API v1.37.0."
+        : `Couldn't load admin actions (${r.status || "network"}).`;
+      $("actList").innerHTML = "";
+      $("actMore").classList.add("hide");
+      return;
+    }
+    actRows = r.body.data.events;
+    renderActivity();
+  }
+
+  Admin.mount({
+    id: "activity",
+    title: "Admin actions",
+    init() {
+      Admin.chips("actFilter", "g", (v) => { actGroup = v; actShown = ACT_PAGE; renderActivity(); });
+      $("actMore").addEventListener("click", () => { actShown += ACT_PAGE; renderActivity(); });
+    },
+    refresh: loadActivity,
+  });
+})();
+</script>
+</body>
+</html>

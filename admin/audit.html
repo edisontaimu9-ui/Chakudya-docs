@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<meta name="robots" content="noindex, nofollow, noarchive" />
+<meta name="theme-color" content="#0e1210" />
+<title>Chakudya admin · FHIR audit</title>
+<link rel="stylesheet" href="admin.css" />
+</head>
+<body>
+<main id="root"></main>
+
+<template id="tpl">
+  <h2>FHIR audit log</h2>
+  <div class="filters" id="aFilters">
+    <select id="aOutcome" aria-label="Outcome">
+      <option value="">All outcomes</option><option value="0">Success</option><option value="4">Denied or client error</option><option value="8">Server error</option><option value="12">Major failure</option>
+    </select>
+    <select id="aSince" aria-label="Period">
+      <option value="1">Last 24 hours</option><option value="7" selected>Last 7 days</option><option value="30">Last 30 days</option><option value="0">All time</option>
+    </select>
+    <input id="aOp" type="text" maxlength="80" placeholder="Route contains, e.g. $diagnose" aria-label="Route contains" />
+    <input id="aAgent" type="text" maxlength="120" placeholder="Exact key label, or anonymous" aria-label="Key label" />
+    <button id="aGo" class="primary">Search</button>
+  </div>
+  <p id="aMsg" class="muted" role="status"></p>
+  <div id="auditList"></div>
+  <button id="aMore" class="hide">Load more</button>
+  <p class="muted">One entry per audited /fhir request: who, which route, when, outcome. Never request bodies or query strings. Needs <code>FHIR_AUDIT_STORE=true</code> on the API.</p>
+</template>
+
+<script src="../js/config.js"></script>
+<script src="admin.js"></script>
+<script>
+(() => {
+  "use strict";
+  const { $, esc, fmt, ago, call } = Admin;
+  const A_PAGE = 25;
+  let aLoaded = [];
+  let aTotal = null;
+  let aQuery = "";
+  const A_OUT = { "0": ["Success", "ok"], "4": ["Denied or client error", "warn"], "8": ["Server error", "bad"], "12": ["Major failure", "bad"] };
+  const A_ACT = { C: "Create", R: "Read", U: "Update", D: "Delete", E: "Execute" };
+
+  function auditCard(e) {
+    const [label, cls] = A_OUT[e.outcome] || ["Outcome " + e.outcome, ""];
+    const ag = e.agent?.[0] || {};
+    const ip = ag.network?.address ? ` · ${esc(ag.network.address)}` : "";
+    const when = e.recorded ? new Date(e.recorded).toLocaleString() : "unknown time";
+    return `<div class="ev"><div class="head"><div><span class="pill ${cls}">${esc(label)}</span> <span class="pill">${esc(A_ACT[e.action] || e.action || "")}</span></div>
+      <span class="muted">${esc(when)} · ${esc(ago(e.recorded))}</span></div>
+      <div class="op">${esc(e.entity?.[0]?.name || "")}</div>
+      <div class="muted">${esc(ag.name || "anonymous")}${ip}${e.outcomeDesc ? " · " + esc(e.outcomeDesc) : ""}</div>
+      <details><summary>Raw AuditEvent</summary><pre>${esc(JSON.stringify(e, null, 2))}</pre></details></div>`;
+  }
+
+  function renderAudit() {
+    $("auditList").innerHTML = aLoaded.map(auditCard).join("");
+    const more = typeof aTotal === "number" ? aLoaded.length < aTotal : false;
+    $("aMore").classList.toggle("hide", !more);
+    $("aMsg").textContent = aLoaded.length
+      ? `Showing ${aLoaded.length}${typeof aTotal === "number" ? " of " + fmt(aTotal) : ""}, newest first.`
+      : "No audit events match.";
+  }
+
+  function auditQuery() {
+    const p = new URLSearchParams();
+    if ($("aOutcome").value) p.set("outcome", $("aOutcome").value);
+    const days = Number($("aSince").value);
+    if (days > 0) p.set("date", "ge" + new Date(Date.now() - days * 86400000).toISOString());
+    const op = $("aOp").value.trim(); if (op) p.set("operation", op);
+    const ag = $("aAgent").value.trim(); if (ag) p.set("agent-name", ag);
+    return p;
+  }
+
+  async function loadAudit(reset) {
+    if (reset) { aLoaded = []; aTotal = null; aQuery = auditQuery().toString(); $("auditList").innerHTML = ""; }
+    $("aMsg").textContent = "Loading audit events…";
+    const r = await call(`/fhir/AuditEvent?${aQuery}&_count=${A_PAGE}&_offset=${aLoaded.length}`);
+    if (Admin.authFail(r)) { $("aMsg").textContent = ""; return; }
+    const b = r.body;
+    if (r.status !== 200 || b?.resourceType !== "Bundle") {
+      const why = b?.issue?.[0]?.diagnostics || b?.error || b?.message;
+      $("aMsg").textContent = r.status === 403 ? "The gateway has not enabled the audit log yet (add /fhir/AuditEvent to ADMIN_GET_PATHS)."
+        : r.status === 501 ? "Audit storage is off. Set FHIR_AUDIT_STORE=true on the API and run sql/028."
+        : `Couldn't load the audit log (${r.status || "network"})${why ? ": " + why : ""}`;
+      $("aMore").classList.add("hide");
+      return;
+    }
+    const events = (b.entry || []).map((x) => x.resource).filter(Boolean);
+    aLoaded = aLoaded.concat(events);
+    aTotal = typeof b.total === "number" ? b.total : (events.length >= A_PAGE ? aLoaded.length + 1 : aLoaded.length);
+    renderAudit();
+  }
+
+  Admin.mount({
+    id: "audit",
+    title: "FHIR audit",
+    init() {
+      $("aGo").addEventListener("click", () => loadAudit(true));
+      $("aMore").addEventListener("click", () => loadAudit(false));
+      $("aOp").addEventListener("keydown", (e) => { if (e.key === "Enter") loadAudit(true); });
+      $("aAgent").addEventListener("keydown", (e) => { if (e.key === "Enter") loadAudit(true); });
+      $("aOutcome").addEventListener("change", () => loadAudit(true));
+      $("aSince").addEventListener("change", () => loadAudit(true));
+    },
+    async refresh(keep) {
+      if (!keep) await loadAudit(true); // auto refresh leaves your search results alone
+    },
+  });
+})();
+</script>
+</body>
+</html>

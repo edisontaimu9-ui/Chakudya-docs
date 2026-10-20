@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<meta name="robots" content="noindex, nofollow, noarchive" />
+<meta name="theme-color" content="#0e1210" />
+<title>Chakudya admin · RAG ingest</title>
+<link rel="stylesheet" href="admin.css" />
+</head>
+<body>
+<main id="root"></main>
+
+<template id="tpl">
+  <h2>RAG ingest jobs</h2>
+  <div id="jobs" class="grid"></div>
+  <div class="bar" style="gap:6px;margin:12px 0 8px" id="jFilter">
+    <button data-st="" class="chip on">All</button><button data-st="queued" class="chip">Queued</button><button data-st="processing" class="chip">Processing</button><button data-st="done" class="chip">Done</button><button data-st="failed" class="chip">Failed</button>
+  </div>
+  <p id="jMsg" class="muted" role="status"></p>
+  <div id="jobList"></div>
+  <button id="jMore" class="hide">Load more</button>
+  <p class="muted">Read-only. Upload and retry go through the API (<code>POST /rag/upload</code>, <code>POST /rag/enqueue</code>).</p>
+</template>
+
+<script src="../js/config.js"></script>
+<script src="admin.js"></script>
+<script>
+(() => {
+  "use strict";
+  const { $, esc, fmt, stat, ago, call } = Admin;
+  const J_PAGE = 20;
+  let jStatus = "";
+  let jLoaded = [];
+  let jTotal = null;
+  const JOB_CLS = { queued: "warn", processing: "run", done: "ok", failed: "bad" };
+
+  function jobCard(j) {
+    const cls = JOB_CLS[j.status] || "";
+    const chunks = typeof j.chunk_count === "number" ? ` · ${fmt(j.chunk_count)} chunks` : "";
+    const tries = j.attempts ? ` · ${Number(j.attempts)} attempt${Number(j.attempts) === 1 ? "" : "s"}` : "";
+    const rep = j.replace ? ' <span class="pill">replaces existing</span>' : "";
+    return `<div class="ev"><div class="head"><div><b>${esc(j.file_name || "Unnamed file")}</b> <span class="pill ${cls}">${esc(j.status)}</span> <span class="pill">${esc(j.context || "both")}</span>${rep}</div>
+      <span class="muted">${esc(ago(j.created_at))}</span></div>
+      <div class="muted" style="word-break:break-word">${esc(j.source || "")}</div>
+      <div class="muted">Updated ${esc(ago(j.updated_at))}${chunks}${tries} · <span style="font-family:var(--mono)">${esc(String(j.id || "").slice(0, 8))}</span></div>
+      ${j.error ? `<p class="err-text">${esc(j.error)}</p>` : ""}</div>`;
+  }
+
+  function renderJobs() {
+    $("jobList").innerHTML = jLoaded.map(jobCard).join("");
+    const more = typeof jTotal === "number" ? jLoaded.length < jTotal : false;
+    $("jMore").classList.toggle("hide", !more);
+    $("jMsg").textContent = jLoaded.length
+      ? `Showing ${jLoaded.length}${typeof jTotal === "number" ? " of " + fmt(jTotal) : ""}, newest first.`
+      : "No ingest jobs" + (jStatus ? " with status " + jStatus : "") + ".";
+  }
+
+  // reset = true: reload from the first page, keeping as many rows as are already shown (so auto refresh doesn't collapse the list).
+  async function loadJobs(reset) {
+    const limit = reset ? Math.min(100, Math.max(J_PAGE, jLoaded.length)) : J_PAGE;
+    const offset = reset ? 0 : jLoaded.length;
+    const qs = `?limit=${limit}&offset=${offset}` + (jStatus ? "&status=" + jStatus : "");
+    const r = await call("/rag/jobs" + qs);
+    if (Admin.authFail(r)) { $("jMsg").textContent = ""; return; }
+    if (r.status !== 200 || !Array.isArray(r.body?.data)) {
+      $("jMsg").textContent = r.status === 403 ? "The gateway has not enabled the ingest job list yet (add /rag/jobs to ADMIN_GET_PATHS)." : "Couldn't load ingest jobs (" + (r.status || "network") + ").";
+      $("jMore").classList.add("hide");
+      return;
+    }
+    jLoaded = reset ? r.body.data : jLoaded.concat(r.body.data);
+    // Older API versions return no total: fall back to "more if the page was full".
+    jTotal = typeof r.body.total === "number" ? r.body.total : (r.body.data.length >= limit ? jLoaded.length + 1 : jLoaded.length);
+    renderJobs();
+  }
+
+  Admin.mount({
+    id: "ingest",
+    title: "RAG ingest",
+    init() {
+      Admin.chips("jFilter", "st", (v) => { jStatus = v; jLoaded = []; jTotal = null; loadJobs(true); });
+      $("jMore").addEventListener("click", () => loadJobs(false));
+    },
+    async refresh() {
+      const d = await Admin.overview();
+      if (!d) return;
+      const j = d.rag_ingest_jobs || {};
+      $("jobs").innerHTML = ["queued", "processing", "done", "failed"].map((k) => stat(k[0].toUpperCase() + k.slice(1), j[k])).join("");
+      await loadJobs(true);
+    },
+  });
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<meta name="robots" content="noindex, nofollow, noarchive" />
+<meta name="theme-color" content="#0e1210" />
+<title>Chakudya admin · Errors &amp; latency</title>
+<link rel="stylesheet" href="admin.css" />
+</head>
+<body>
+<main id="root"></main>
+
+<template id="tpl">
+  <h2>Errors and latency</h2>
+  <div class="bar" style="gap:6px;margin:0 0 8px" id="monFilter">
+    <button data-h="24" class="chip on">24 hours</button><button data-h="72" class="chip">3 days</button><button data-h="168" class="chip">7 days</button>
+  </div>
+  <p id="monMsg" class="muted" role="status"></p>
+  <div id="monStats" class="grid"></div>
+  <h3 class="muted" style="margin:14px 0 6px;font-size:14px">Failing endpoints</h3>
+  <div id="monFail"></div>
+  <h3 class="muted" style="margin:14px 0 6px;font-size:14px">Slow endpoints</h3>
+  <div id="monSlow"></div>
+  <h3 class="muted" style="margin:14px 0 6px;font-size:14px">Latest failed and slow calls</h3>
+  <div id="monRecent"></div>
+  <button id="monMore" class="hide">Show more</button>
+  <p class="muted">Only failed calls (5xx, 429, other 4xx except 401 and 404) and slow calls are recorded, so this shows what is breaking, not an overall error rate. Needs <code>REQUEST_LOG_STORE=true</code> and <code>sql/031</code> on the API. Use the request id to find a call in the Worker logs.</p>
+</template>
+
+<script src="../js/config.js"></script>
+<script src="admin.js"></script>
+<script>
+(() => {
+  "use strict";
+  const { $, esc, fmt, stat, ago, msFmt, call } = Admin;
+  let monHours = 24;
+  let monRecent = [];
+  let monShown = 10;
+  const stCls = (st) => (st >= 500 ? "bad" : st >= 400 ? "warn" : "run");
+  const IDS = ["monStats", "monFail", "monSlow", "monRecent"];
+
+  function monRow(e) {
+    const st = e.status != null ? `<span class="pill ${stCls(e.status)}">${esc(e.status)}</span> ` : "";
+    return `<div class="ev"><div class="head"><div>${st}<span class="pill">${esc(e.kind === "both" ? "failed + slow" : e.kind)}</span></div>
+      <span class="muted">${esc(new Date(e.at).toLocaleString())} · ${esc(ago(e.at))}</span></div>
+      <div class="op">${esc(e.method)} ${esc(e.route)}</div>
+      <div class="muted">${esc(msFmt(e.duration_ms))}${e.request_id ? " · " + esc(e.request_id) : ""}</div></div>`;
+  }
+
+  function renderMonRecent() {
+    $("monRecent").innerHTML = monRecent.slice(0, monShown).map(monRow).join("") || '<p class="muted">Nothing recorded in this period.</p>';
+    $("monMore").classList.toggle("hide", monRecent.length <= monShown);
+  }
+
+  function clear() { IDS.forEach((id) => ($(id).innerHTML = "")); $("monMore").classList.add("hide"); }
+
+  async function loadMonitoring() {
+    const r = await call(`/admin/monitoring?hours=${monHours}`);
+    const d = r.body?.data;
+    if (Admin.authFail(r)) { $("monMsg").textContent = ""; clear(); return; }
+    if (r.status !== 200 || !d) {
+      $("monMsg").textContent = r.status === 403 ? "The gateway has not enabled monitoring yet (add /admin/monitoring to ADMIN_GET_PATHS)."
+        : r.status === 404 ? "The API does not have /admin/monitoring yet. Deploy API v1.38.0."
+        : `Couldn't load monitoring (${r.status || "network"}).`;
+      clear();
+      return;
+    }
+    if (!d.available) { $("monMsg").textContent = d.note || "Monitoring storage is not ready."; clear(); return; }
+    const t = d.totals || {};
+    $("monMsg").textContent = (d.storage_enabled ? "" : "Recording is off on the API (REQUEST_LOG_STORE is not true). ")
+      + `Slow means ${msFmt(d.slow_ms)} or more.` + (d.truncated ? " Very busy period: only the newest 2000 records are summarised." : "");
+    const by = Object.entries(t.by_status || {}).sort((a, b) => b[1] - a[1]).map(([s, n]) => `${esc(s)}: ${fmt(n)}`).join(" · ") || "none";
+    $("monStats").innerHTML = stat("Failed calls", t.failed || 0) + stat(`Slow calls, last ${d.window_hours} h`, t.slow || 0);
+    $("monMsg").textContent += ` Failed by status: ${by}.`;
+    $("monFail").innerHTML = (d.failing_endpoints || []).map((f) =>
+      `<div class="ev"><div class="head"><div class="op">${esc(f.method)} ${esc(f.route)}</div><span class="pill bad">${fmt(f.count)}</span></div>
+       <div class="muted">${Object.entries(f.statuses).map(([s, n]) => `${esc(s)} ×${fmt(n)}`).join(" · ")} · last ${esc(ago(f.last_at))}</div></div>`).join("")
+      || '<p class="muted">No failed calls in this period.</p>';
+    $("monSlow").innerHTML = (d.slow_endpoints || []).map((f) =>
+      `<div class="ev"><div class="head"><div class="op">${esc(f.method)} ${esc(f.route)}</div><span class="pill warn">${esc(msFmt(f.max_ms))} max</span></div>
+       <div class="muted">${fmt(f.count)} slow call${f.count === 1 ? "" : "s"} · average ${esc(msFmt(f.avg_ms))} · last ${esc(ago(f.last_at))}</div></div>`).join("")
+      || '<p class="muted">No slow calls in this period.</p>';
+    monRecent = d.recent || [];
+    renderMonRecent();
+  }
+
+  Admin.mount({
+    id: "monitoring",
+    title: "Errors & latency",
+    init() {
+      Admin.chips("monFilter", "h", (v) => { monHours = Number(v); monShown = 10; loadMonitoring(); });
+      $("monMore").addEventListener("click", () => { monShown += 10; renderMonRecent(); });
+    },
+    refresh: loadMonitoring,
+  });
+})();
+</script>
+</body>
+</html>

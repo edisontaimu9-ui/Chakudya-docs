@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<meta name="robots" content="noindex, nofollow, noarchive" />
+<meta name="theme-color" content="#0e1210" />
+<title>Chakudya admin · Usage</title>
+<link rel="stylesheet" href="admin.css" />
+</head>
+<body>
+<main id="root"></main>
+
+<template id="tpl">
+  <h2>Usage by endpoint</h2>
+  <div class="bar" style="gap:6px;margin:0 0 8px" id="useFilter">
+    <button data-d="1" class="chip">Today</button><button data-d="7" class="chip on">7 days</button><button data-d="30" class="chip">30 days</button>
+  </div>
+  <p id="useMsg" class="muted" role="status"></p>
+  <div id="useStats" class="grid"></div>
+  <div id="useTrend" style="margin:12px 0"></div>
+  <div id="useList"></div>
+  <button id="useMore" class="hide">Show more</button>
+  <p class="muted">Calls per endpoint, counted per UTC day. Ids in paths are grouped (<code>/foods/:id</code>). The root page, <code>/health</code> and admin routes are not counted. Needs <code>ROUTE_USAGE_STORE=true</code> and <code>sql/032</code> on the API.</p>
+</template>
+
+<script src="../js/config.js"></script>
+<script src="admin.js"></script>
+<script>
+(() => {
+  "use strict";
+  const { $, esc, fmt, stat, msFmt, call, trendBars } = Admin;
+  let useDays = 7;
+  let useTop = [];
+  let useShown = 10;
+
+  function useRow(e, i) {
+    const w = Math.max(2, Math.min(100, e.share));
+    return `<div class="ev"><div class="head"><div class="op">${i + 1}. ${esc(e.method)} ${esc(e.route)}</div><span class="pill run">${fmt(e.calls)}</span></div>
+      <div style="height:6px;border-radius:3px;background:var(--border);margin:6px 0"><div style="height:6px;border-radius:3px;background:var(--accent);width:${w}%"></div></div>
+      <div class="muted">${esc(e.share)}% of calls · avg ${esc(msFmt(e.avg_ms))} · ${e.errors ? `<span class="pill bad">${fmt(e.errors)} failed (${esc(e.error_rate)}%)</span>` : "no failures"}</div></div>`;
+  }
+
+  function renderUseList() {
+    $("useList").innerHTML = useTop.slice(0, useShown).map(useRow).join("") || '<p class="muted">No calls recorded in this period.</p>';
+    $("useMore").classList.toggle("hide", useTop.length <= useShown);
+  }
+
+  async function loadUsage() {
+    const r = await call(`/admin/usage?days=${useDays}`);
+    const d = r.body?.data;
+    const clear = () => { ["useStats", "useTrend", "useList"].forEach((id) => ($(id).innerHTML = "")); $("useMore").classList.add("hide"); };
+    if (Admin.authFail(r)) { $("useMsg").textContent = ""; clear(); return; }
+    if (r.status !== 200 || !d) {
+      $("useMsg").textContent = r.status === 403 ? "The gateway has not enabled usage yet (add /admin/usage to ADMIN_GET_PATHS)."
+        : r.status === 404 ? "The API does not have /admin/usage yet. Deploy API v1.39.0."
+        : `Couldn't load usage (${r.status || "network"}).`;
+      clear(); return;
+    }
+    if (!d.available) { $("useMsg").textContent = d.note || "Usage storage is not ready."; clear(); return; }
+    const t = d.totals || {};
+    $("useMsg").textContent = (d.storage_enabled ? "" : "Counting is off on the API (ROUTE_USAGE_STORE is not true). ")
+      + (t.calls ? "" : "No calls counted yet. Counting starts once the API is deployed and sql/032 is run.")
+      + (d.truncated ? " Very busy period: only part of the data is summarised." : "");
+    $("useStats").innerHTML = stat("Calls", t.calls || 0) + stat("Endpoints used", t.routes || 0) + stat("Failed calls", t.errors || 0);
+    const days = d.daily || [];
+    $("useTrend").innerHTML = days.length > 1 && (t.calls || 0) > 0 ? trendBars(days) : "";
+    useTop = d.top || [];
+    renderUseList();
+  }
+
+  Admin.mount({
+    id: "usage",
+    title: "Usage",
+    init() {
+      Admin.chips("useFilter", "d", (v) => { useDays = Number(v); useShown = 10; loadUsage(); });
+      $("useMore").addEventListener("click", () => { useShown += 10; renderUseList(); });
+    },
+    refresh: loadUsage,
+  });
+})();
+</script>
+</body>
+</html>
