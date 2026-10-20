@@ -33,7 +33,10 @@ const RenderDocs = (() => {
     return t.content.firstElementChild;
   }
   const base = () => (AppState.state.baseUrl || "https://your-worker.workers.dev").replace(/\/$/, "");
-  const has = (id) => SECTIONS.some((s) => s.id === id);
+  // A guide exists, and so does its sub-page when one is asked for (see SUBPAGES below).
+  const has = (id, sub) => SECTIONS.some((s) => s.id === id)
+    && (!sub || (!!SUBPAGES[id] && SUBPAGES[id]().some((x) => x.id === sub)));
+  const slug = (s) => String(s).toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
 
   function epFor(method, path) {
     return AppState.state.endpoints.find((e) => e.method === method && e.path === path);
@@ -61,7 +64,7 @@ const RenderDocs = (() => {
 
   function section(id, title, ...nodes) {
     const sec = el(`<section class="section doc-section" id="doc-${id}"><h2 class="section__title"></h2></section>`);
-    sec.querySelector("h2").textContent = title;
+    if (title) sec.querySelector("h2").textContent = title; else sec.querySelector("h2").remove();
     nodes.forEach((n) => {
       if (n === null || n === undefined) return;
       sec.append(typeof n === "string" ? el(`<div>${n}</div>`) : n);
@@ -231,20 +234,48 @@ const RenderDocs = (() => {
     return el(`<nav class="endpoint-pager doc-pager" aria-label="Documentation sections">${card(SECTIONS[i - 1], "prev")}${card(SECTIONS[i + 1], "next")}</nav>`);
   }
 
-  function page(id, lead, blocks) {
+  // Prev/next for a sub-page: its siblings, then back to the overview, and on to the next guide at the end.
+  function subPager(id, subs, cur) {
+    const idx = SECTIONS.findIndex((x) => x.id === id);
+    const meta = SECTIONS[idx];
+    const i = subs.findIndex((x) => x.id === cur.id);
+    const card = (href, title, dir) => `<a class="endpoint-pager__card endpoint-pager__card--${dir}" href="${href}">
+        <span class="endpoint-pager__label">${dir === "prev" ? "← Previous" : "Next →"}</span>
+        <span class="doc-pager__title">${esc(title)}</span></a>`;
+    const prev = i > 0 ? card(`#/docs/${id}/${subs[i - 1].id}`, subs[i - 1].title, "prev") : card(`#/docs/${id}`, `${meta.title} overview`, "prev");
+    const next = i < subs.length - 1 ? card(`#/docs/${id}/${subs[i + 1].id}`, subs[i + 1].title, "next")
+      : SECTIONS[idx + 1] ? card(`#/docs/${SECTIONS[idx + 1].id}`, SECTIONS[idx + 1].title, "next")
+      : `<span class="endpoint-pager__spacer"></span>`;
+    return el(`<nav class="endpoint-pager doc-pager" aria-label="Pages in ${esc(meta.title)}">${prev}${next}</nav>`);
+  }
+
+  // Row of sibling sub-pages shown under a sub-page's title.
+  function subnav(id, subs, cur) {
+    return el(`<nav class="doc-subnav" aria-label="Pages in this section">${subs.map((x) =>
+      `<a href="#/docs/${id}/${x.id}"${x.id === cur.id ? ' aria-current="page"' : ""}>${esc(x.title)}</a>`).join("")}</nav>`);
+  }
+
+  // opt.sub / opt.subs make this a sub-page of guide `id` (own title, breadcrumb, sibling nav and pager).
+  function page(id, lead, blocks, opt = {}) {
     const idx = SECTIONS.findIndex((s) => s.id === id);
     const meta = SECTIONS[idx];
+    const { sub, subs } = opt;
+    const eyebrow = sub
+      ? `${esc(meta.title)} · ${subs.findIndex((x) => x.id === sub.id) + 1} of ${subs.length}`
+      : `Documentation · ${idx + 1} of ${SECTIONS.length}`;
     const root = el(`
       <div class="doc-page">
-        <p class="eyebrow">Documentation · ${idx + 1} of ${SECTIONS.length}</p>
+        ${sub ? `<a class="doc-back" href="#/docs/${id}">← ${esc(meta.title)}</a>` : ""}
+        <p class="eyebrow">${eyebrow}</p>
         <h1 class="doc-title"></h1>
         <p class="doc-lead"></p>
       </div>`);
-    root.querySelector("h1").textContent = meta.title;
+    root.querySelector("h1").textContent = sub ? sub.title : meta.title;
     root.querySelector(".doc-lead").innerHTML = lead;
+    if (sub) root.appendChild(subnav(id, subs, sub));
     const body = el(`<div class="doc-body"></div>`);
     blocks.forEach((b) => b && body.appendChild(b));
-    const heads = [...body.querySelectorAll(".doc-section:not(.doc-schema)")];
+    const heads = [...body.querySelectorAll(".doc-section:not(.doc-schema)")].filter((h) => h.querySelector("h2"));
     if (heads.length >= 3) {
       root.appendChild(el(`
         <nav class="doc-toc" aria-label="On this page">
@@ -253,7 +284,7 @@ const RenderDocs = (() => {
         </nav>`));
     }
     root.appendChild(body);
-    root.appendChild(pager(id));
+    root.appendChild(sub ? subPager(id, subs, sub) : pager(id));
     intercept(root);
     return root;
   }
@@ -449,30 +480,51 @@ const RenderDocs = (() => {
     },
   ];
 
-  function examplesPage() {
+  function exEnvelope() {
     const listOk = RenderEndpoint.codeBlock("List response", { status: "success", count: 123, limit: 50, offset: 0, data: [] });
     const oneOk = RenderEndpoint.codeBlock("Single or mutation response", { status: "success", message: "Food created", data: {} });
     const errBlock = RenderEndpoint.codeBlock("Error response", { status: "error", message: "Description of what went wrong" });
+    const envelope = el(`<div class="doc-pair"></div>`);
+    envelope.append(listOk, oneOk, errBlock);
+    return section("envelope", "Response format",
+      p("Every JSON response carries a <code>status</code> of <code>success</code> or <code>error</code>. FHIR routes return FHIR resources, and FHIR errors are <code>OperationOutcome</code> resources (see <a href=\"#/docs/errors\">Error Handling</a>)."),
+      envelope);
+  }
+
+  function exPagination() {
     const cursorBlock = RenderEndpoint.codeBlock("Cursor response", { status: "success", limit: 50, has_more: true, next_cursor: 187, data: [] });
     const cursorCurl = RenderEndpoint.codeBlock("Walk the pages", [
       `curl "${base()}/foods?limit=50&cursor="       # first page`,
       `curl "${base()}/foods?limit=50&cursor=187"    # next page: use next_cursor from the last response`,
     ].join("\n"), { lang: "bash" });
+    return section("pagination", "Pagination",
+      p("List routes support two modes, chosen by whether <code>?cursor=</code> is present. <strong>Offset/limit</strong> (the default) uses <code>?limit=50&amp;offset=100</code>. <strong>Cursor</strong> (keyset) adds <code>?cursor=</code>, empty for the first page. Each response includes <code>next_cursor</code> to pass as the next request's <code>cursor</code>, and stops when <code>has_more</code> is <code>false</code>. Cursor pages are always ordered by <code>id.asc</code>, even where the offset mode's default order differs, and are not disturbed by rows changing mid-walk."),
+      cursorBlock, cursorCurl);
+  }
 
-    const envelope = el(`<div class="doc-pair"></div>`);
-    envelope.append(listOk, oneOk, errBlock);
-
-    return page("examples",
-      `The shapes you will see in every response, how to page through lists, and runnable examples of the most common calls. Every example has a <em>Run live</em> button that calls the production API.`,
-      [
-        section("envelope", "Response format",
-          p("Every JSON response carries a <code>status</code> of <code>success</code> or <code>error</code>. FHIR routes return FHIR resources, and FHIR errors are <code>OperationOutcome</code> resources (see <a href=\"#/docs/errors\">Error Handling</a>)."),
-          envelope),
-        section("pagination", "Pagination",
-          p("List routes support two modes, chosen by whether <code>?cursor=</code> is present. <strong>Offset/limit</strong> (the default) uses <code>?limit=50&amp;offset=100</code>. <strong>Cursor</strong> (keyset) adds <code>?cursor=</code>, empty for the first page. Each response includes <code>next_cursor</code> to pass as the next request's <code>cursor</code>, and stops when <code>has_more</code> is <code>false</code>. Cursor pages are always ordered by <code>id.asc</code>, even where the offset mode's default order differs, and are not disturbed by rows changing mid-walk."),
-          cursorBlock, cursorCurl),
-        section("worked", "Worked examples", ...EXAMPLES.map(example)),
-      ]);
+  // Examples sub-pages: the response shape first, then the runnable examples grouped by what they call.
+  function examplesSubs() {
+    const live = "Every example has a <em>Run live</em> button that calls the production API.";
+    const subs = [{
+      id: "response-format", title: "Response format & pagination",
+      blurb: "The shape of every response and how to page through lists.",
+      lead: "The shapes you will see in every response, and how to page through lists.",
+      build: () => [exEnvelope(), exPagination()],
+    }];
+    const groups = [
+      { id: "foods", title: "Foods", blurb: "Search, look up and compare foods.", test: (e) => e.path.startsWith("/foods") },
+      { id: "meals", title: "Meals & ingredients", blurb: "Analyze a meal and turn free text into ingredients.", test: (e) => /^\/(meals|ingredients|recipes)/.test(e.path) },
+      { id: "knowledge", title: "Knowledge retrieval", blurb: "Semantic retrieval for AI assistants.", test: (e) => e.path.startsWith("/rag") },
+    ];
+    const used = new Set();
+    groups.forEach((g) => {
+      const list = EXAMPLES.filter(g.test);
+      list.forEach((e) => used.add(e));
+      if (list.length) subs.push({ id: g.id, title: g.title, blurb: g.blurb, lead: `Runnable examples: ${g.blurb.toLowerCase()} ${live}`, build: () => [section("examples", "", ...list.map(example))] });
+    });
+    const rest = EXAMPLES.filter((e) => !used.has(e)); // a future example never silently disappears
+    if (rest.length) subs.push({ id: "more", title: "More examples", blurb: "Other runnable examples.", lead: `Other runnable examples. ${live}`, build: () => [section("examples", "", ...rest.map(example))] });
+    return subs;
   }
 
   /* ───────── 5. Data Schemas ───────── */
@@ -648,101 +700,174 @@ const RenderDocs = (() => {
 
   /* ───────── 7. Integrations ───────── */
 
-  function integrationsPage() {
+  function integrationsSubs() {
     const fhirEps = AppState.state.endpoints.filter((e) => e.path.startsWith("/fhir"));
-    const cors = RenderEndpoint.codeBlock("Response headers",
+    const cors = () => RenderEndpoint.codeBlock("Response headers",
       "Access-Control-Allow-Origin: *\nAccess-Control-Allow-Methods: GET, POST, PUT, PATCH, DELETE, OPTIONS\nAccess-Control-Allow-Headers: Content-Type, Authorization, apikey\nAccess-Control-Max-Age: 86400\nAccess-Control-Expose-Headers: X-Cache, X-Request-Id, Retry-After, WWW-Authenticate",
       { lang: "text" });
-
     const batchBody = { requests: [{ id: "nsima", method: "GET", path: "/foods/lookup?q=nsima" }, { id: "beans", method: "GET", path: "/foods?search=beans&limit=3" }] };
-
-    const fhirTable = fhirEps.length
+    const fhirTable = () => fhirEps.length
       ? table(["Operation", "Summary"], fhirEps.map((e) => [epRef(e.method, e.path), esc(e.summary)]))
       : null;
 
-    return page("integrations",
-      `Ways to connect Chakudya to browsers, apps, clinical systems and AI assistants.`,
-      [
-        section("browser", "Browsers and CORS",
-          p("The API sends permissive CORS headers on every response, so any origin can call it directly with no proxy. Remember not to ship an API key to the browser (see <a href=\"#/docs/authentication\">Authentication</a>)."),
-          cors),
-        section("sdk", "JavaScript SDK",
-          p("A zero-dependency JavaScript client lives in its own repository. It ships browser (<code>&lt;script&gt;</code> tag), ESM and CommonJS builds with TypeScript types. See its README for install and usage."),
-          el(`<p><a class="btn" href="https://github.com/edisontaimu9-ui/Chakudya-sdk" target="_blank" rel="noopener">Chakudya-sdk on GitHub</a></p>`)),
-        section("openapi", "OpenAPI spec",
-          p("The whole API is described in OpenAPI 3. Download it to generate a typed client in your language, or import it into any OpenAPI-compatible tool."),
-          el(`<p class="doc-actions"><a class="btn" href="openapi.yaml" download>Download openapi.yaml</a><a class="btn" href="openapi.json" download>Download openapi.json</a></p>`)),
-        section("fhir", "FHIR R4 and clinical systems",
+    return [
+      {
+        id: "web-sdk", title: "Browsers, SDK & OpenAPI",
+        blurb: "Call the API from a browser, use the JavaScript SDK or generate a client.",
+        lead: "Call Chakudya straight from a browser, use the JavaScript SDK, or generate a typed client from the OpenAPI spec.",
+        build: () => [
+          section("browser", "Browsers and CORS",
+            p("The API sends permissive CORS headers on every response, so any origin can call it directly with no proxy. Remember not to ship an API key to the browser (see <a href=\"#/docs/authentication\">Authentication</a>)."),
+            cors()),
+          section("sdk", "JavaScript SDK",
+            p("A zero-dependency JavaScript client lives in its own repository. It ships browser (<code>&lt;script&gt;</code> tag), ESM and CommonJS builds with TypeScript types. See its README for install and usage."),
+            el(`<p><a class="btn" href="https://github.com/edisontaimu9-ui/Chakudya-sdk" target="_blank" rel="noopener">Chakudya-sdk on GitHub</a></p>`)),
+          section("openapi", "OpenAPI spec",
+            p("The whole API is described in OpenAPI 3. Download it to generate a typed client in your language, or import it into any OpenAPI-compatible tool."),
+            el(`<p class="doc-actions"><a class="btn" href="openapi.yaml" download>Download openapi.yaml</a><a class="btn" href="openapi.json" download>Download openapi.json</a></p>`)),
+        ],
+      },
+      {
+        id: "fhir", title: "FHIR R4 & clinical systems",
+        blurb: "A stateless FHIR R4 layer for growth evaluation and the Nutrition Care Process.",
+        lead: "Connect clinical systems through the FHIR R4 facade.",
+        build: () => [section("fhir", "",
           p("The <code>/fhir</code> facade is a stateless FHIR R4 layer for growth evaluation and the Nutrition Care Process (screening, assessment, diagnosis, intervention, monitoring and ADIME documents), with validation and terminology maps. Use a <a href=\"#/account\">consumer key</a> to call it."),
-          fhirTable),
-        section("ai", "AI assistants and RAG",
+          fhirTable())],
+      },
+      {
+        id: "ai-rag", title: "AI assistants & RAG",
+        blurb: "Ground an assistant in real nutrition data and keep context between turns.",
+        lead: "Ground an AI assistant in real nutrition data.",
+        build: () => [section("ai", "",
           p(`Ground an assistant in real nutrition data with ${epLink("POST", "/rag/retrieve")} (raw semantic retrieval) or ${epLink("POST", "/rag/ask")} (answer a question), and keep context between turns with ${epLink("POST", "/memory/write")} and ${epLink("GET", "/memory/recall")}.`),
-          sampleSet({ method: "POST", path: "/rag/retrieve", body: { query: "high potassium foods", context: "both", top_k: 5 } })),
-        section("batch", "Batching requests",
+          sampleSet({ method: "POST", path: "/rag/retrieve", body: { query: "high potassium foods", context: "both", top_k: 5 } }))],
+      },
+      {
+        id: "batching", title: "Batching requests",
+        blurb: "Run up to 20 calls in one round trip.",
+        lead: "Fan several calls out in a single round trip.",
+        build: () => [section("batch", "",
           p(`${epLink("POST", "/batch")} runs up to 20 sub-requests in one round trip through the same auth and rate-limit pipeline as a normal request. Each sub-request still counts against its own route's limit, and the batch itself is limited to 10 per minute per IP. Pass an <code>id</code> on each item to match results to requests.`),
-          sampleSet({ method: "POST", path: "/batch", body: batchBody })),
-      ]);
+          sampleSet({ method: "POST", path: "/batch", body: batchBody }))],
+      },
+    ];
   }
 
   /* ───────── 8. API Reference ───────── */
 
-  function apiReference() {
-    const { groups, endpoints } = AppState.state;
+  // The spec has many small tags (36). They are gathered into a few categories so the reference is a set of
+  // short pages instead of one list of every route. Matching is by tag name; a tag that is not listed here
+  // (for example one added to the spec later) lands in "More routes", so no route ever disappears.
+  const REF_CATEGORIES = [
+    { id: "foods", title: "Foods & packaged foods", blurb: "Search, look up, compare, substitute and submit foods and branded products.", tags: ["Foods", "Packaged"] },
+    { id: "meals", title: "Meals, intake & food log", blurb: "Analyze meals and recipes, compare intake with dietary reference intakes, and keep a food diary.", tags: ["Meals", "Recipes", "Ingredients", "DRI", "Food Log", "Favorites", "History"] },
+    { id: "growth", title: "WHO growth standards", blurb: "Z-scores, percentiles and status bands from birth to 19 years, and the combined assessment.", tags: ["Growth assessment", "Weight for age", "Length height for age", "Weight for length height", "BMI for age", "BMI for age under 5", "HC for age", "MUAC for age", "MUAC fixed cut-offs"] },
+    { id: "velocity", title: "Growth velocity & preterm", blurb: "WHO increment bands for infants and Fenton preterm growth charts.", tags: ["Weight velocity", "Length velocity", "HC velocity", "Fenton Preterm"] },
+    { id: "diets", title: "Diets, exchange & formulas", blurb: "Glycaemic index, food exchange lists, renal nutrition and enteral formulas.", tags: ["Glycaemic Index", "Exchange", "Renal", "Formulas"] },
+    { id: "clinical", title: "Energy & drug interactions", blurb: "Energy requirements and known drug-nutrient interactions.", tags: ["Energy", "Drug Interactions"] },
+    { id: "fhir", title: "FHIR R4", blurb: "Stateless growth evaluation and the Nutrition Care Process as FHIR resources.", tags: ["FHIR"] },
+    { id: "ai", title: "AI, knowledge & memory", blurb: "Retrieval-augmented answers and session memory for assistants.", tags: ["RAG", "Memory"] },
+    { id: "platform", title: "Keys & platform", blurb: "API keys, developer keys, batching, health and metadata.", tags: ["API Keys", "Developer keys", "Batch", "Health", "Meta"] },
+  ];
+
+  function refCategories() {
+    const { groups } = AppState.state;
+    const used = new Set();
+    const cats = [];
+    REF_CATEGORIES.forEach((c) => {
+      const gs = c.tags.map((t) => groups.find((g) => g.tag.toLowerCase() === t.toLowerCase())).filter(Boolean);
+      gs.forEach((g) => used.add(g));
+      if (gs.length) cats.push({ ...c, groups: gs });
+    });
+    const more = groups.filter((g) => !used.has(g));
+    if (more.length) cats.push({ id: "more", title: "More routes", blurb: "Other documented routes.", tags: [], groups: more });
+    cats.forEach((c) => { c.count = c.groups.reduce((n, g) => n + g.endpoints.length, 0); });
+    return cats;
+  }
+
+  // Used by the endpoint page to link its tag back to the category page.
+  function refCategoryFor(tag) {
+    const c = refCategories().find((x) => x.groups.some((g) => g.tag === tag));
+    return c ? { id: c.id, title: c.title } : null;
+  }
+
+  function refRow(ep, showTag) {
+    const li = el(`
+      <li data-search="${esc((ep.method + " " + ep.path + " " + ep.summary + " " + ep.tags[0]).toLowerCase())}">
+        <a class="doc-ref__row" href="#/${ep.slug}">
+          <span class="badge-method badge-method--${ep.method}">${ep.method}</span>
+          <code class="doc-ref__path"></code>
+          <span class="doc-ref__sum"></span>
+        </a>
+      </li>`);
+    li.querySelector(".doc-ref__path").textContent = ep.path;
+    li.querySelector(".doc-ref__sum").textContent = ep.summary + (showTag ? ` · ${ep.tags[0]}` : "");
+    return li;
+  }
+
+  function refList(g) {
+    const ul = el(`<ul class="doc-ref__list"></ul>`);
+    g.endpoints.forEach((ep) => ul.appendChild(refRow(ep, false)));
+    return ul;
+  }
+
+  function apiReferenceSubs() {
+    return refCategories().map((c) => ({
+      id: c.id, title: c.title, blurb: c.blurb, count: c.count,
+      lead: `${esc(c.blurb)} ${c.count} route${c.count === 1 ? "" : "s"}. Open any route for its parameters, example requests and responses, and a live <em>Try it</em> console.`,
+      build: () => c.groups.map((g) => section("grp-" + slug(g.tag), c.groups.length > 1 ? g.tag : "", refList(g))),
+    }));
+  }
+
+  // Card grid linking to sub-pages (used by every guide that has them).
+  function subCards(id, subs) {
+    return el(`<div class="group-grid">${subs.map((x) => `
+      <a class="group-card" href="#/docs/${id}/${x.id}">
+        <div class="group-card__title">${esc(x.title)}</div>
+        <div class="group-card__desc">${x.count ? `${x.count} route${x.count === 1 ? "" : "s"} · ` : ""}${esc(x.blurb)}</div>
+      </a>`).join("")}</div>`);
+  }
+
+  function hubPage(id, lead, subs) {
+    return page(id, lead, [section("pages", "In this section", subCards(id, subs))]);
+  }
+
+  // The API Reference overview: search every route, or browse by category.
+  function apiReference(subs) {
+    const { endpoints } = AppState.state;
     const filter = el(`
       <div class="doc-filter">
-        <label class="sr-only" for="doc-ref-filter">Filter routes</label>
-        <input id="doc-ref-filter" type="search" placeholder="Filter routes, e.g. growth, /foods, POST" autocomplete="off" />
+        <label class="sr-only" for="doc-ref-filter">Search routes</label>
+        <input id="doc-ref-filter" type="search" placeholder="Search all routes, e.g. growth, /foods, POST" autocomplete="off" />
         <span class="doc-filter__count" id="doc-ref-count" aria-live="polite"></span>
       </div>`);
-    const wrap = el(`<div class="doc-ref"></div>`);
-    groups.forEach((g) => {
-      const sec = el(`
-        <section class="doc-ref__group">
-          <h3 class="doc-ref__title"><span></span><small>${g.endpoints.length}</small></h3>
-          <ul class="doc-ref__list"></ul>
-        </section>`);
-      sec.querySelector("h3 span").textContent = g.tag;
-      const ul = sec.querySelector("ul");
-      g.endpoints.forEach((ep) => {
-        const li = el(`
-          <li data-search="${esc((ep.method + " " + ep.path + " " + ep.summary + " " + g.tag).toLowerCase())}">
-            <a class="doc-ref__row" href="#/${ep.slug}">
-              <span class="badge-method badge-method--${ep.method}">${ep.method}</span>
-              <code class="doc-ref__path"></code>
-              <span class="doc-ref__sum"></span>
-            </a>
-          </li>`);
-        li.querySelector(".doc-ref__path").textContent = ep.path;
-        li.querySelector(".doc-ref__sum").textContent = ep.summary;
-        ul.appendChild(li);
-      });
-      wrap.appendChild(sec);
-    });
-    const empty = el(`<p class="section__note doc-ref__empty" hidden>No routes match that filter.</p>`);
+    const results = el(`<ul class="doc-ref__list doc-ref__results" hidden></ul>`);
+    endpoints.forEach((ep) => results.appendChild(refRow(ep, true)));
+    const empty = el(`<p class="section__note doc-ref__empty" hidden>No routes match that search.</p>`);
+    const browse = section("browse", "Browse by category", subCards("api-reference", subs));
 
     function apply(q) {
       q = q.trim().toLowerCase();
       let shown = 0;
-      wrap.querySelectorAll(".doc-ref__group").forEach((g) => {
-        let n = 0;
-        g.querySelectorAll("li").forEach((li) => {
-          const ok = !q || li.dataset.search.includes(q);
-          li.hidden = !ok;
-          if (ok) n++;
-        });
-        g.hidden = n === 0;
-        shown += n;
+      results.querySelectorAll("li").forEach((li) => {
+        const ok = !!q && li.dataset.search.includes(q);
+        li.hidden = !ok;
+        if (ok) shown++;
       });
-      empty.hidden = shown !== 0;
+      results.hidden = !q || shown === 0;
+      browse.hidden = !!q;
+      empty.hidden = !q || shown !== 0;
       filter.querySelector("#doc-ref-count").textContent = q ? `${shown} of ${endpoints.length}` : `${endpoints.length} routes`;
     }
     filter.querySelector("input").addEventListener("input", (e) => apply(e.target.value));
     apply("");
 
     return page("api-reference",
-      `All ${endpoints.length} documented routes in ${groups.length} resource groups. Open any route for its parameters, example requests and responses, and a live <em>Try it</em> console. Use <kbd>←</kbd> and <kbd>→</kbd> on a route page to step through them.`,
+      `All ${endpoints.length} documented routes in ${subs.length} categories. Search for a route, or pick a category. Open any route for its parameters, example requests and responses, and a live <em>Try it</em> console. Use <kbd>←</kbd> and <kbd>→</kbd> on a route page to step through them.`,
       [
-        section("routes", "Routes", filter, wrap, empty),
+        section("routes", "Find a route", filter, results, empty),
+        browse,
         section("spec", "Machine-readable spec",
           el(`<p class="doc-actions"><a class="btn" href="openapi.yaml" download>Download openapi.yaml</a><a class="btn" href="openapi.json" download>Download openapi.json</a></p>`)),
       ]);
@@ -750,22 +875,45 @@ const RenderDocs = (() => {
 
   /* ───────── entry point ───────── */
 
+  // Guides that are split into sub-pages ("#/docs/<guide>/<sub>"). Each returns the list of sub-pages.
+  const SUBPAGES = {
+    examples: examplesSubs,
+    integrations: integrationsSubs,
+    "api-reference": apiReferenceSubs,
+  };
+  const HUB_LEADS = {
+    examples: "The shapes you will see in every response, how to page through lists, and runnable examples of the most common calls. Pick a page below.",
+    integrations: "Ways to connect Chakudya to browsers, apps, clinical systems and AI assistants. Pick a page below.",
+  };
+
   const BUILDERS = {
     "getting-started": gettingStarted,
     endpoints: apiEndpoints,
     authentication,
-    examples: examplesPage,
     schemas: schemasPage,
     errors: errorsPage,
-    integrations: integrationsPage,
-    "api-reference": apiReference,
   };
 
-  function render(id, container) {
+  // Title and description for the browser tab / search results.
+  function meta(id, sub) {
+    const g = SECTIONS.find((s) => s.id === id);
+    const s = sub && SUBPAGES[id] ? SUBPAGES[id]().find((x) => x.id === sub) : null;
+    return s ? { title: `${s.title} - ${g.title}`, blurb: s.blurb } : { title: g.title, blurb: g.blurb };
+  }
+
+  function render(id, container, sub) {
     container.innerHTML = "";
-    const root = BUILDERS[id]();
+    let root;
+    if (SUBPAGES[id]) {
+      const subs = SUBPAGES[id]();
+      const cur = sub && subs.find((x) => x.id === sub);
+      if (cur) root = page(id, cur.lead, cur.build(), { sub: cur, subs });
+      else root = id === "api-reference" ? apiReference(subs) : hubPage(id, HUB_LEADS[id], subs);
+    } else {
+      root = BUILDERS[id]();
+    }
     container.appendChild(root);
   }
 
-  return { SECTIONS, has, render };
+  return { SECTIONS, has, meta, render, refCategoryFor };
 })();

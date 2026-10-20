@@ -48,14 +48,21 @@ service worker, icons, offline strategy, install requirements).
 | `#/docs/getting-started` | Getting Started: base URL, first request, live status |
 | `#/docs/endpoints` | API Endpoints: what the API provides, by resource |
 | `#/docs/authentication` | Authentication: key types, open routes, consumer keys, rate limits |
-| `#/docs/examples` | Request & Response Examples: envelope, pagination, runnable examples |
+| `#/docs/examples` | Request & Response Examples: overview of the pages below |
+| `#/docs/examples/<page>` | `response-format`, `foods`, `meals`, `knowledge` |
 | `#/docs/schemas` | Data Schemas: every `components.schemas` entry in the spec |
 | `#/docs/errors` | Error Handling: status codes, headers, retries |
-| `#/docs/integrations` | Integrations: CORS, JS SDK, OpenAPI, FHIR, RAG, batch |
-| `#/docs/api-reference` | API Reference: every documented route, filterable |
+| `#/docs/integrations` | Integrations: overview of the pages below |
+| `#/docs/integrations/<page>` | `web-sdk`, `fhir`, `ai-rag`, `batching` |
+| `#/docs/api-reference` | API Reference: search every route, or browse by category |
+| `#/docs/api-reference/<category>` | `foods`, `meals`, `growth`, `velocity`, `diets`, `clinical`, `fhir`, `ai`, `platform` |
 | `#/<method>-<path-slug>` | One endpoint page (unchanged), e.g. `#/get-foods` |
 | `#/account` | Developer login and consumer keys (unchanged) |
 | `#/reference` | Legacy link; redirects to `#/docs/getting-started` |
+
+The 36 spec tags are grouped into the API Reference categories by `REF_CATEGORIES` in `js/render-docs.js`.
+A tag that is not listed there (for example one added to the spec later) appears under a "More routes"
+category, so no route is ever hidden. To add a sub-page to another guide, add it to `SUBPAGES` in the same file.
 
 Route lists, schemas, status-code counts, rate limits and the FHIR operation table are
 generated from `openapi.json` and `data/endpoint-metadata.json`. The hand-written parts are

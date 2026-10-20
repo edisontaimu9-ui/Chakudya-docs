@@ -171,20 +171,26 @@
     }
     if (isGuide) {
       if (hash === "docs") { location.replace("#/docs/getting-started"); return; }
-      if (!RenderDocs.has(guideId) || hash.split("/").length > 2) {
+      // "#/docs/<guide>" or, for the guides split into smaller pages, "#/docs/<guide>/<page>".
+      const parts = hash.split("/");
+      const subId = parts[2];
+      if (!RenderDocs.has(guideId, subId) || parts.length > 3) {
+        const back = subId && RenderDocs.has(guideId)
+          ? `<a class="btn" href="#/docs/${RenderEndpoint.escapeHtml(guideId)}">Back to ${RenderEndpoint.escapeHtml(RenderDocs.meta(guideId).title)}</a>`
+          : `<a class="btn" href="#/docs/getting-started">Go to Getting Started</a>`;
         content.innerHTML = `
           <div class="empty-state">
             <h3>Page not found</h3>
             <p>There is no documentation page at <span class="mono">${RenderEndpoint.escapeHtml(hash)}</span>.</p>
-            <a class="btn" href="#/docs/getting-started">Go to Getting Started</a>
+            ${back}
           </div>`;
         Sidebar.setActive(null);
         AppState.set({ activeId: null });
         closeSidebar();
         return;
       }
-      RenderDocs.render(guideId, content);
-      const gs = RenderDocs.SECTIONS.find((s) => s.id === guideId);
+      RenderDocs.render(guideId, content, subId);
+      const gs = RenderDocs.meta(guideId, subId);
       Seo.set(`${gs.title} - API Documentation`, gs.blurb);
       Sidebar.setActive(`guide:${guideId}`);
       AppState.set({ activeId: null });
