@@ -8,7 +8,7 @@
 (() => {
   "use strict";
   const SESSION_KEY = "chakudya-docs:session"; // same key the docs site uses
-  const AUTO_KEY = "chakudya-admin:auto";
+  const AUTO_MS = 60000; // auto refresh is always on while a page is open and visible
   const AUTH = window.CHAKUDYA_AUTH || {};
   const API = window.CHAKUDYA_API || {};
   const SB = String(AUTH.supabaseUrl || "").replace(/\/$/, "");
@@ -125,11 +125,17 @@
     return r.body.data;
   }
 
+  const ICON_REFRESH = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 11a8 8 0 0 0-14.9-3M4 5v4h4"/><path d="M4 13a8 8 0 0 0 14.9 3M20 19v-4h-4"/></svg>';
+  const ICON_OUT = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5M21 12H9"/></svg>';
+
   function shellHtml() {
     const nav = PAGES.map(([href, label, id]) => `<a href="${href}"${id === cfg.id ? ' class="on" aria-current="page"' : ""}>${esc(label)}</a>`).join("");
     return `
   <section id="login" class="card login hide">
-    <h1>Chakudya admin</h1>
+    <div class="brand login-brand">
+      <img src="../assets/icons/icon-192.png" alt="" width="44" height="44" />
+      <div><div class="eyebrow">Nutrition Registry</div><h1>Chakudya <em>Admin</em></h1></div>
+    </div>
     <p class="muted">Sign in with an approved admin account.</p>
     <label class="muted" for="em">Email</label>
     <input id="em" type="email" autocomplete="username" />
@@ -145,45 +151,67 @@
   </section>
 
   <section id="app" class="hide">
-    <div class="bar">
-      <div>
-        <h1>Chakudya admin</h1>
-        <div id="who" class="muted"></div>
+    <header class="topbar">
+      <div class="brand">
+        <img src="../assets/icons/icon-192.png" alt="" width="44" height="44" />
+        <div>
+          <div class="eyebrow">Nutrition Registry</div>
+          <h1>Chakudya <em>Admin</em></h1>
+        </div>
       </div>
-      <div class="bar" style="gap:8px">
-        <label class="chk"><input id="auto" type="checkbox" /> auto 60s</label>
-        <button id="refresh">Refresh</button>
-        <button id="out">Sign out</button>
+      <div class="tools">
+        <div id="who" class="who" title=""><span id="avatar" class="av" aria-hidden="true"></span><span id="whoEmail" class="em"></span></div>
+        <button id="refresh" class="ibtn" type="button" title="Refresh now">${ICON_REFRESH}<span>Refresh</span></button>
+        <button id="out" class="ibtn ghost" type="button" title="Sign out">${ICON_OUT}<span>Sign out</span></button>
       </div>
-    </div>
+    </header>
     <nav class="nav" aria-label="Admin pages">${nav}</nav>
-    <p id="status" class="muted" role="status"></p>
+    <div class="live" id="live"><span class="pulse" aria-hidden="true"></span><span id="status" role="status"></span></div>
     <div id="fatal" class="card err hide"></div>
     <div id="page"></div>
   </section>`;
   }
 
   // Runs the page's refresh and keeps the status line honest. keep = true on auto refresh (pages keep loaded lists).
+  let busy = false;
+  let lastLoad = 0;
   async function load(keep) {
+    if (busy) return;
+    busy = true;
     $("fatal").classList.add("hide");
     $("refresh").disabled = true;
+    $("refresh").classList.add("busy");
+    $("live").classList.add("busy");
     $("status").textContent = "Refreshing…";
     try { await cfg.refresh?.(keep === true); }
-    finally { $("refresh").disabled = false; }
-    $("status").textContent = $("fatal").classList.contains("hide") ? "Updated " + new Date().toLocaleTimeString() : "";
+    finally {
+      busy = false;
+      lastLoad = Date.now();
+      $("refresh").disabled = false;
+      $("refresh").classList.remove("busy");
+      $("live").classList.remove("busy");
+    }
+    $("status").textContent = $("fatal").classList.contains("hide") ? "Live · updated " + new Date().toLocaleTimeString() : "";
   }
 
-  function setAuto(on) {
-    clearInterval(timer); timer = null;
-    try { on ? localStorage.setItem(AUTO_KEY, "1") : localStorage.removeItem(AUTO_KEY); } catch (_) {}
-    if (on) timer = setInterval(() => { if (!document.hidden) load(true); }, 60000);
+  // Always on: refresh every minute while the tab is visible, and catch up when you come back to a stale tab.
+  function startAuto() {
+    if (timer) return;
+    timer = setInterval(() => { if (!document.hidden) load(true); }, AUTO_MS);
+    document.addEventListener("visibilitychange", () => {
+      if (!document.hidden && loadSession() && Date.now() - lastLoad > AUTO_MS) load(true);
+    });
   }
 
   async function start() {
     const s = loadSession();
     if (!s || !(await token())) { show("login"); return; }
     show("app");
-    $("who").textContent = loadSession()?.email || "";
+    const email = loadSession()?.email || "";
+    $("whoEmail").textContent = email;
+    $("who").title = email;
+    $("avatar").textContent = (email.trim()[0] || "A");
+    startAuto();
     if (!mounted) {
       mounted = true;
       const tpl = $("tpl");
@@ -227,11 +255,8 @@
     });
     $("pw").addEventListener("keydown", (e) => { if (e.key === "Enter") $("go").click(); });
     $("refresh").addEventListener("click", () => load());
-    $("auto").addEventListener("change", (e) => setAuto(e.target.checked));
     // Reloading clears every list and any key shown on screen, so nothing from the session stays in the page.
-    $("out").addEventListener("click", () => { saveSession(null); setAuto(false); location.reload(); });
-
-    try { if (localStorage.getItem(AUTO_KEY)) { $("auto").checked = true; setAuto(true); } } catch (_) {}
+    $("out").addEventListener("click", () => { saveSession(null); clearInterval(timer); location.reload(); });
 
     if (!SB || !GW) { show("login"); $("loginMsg").textContent = "Missing config. Check js/config.js."; }
     else start();

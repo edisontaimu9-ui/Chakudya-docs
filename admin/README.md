@@ -22,7 +22,7 @@ Sign-in uses the same session key as the docs site, so signing in on one page si
 ## Adding a page
 1. Copy a small page such as `activity.html`: content goes in `<template id="tpl">`, logic in the inline script.
 2. Call `Admin.mount({ id, title, init(), refresh(keep) })`.
-   `init()` runs once (attach listeners), `refresh(keep)` runs on load, on Refresh and every 60 s when auto is on.
+   `init()` runs once (attach listeners), `refresh(keep)` runs on load, on Refresh and every 60 s (auto refresh is always on).
    `keep` is `true` on auto refresh, so lists the person is working through are not reset.
 3. Add the page to `PAGES` in `admin.js` so it appears in the navigation.
 
