@@ -345,6 +345,12 @@ const RenderDocs = (() => {
         <li><span><strong>WHO child and adolescent growth standards</strong> (<code>/length-height-for-age</code>, <code>/weight-for-age</code>, <code>/weight-for-length-height</code>, <code>/bmi-for-age</code>, <code>/bmi-for-age-under-5</code>, <code>/hc-for-age</code>, <code>/muac-for-age</code>, <code>/muac</code>). Z-scores, percentiles and status bands from birth to 19 years. Screening aids, not diagnoses.</span></li>
         <li><span><strong>Growth velocity</strong> (<code>/weight-velocity</code>, <code>/length-velocity</code>, <code>/hc-velocity</code>). WHO 6-month increment bands for infants.</span></li>
         <li><span><strong>Combined growth assessment</strong> (<code>/growth/assess</code>). Every applicable WHO indicator for one child in a single call, with the findings that need attention listed first.</span></li>
+        <li><span><strong>Diabetes nutrition</strong> (<code>/diabetes</code>). Glucose targets, carbohydrate plans and counting, glycaemic load, insulin dose, hypoglycaemia and exercise calculators. Calculations only, nothing is stored.</span></li>
+        <li><span><strong>Renal nutrition calculators</strong> (<code>/renal-nutrition</code>). eGFR and CKD stage, nutrient targets, lab actions, dialysis adequacy and a renal food plan.</span></li>
+        <li><span><strong>Pregnancy and lactation</strong> (<code>/pregnancy</code>). Gestational age, weight gain, nutrition plan and lab or clinical screens.</span></li>
+        <li><span><strong>Sports nutrition</strong> (<code>/sports</code>). Athlete energy, macronutrients, fuel timing, hydration, body composition and supplement doses.</span></li>
+        <li><span><strong>Weight management</strong> (<code>/weight-management</code>). Weight status assessment, loss and gain plans, progress tracking, diet pattern and bariatric diet stages.</span></li>
+        <li><span><strong>Household measures</strong> (<code>/measures</code>, <code>/foods/convert</code>). Convert between household and standard measures, with or without a food.</span></li>
         <li><span><strong>Preterm growth</strong> (<code>/fenton-preterm</code>). Fenton chart classification, trajectories, velocity and server-rendered charts. Raw reference values are never returned.</span></li>
         <li><span><strong>FHIR R4 facade</strong> (<code>/fhir</code>). Stateless growth evaluation and the full Nutrition Care Process: screening, assessment, diagnosis, intervention, monitoring and ADIME documents, plus validation, terminology maps and audit events.</span></li>
         <li><span><strong>Packaged and branded foods</strong> (<code>/packaged</code>). Barcode lookup, community product submission, and OCR assisted data capture.</span></li>
@@ -766,6 +772,7 @@ const RenderDocs = (() => {
     { id: "velocity", title: "Growth velocity & preterm", blurb: "WHO increment bands for infants and Fenton preterm growth charts.", tags: ["Weight velocity", "Length velocity", "HC velocity", "Fenton Preterm"] },
     { id: "diets", title: "Diets, exchange & formulas", blurb: "Glycaemic index, food exchange lists, renal nutrition and enteral formulas.", tags: ["Glycaemic Index", "Exchange", "Renal", "Formulas"] },
     { id: "clinical", title: "Energy & drug interactions", blurb: "Energy requirements and known drug-nutrient interactions.", tags: ["Energy", "Drug Interactions"] },
+    { id: "conditions", title: "Condition-specific nutrition", blurb: "Calculators for diabetes, kidney disease, pregnancy and lactation, sports and weight management.", tags: ["Diabetes Nutrition", "Renal Nutrition", "Pregnancy", "Sports Nutrition", "Weight Management"] },
     { id: "fhir", title: "FHIR R4", blurb: "Stateless growth evaluation and the Nutrition Care Process as FHIR resources.", tags: ["FHIR"] },
     { id: "ai", title: "AI, knowledge & memory", blurb: "Retrieval-augmented answers and session memory for assistants.", tags: ["RAG", "Memory"] },
     { id: "platform", title: "Keys & platform", blurb: "API keys, developer keys, batching, health and metadata.", tags: ["API Keys", "Developer keys", "Batch", "Health", "Meta"] },

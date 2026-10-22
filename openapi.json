@@ -3,7 +3,7 @@
   "info": {
     "title": "Chakudya Nutrition Registry API (CNR)",
     "description": "Chakudya is a Malawi focused nutrition data and intelligence API. It provides structured, searchable nutrition information for health applications, researchers, students, dietitians, and developers building tools for clinical or public health nutrition work. The API combines local food composition data with international sources such as USDA FoodData Central, Open Food Facts, and FatSecret, and adds retrieval augmented question answering and session memory for AI assisted applications.\n\nIt also covers clinical growth assessment (WHO child growth standards from birth to 19 years, Fenton preterm charts, and a combined `/growth/assess` call), recipe and meal nutrition analysis, dietary reference intakes, and a stateless FHIR R4 facade that exposes growth evaluation and the full Nutrition Care Process (screening, assessment, diagnosis, intervention, monitoring and ADIME documents).\n\nPeople can sign in on the docs site and create their own consumer API keys (higher rate limits, FHIR access, usage counts) with `/developer/keys`.\n\nEvery operational route needs `Authorization: Bearer YOUR_API_KEY` (a consumer key from the developer console, or an admin or reviewer key). The only routes that work without a key are `GET /`, `GET /health` and the FHIR conformance reads (`GET /fhir/metadata`, `CodeSystem`, `OperationDefinition`, `StructureDefinition`, `ConceptMap`, `Questionnaire`). `/developer/keys` takes your Supabase login token instead of an API key, and `POST /rag/webhook` takes a shared secret. Privileged registry writes (foods, exchange, renal, formulas, drug interactions, glycaemic index, reference tables, packaged CRUD and review, RAG ingest, bulk inserts) and key management need an admin key; a consumer key is refused there. Anonymous calls receive 401 with the code `api_key_required`. OAuth 2.0 was removed in v1.34.0.\n",
-    "version": "1.43.0",
+    "version": "1.53.0",
     "contact": {
       "name": "Edison Taimu",
       "x-location": "Blantyre, Malawi"
@@ -95,6 +95,21 @@
     },
     {
       "name": "Energy"
+    },
+    {
+      "name": "Sports Nutrition"
+    },
+    {
+      "name": "Weight Management"
+    },
+    {
+      "name": "Pregnancy"
+    },
+    {
+      "name": "Renal Nutrition"
+    },
+    {
+      "name": "Diabetes Nutrition"
     },
     {
       "name": "Fenton Preterm"
@@ -377,7 +392,128 @@
                               "description": "Up to 25 busiest endpoints.",
                               "items": {
                                 "type": "object",
-                                "description": "method, route, calls, errors, error_rate (percent), avg_ms, share (percent of all calls) and last_day."
+                                "description": "method, route, calls, errors, error_rate (percent), avg_ms, p95_ms (estimated from latency buckets, null until sql/036 is run and traffic arrives), share (percent of all calls) and last_day."
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "description": "Not the root key",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/health-history": {
+      "get": {
+        "tags": [
+          "API Keys"
+        ],
+        "summary": "Uptime, upstream status and outage timeline (root key only)",
+        "description": "Reads the health probe history. A cron runs the same checks as `GET /health` every 5 minutes and stores one row per run when `HEALTH_CHECK_STORE=true` (run `sql/034_add_health_checks.sql` first). Returns uptime percent, coverage (how many of the expected probes actually ran), per-upstream uptime and probe latency (average, p95, max), an outage timeline (runs of consecutive degraded probes, newest first) and daily uptime. `current.stale` is true when the latest probe is older than 15 minutes, which usually means the cron is not running. A probe that could not reach the database is held in KV and written with the next one, so a database outage still shows up. Only Supabase, Cohere and Groq count towards an outage. Needs the root key. When the table cannot be read the response has `available` false and a note.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "hours",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "default": 24,
+              "maximum": 720
+            },
+            "description": "Look-back window in hours."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Health history summary",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/Success"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "type": "object",
+                          "properties": {
+                            "generated_at": {
+                              "type": "string",
+                              "format": "date-time"
+                            },
+                            "window_hours": {
+                              "type": "integer"
+                            },
+                            "available": {
+                              "type": "boolean"
+                            },
+                            "storage_enabled": {
+                              "type": "boolean"
+                            },
+                            "probe_every_minutes": {
+                              "type": "integer"
+                            },
+                            "truncated": {
+                              "type": "boolean"
+                            },
+                            "totals": {
+                              "type": "object",
+                              "description": "checks, healthy and degraded counts."
+                            },
+                            "uptime_pct": {
+                              "type": "number",
+                              "nullable": true,
+                              "description": "Healthy probes as a percent of all probes in the window."
+                            },
+                            "coverage_pct": {
+                              "type": "number",
+                              "nullable": true,
+                              "description": "Probes that ran as a percent of probes expected since the first one in the window."
+                            },
+                            "current": {
+                              "type": "object",
+                              "nullable": true,
+                              "description": "Latest probe, with age_minutes, stale and each service status."
+                            },
+                            "services": {
+                              "type": "object",
+                              "description": "Per service checks, errors, uptime_pct, avg_ms, p95_ms, max_ms and required."
+                            },
+                            "incidents": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "description": "started_at, resolved_at, ongoing, checks, duration_minutes, failing_services and detail."
+                              }
+                            },
+                            "daily": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "description": "day, checks, healthy and uptime_pct."
                               }
                             }
                           }
@@ -1150,6 +1286,7 @@
           "Foods"
         ],
         "summary": "List foods",
+        "description": "With `search`, rows in the \"Baby foods\" category are left out (they sort ahead of ordinary foods, e.g. \"Baby food (jar), banana\" before \"Banana\"). They come back if the query has a baby word (baby, infant, toddler, weaning, nestum, cerelac, formula, puree), if `category=Baby foods`, if `include_baby_foods=true`, or if nothing else matches. To search only baby foods use `GET /foods/baby-foods`.\n",
         "parameters": [
           {
             "$ref": "#/components/parameters/Search"
@@ -1159,6 +1296,14 @@
             "in": "query",
             "schema": {
               "type": "string"
+            }
+          },
+          {
+            "name": "include_baby_foods",
+            "in": "query",
+            "description": "Set to true to include \"Baby foods\" rows in a name search.",
+            "schema": {
+              "type": "boolean"
             }
           },
           {
@@ -1543,6 +1688,287 @@
         }
       }
     },
+    "/foods/convert": {
+      "get": {
+        "tags": [
+          "Foods"
+        ],
+        "summary": "Household and standard measures for one food, either way round (API key, rate-limited)",
+        "description": "Give a household measure (tsp, tbsp, dsp, h dsp, cup, us cup, scoop 16, or a food-specific label such as chipande, piece, slice) and get the standard weight; give a standard measure (g, kg, oz, lb, ml, l, fl oz) and get the household equivalents. The reply always has `standard`, `household` (the food's own servings as fractional counts, plus spoon and cup equivalents when the food has a density), the nutrients for that amount, and `assumptions`. A volume becomes grams using the food's own serving in that unit, else its density from a cup or spoon serving, else 1 g/ml (flagged). `cup` is the 250 ml metric household cup; `us cup` is 240 ml. Same food matching and gram conversion as POST /recipes/calculate.",
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "description": "Food name. Give this or `id`.",
+            "schema": {
+              "type": "string",
+              "example": "rice"
+            }
+          },
+          {
+            "name": "id",
+            "in": "query",
+            "description": "Food id. Give this or `q`. Also available as GET /foods/{id}/convert.",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "amount",
+            "in": "query",
+            "description": "Quantity, default 1. Accepts 2, 0.5, 1/2, 1 1/2.",
+            "schema": {
+              "type": "string",
+              "example": "2"
+            }
+          },
+          {
+            "name": "unit",
+            "in": "query",
+            "description": "Unit, default g. See GET /measures for every unit, or use a food-specific label (chipande, piece, slice).",
+            "schema": {
+              "type": "string",
+              "example": "cup"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/MutationSuccess"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "422": {
+            "description": "The unit could not be resolved for this food."
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          }
+        }
+      }
+    },
+    "/foods/{id}/convert": {
+      "get": {
+        "tags": [
+          "Foods"
+        ],
+        "summary": "Household and standard measures for the food with this id (API key, rate-limited)",
+        "description": "Same as GET /foods/convert with `id` in the path.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "amount",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "example": "300"
+            }
+          },
+          {
+            "name": "unit",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "example": "g"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/MutationSuccess"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "422": {
+            "description": "The unit could not be resolved for this food."
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          }
+        }
+      }
+    },
+    "/measures": {
+      "get": {
+        "tags": [
+          "Foods"
+        ],
+        "summary": "Every unit, the printed reference tables and the scoop sizes (API key, rate-limited)",
+        "description": "Units with their size, aliases and source, the printed reference tables as published (UCT Household Measurements Guide, Kitchen Measurement Conversion Tables, Krause and Mahan 16th ed. Appendix 2), and the #6-#60 portion scoop sizes.",
+        "parameters": [
+          {
+            "name": "section",
+            "in": "query",
+            "description": "Return one part only.",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "units",
+                "scoop_sizes",
+                "reference_tables",
+                "sources"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/MutationSuccess"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          }
+        }
+      }
+    },
+    "/measures/convert": {
+      "get": {
+        "tags": [
+          "Foods"
+        ],
+        "summary": "Unit to unit, no food (API key, rate-limited)",
+        "description": "Volume to volume or weight to weight. Leave out `to` for every unit of that kind. Weight-to-volume needs a food, so use GET /foods/convert for that.",
+        "parameters": [
+          {
+            "name": "amount",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "example": "3"
+            }
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "example": "tbsp"
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "example": "ml"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/MutationSuccess"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "422": {
+            "description": "The two units are of different kinds (volume vs weight)."
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          }
+        }
+      }
+    },
+    "/foods/baby-foods": {
+      "get": {
+        "tags": [
+          "Foods"
+        ],
+        "summary": "Baby and infant foods (API key, rate-limited)",
+        "description": "Only the \"Baby foods\" rows (infant cereals, jarred baby food). Same paging (`limit`, `offset`, `cursor`) and row shape as `GET /foods`, with an optional `search` on the food name.\n",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Search"
+          },
+          {
+            "$ref": "#/components/parameters/Limit"
+          },
+          {
+            "$ref": "#/components/parameters/Offset"
+          },
+          {
+            "$ref": "#/components/parameters/Cursor"
+          }
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/ListOrCursor"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          }
+        }
+      }
+    },
+    "/foods/local-categories": {
+      "get": {
+        "tags": [
+          "Foods"
+        ],
+        "summary": "Categories used by the local food table (API key, rate-limited)",
+        "description": "The category values the local Malawi food composition table actually uses (for example `Staples`, `Animal`, `Baby foods`), each with the number of foods in it. Pass these to `/foods/by-category` or to `category=` on `/foods` and `/foods/search`. This is a different list from `GET /foods/categories`, which returns FatSecret's taxonomy and does not match the local table.\n",
+        "responses": {
+          "200": {
+            "description": "Local categories, sorted by name",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/Success"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "name": {
+                                "type": "string",
+                                "example": "Staples"
+                              },
+                              "count": {
+                                "type": "integer",
+                                "example": 42
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          }
+        }
+      }
+    },
     "/foods/by-category": {
       "get": {
         "tags": [
@@ -1555,10 +1981,10 @@
             "name": "category",
             "in": "query",
             "required": true,
-            "description": "Food category to list.",
+            "description": "Food category to list, a value from GET /foods/local-categories (matched case-insensitively).",
             "schema": {
               "type": "string",
-              "example": "Cereals"
+              "example": "Staples"
             }
           },
           {
@@ -10784,6 +11210,2581 @@
           },
           "401": {
             "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      }
+    },
+    "/sports/reference": {
+      "get": {
+        "tags": [
+          "Sports Nutrition"
+        ],
+        "summary": "Sports nutrition reference tables and known chapter issues",
+        "description": "Activity factors, kcal/kg tiers, macronutrient targets by training profile, fuel timing, hydration guidance, body-fat standards (Table 23.1), sweat electrolytes (Table 23.3), pre-event meal tiers (Box 23.4) and the places where Krause chapter 23 contradicts itself. Any API key.",
+        "responses": {
+          "200": {
+            "description": "Reference catalog"
+          },
+          "401": {
+            "description": "Missing or invalid API key"
+          }
+        }
+      }
+    },
+    "/sports/energy": {
+      "post": {
+        "tags": [
+          "Sports Nutrition"
+        ],
+        "summary": "Athlete energy requirement (Cunningham REE, Box 23.2)",
+        "description": "REE = 500 + 22 x lean body mass, times a Box 23.2 activity factor (or a custom multiplier), plus exercise energy from METs (0.0175 kcal/kg/min per MET) and/or an activity_log looked up in the Appendix 10 table, plus the thermic effect of food as its own 10% step. Returns every step, a kcal/kg cross-check against the chapter tiers and an optional Mifflin-St Jeor cross-check. This is the chapter 23 method: do not add its TEF to a /energy/requirements result.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "weight_kg": {
+                    "type": "number",
+                    "description": "30-250"
+                  },
+                  "lean_body_mass_kg": {
+                    "type": "number",
+                    "description": "Use this or body_fat_percent"
+                  },
+                  "body_fat_percent": {
+                    "type": "number",
+                    "description": "2-60"
+                  },
+                  "activity_level": {
+                    "type": "string",
+                    "enum": [
+                      "sedentary",
+                      "lightly_active",
+                      "moderately_active",
+                      "very_active",
+                      "extra_active"
+                    ]
+                  },
+                  "activity_multiplier": {
+                    "type": "number",
+                    "description": "1-2.5, instead of activity_level"
+                  },
+                  "exercise": {
+                    "type": "array",
+                    "maxItems": 20,
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "mets": {
+                          "type": "number"
+                        },
+                        "minutes": {
+                          "type": "number"
+                        },
+                        "label": {
+                          "type": "string"
+                        }
+                      }
+                    }
+                  },
+                  "activity_log": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "activity": {
+                          "type": "string"
+                        },
+                        "type": {
+                          "type": "string"
+                        },
+                        "minutes": {
+                          "type": "number"
+                        },
+                        "hours": {
+                          "type": "number"
+                        }
+                      }
+                    }
+                  },
+                  "tef": {
+                    "type": "boolean",
+                    "default": true
+                  },
+                  "sex": {
+                    "type": "string",
+                    "enum": [
+                      "male",
+                      "female"
+                    ]
+                  },
+                  "age_years": {
+                    "type": "number"
+                  },
+                  "height_cm": {
+                    "type": "number"
+                  }
+                },
+                "required": [
+                  "weight_kg"
+                ]
+              },
+              "example": {
+                "weight_kg": 79.5,
+                "lean_body_mass_kg": 71.6,
+                "activity_level": "extra_active"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Calculation with steps, warnings and sources"
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "401": {
+            "description": "Missing or invalid API key"
+          },
+          "429": {
+            "description": "Rate limited"
+          }
+        }
+      }
+    },
+    "/sports/macros": {
+      "post": {
+        "tags": [
+          "Sports Nutrition"
+        ],
+        "summary": "Athlete macronutrient targets (g/kg by training profile)",
+        "description": "Carbohydrate, protein and fat ranges in g/kg and grams, protein per meal, an optional energy split with an AMDR check (the table behind GET /dri), and an optional intake comparison.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "weight_kg": {
+                    "type": "number"
+                  },
+                  "profile": {
+                    "type": "string",
+                    "enum": [
+                      "general_fitness",
+                      "general_training",
+                      "endurance",
+                      "elite_endurance",
+                      "resistance_hypertrophy"
+                    ]
+                  },
+                  "energy_kcal": {
+                    "type": "number"
+                  },
+                  "age_years": {
+                    "type": "number"
+                  },
+                  "intake": {
+                    "type": "object",
+                    "properties": {
+                      "carbohydrate_g": {
+                        "type": "number"
+                      },
+                      "protein_g": {
+                        "type": "number"
+                      },
+                      "fat_g": {
+                        "type": "number"
+                      }
+                    }
+                  }
+                },
+                "required": [
+                  "weight_kg",
+                  "profile"
+                ]
+              },
+              "example": {
+                "weight_kg": 79,
+                "profile": "general_training",
+                "intake": {
+                  "carbohydrate_g": 249,
+                  "protein_g": 216,
+                  "fat_g": 130
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Calculation with steps, warnings and sources"
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "401": {
+            "description": "Missing or invalid API key"
+          },
+          "429": {
+            "description": "Rate limited"
+          }
+        }
+      }
+    },
+    "/sports/fuel-timing": {
+      "post": {
+        "tags": [
+          "Sports Nutrition"
+        ],
+        "summary": "Carbohydrate before, during and after exercise",
+        "description": "4 g/kg 4 hours before and 1 g/kg 1 hour before (never above 4 g/kg), Box 23.4 meal tiers, 25-30 g per 30 minutes during exercise over 60 minutes, recovery 1.2 g/kg/h with 5-9 g protein per 100 g carbohydrate, and a drink concentration check (under 5% unlikely to help, over 10% GI distress).",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "weight_kg": {
+                    "type": "number"
+                  },
+                  "duration_min": {
+                    "type": "number"
+                  },
+                  "hours_before_event": {
+                    "type": "number"
+                  },
+                  "recovery_hours": {
+                    "type": "number"
+                  },
+                  "drink": {
+                    "type": "object",
+                    "properties": {
+                      "carbohydrate_g": {
+                        "type": "number"
+                      },
+                      "serving_g": {
+                        "type": "number"
+                      },
+                      "serving_ml": {
+                        "type": "number"
+                      }
+                    }
+                  }
+                },
+                "required": [
+                  "weight_kg"
+                ]
+              },
+              "example": {
+                "weight_kg": 70,
+                "duration_min": 120,
+                "hours_before_event": 4,
+                "recovery_hours": 4
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Calculation with steps, warnings and sources"
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "401": {
+            "description": "Missing or invalid API key"
+          },
+          "429": {
+            "description": "Rate limited"
+          }
+        }
+      }
+    },
+    "/sports/hydration": {
+      "post": {
+        "tags": [
+          "Sports Nutrition"
+        ],
+        "summary": "Hydration: body-mass loss, rehydration, in-exercise fluid and sodium",
+        "description": "Body-mass loss % (2% can impair endurance, 3-4% team sports), rehydration at 25-50% more than the loss (450-675 mL per lb), 80% before a second session, in-exercise fluid and sodium (0.5-0.7 g/L over 1 hour), urine specific gravity band, child and master-athlete rules, heat warning. The sweat estimate is a standard mass balance, not a chapter formula. Daily needs: GET /dri?nutrient=water_l.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "weight_before_kg": {
+                    "type": "number"
+                  },
+                  "weight_after_kg": {
+                    "type": "number"
+                  },
+                  "fluid_intake_ml": {
+                    "type": "number"
+                  },
+                  "urine_ml": {
+                    "type": "number"
+                  },
+                  "duration_min": {
+                    "type": "number"
+                  },
+                  "urine_specific_gravity": {
+                    "type": "number"
+                  },
+                  "age_years": {
+                    "type": "number"
+                  },
+                  "ambient_c": {
+                    "type": "number"
+                  },
+                  "hours_to_next_session": {
+                    "type": "number"
+                  }
+                }
+              },
+              "example": {
+                "weight_before_kg": 70,
+                "weight_after_kg": 68.6,
+                "duration_min": 90,
+                "hours_to_next_session": 3
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Calculation with steps, warnings and sources"
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "401": {
+            "description": "Missing or invalid API key"
+          },
+          "429": {
+            "description": "Rate limited"
+          }
+        }
+      }
+    },
+    "/sports/body-composition": {
+      "post": {
+        "tags": [
+          "Sports Nutrition"
+        ],
+        "summary": "Fat mass, lean mass, lowest safe weight and weekly rates",
+        "description": "Fat and lean mass, lowest safe weight (lean mass / (1 - minimum body fat), 5% males / 12% females, 7% / 14% under 18, Table 23.1), highest optimal weight, healthy range, weekly loss (1-2 lb) and lean gain (0.5-1.0 lb males, 0.25-0.75 lb females) rates, and weeks to a target. No timeline is given for a target below the lowest safe weight.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "sex": {
+                    "type": "string",
+                    "enum": [
+                      "male",
+                      "female"
+                    ]
+                  },
+                  "weight_kg": {
+                    "type": "number"
+                  },
+                  "body_fat_percent": {
+                    "type": "number"
+                  },
+                  "age_years": {
+                    "type": "number"
+                  },
+                  "target_weight_kg": {
+                    "type": "number"
+                  }
+                },
+                "required": [
+                  "sex",
+                  "weight_kg",
+                  "body_fat_percent"
+                ]
+              },
+              "example": {
+                "sex": "male",
+                "weight_kg": 79.5,
+                "body_fat_percent": 10,
+                "target_weight_kg": 76
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Calculation with steps, warnings and sources"
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "401": {
+            "description": "Missing or invalid API key"
+          },
+          "429": {
+            "description": "Rate limited"
+          }
+        }
+      }
+    },
+    "/sports/supplement-dose": {
+      "post": {
+        "tags": [
+          "Sports Nutrition"
+        ],
+        "summary": "Weight-based supplement doses from Table 23.4",
+        "description": "Caffeine (up to 3 mg/kg), creatine (loading and non-loading regimens), beta-alanine (65 mg/kg), HMB and beetroot juice. age_years is required. No doses are returned under 18, in pregnancy or when breastfeeding because the chapter gives none; creatine is specifically advised against for those groups. Not a substitute for clinical advice; check products against the WADA list.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "weight_kg": {
+                    "type": "number"
+                  },
+                  "age_years": {
+                    "type": "number"
+                  },
+                  "supplements": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "enum": [
+                        "caffeine",
+                        "creatine",
+                        "beta_alanine",
+                        "hmb",
+                        "beetroot_juice"
+                      ]
+                    }
+                  },
+                  "pregnant": {
+                    "type": "boolean"
+                  },
+                  "lactating": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "weight_kg",
+                  "age_years"
+                ]
+              },
+              "example": {
+                "weight_kg": 68,
+                "age_years": 25,
+                "supplements": [
+                  "caffeine",
+                  "creatine"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Calculation with steps, warnings and sources"
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "401": {
+            "description": "Missing or invalid API key"
+          },
+          "429": {
+            "description": "Rate limited"
+          }
+        }
+      }
+    },
+    "/sports/plan": {
+      "post": {
+        "tags": [
+          "Sports Nutrition"
+        ],
+        "summary": "One-athlete sports nutrition plan",
+        "description": "Runs every calculator the body has inputs for and returns each as its own section, exactly as its own endpoint would. The macro section uses the energy section total unless energy_kcal is given. A bad value in one section only errors that section (see errors and not_assessed).",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "sex": {
+                    "type": "string"
+                  },
+                  "age_years": {
+                    "type": "number"
+                  },
+                  "height_cm": {
+                    "type": "number"
+                  },
+                  "weight_kg": {
+                    "type": "number"
+                  },
+                  "body_fat_percent": {
+                    "type": "number"
+                  },
+                  "lean_body_mass_kg": {
+                    "type": "number"
+                  },
+                  "activity_level": {
+                    "type": "string"
+                  },
+                  "activity_multiplier": {
+                    "type": "number"
+                  },
+                  "exercise": {
+                    "type": "array",
+                    "items": {
+                      "type": "object"
+                    }
+                  },
+                  "activity_log": {
+                    "type": "array",
+                    "items": {
+                      "type": "object"
+                    }
+                  },
+                  "profile": {
+                    "type": "string"
+                  },
+                  "energy_kcal": {
+                    "type": "number"
+                  },
+                  "intake": {
+                    "type": "object"
+                  },
+                  "event": {
+                    "type": "object",
+                    "description": "duration_min, hours_before_event, recovery_hours, drink"
+                  },
+                  "hydration": {
+                    "type": "object",
+                    "description": "weight_before_kg, weight_after_kg, ..."
+                  },
+                  "weight_goal": {
+                    "type": "object",
+                    "description": "target_weight_kg"
+                  },
+                  "supplements": {
+                    "type": "object",
+                    "description": "supplements?, pregnant?, lactating?"
+                  }
+                }
+              },
+              "example": {
+                "sex": "male",
+                "age_years": 30,
+                "weight_kg": 79.5,
+                "body_fat_percent": 10,
+                "activity_level": "very_active",
+                "profile": "endurance",
+                "event": {
+                  "duration_min": 120,
+                  "hours_before_event": 4
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Calculation with steps, warnings and sources"
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "401": {
+            "description": "Missing or invalid API key"
+          },
+          "429": {
+            "description": "Rate limited"
+          }
+        }
+      }
+    },
+    "/weight-management/reference": {
+      "get": {
+        "tags": [
+          "Weight Management"
+        ],
+        "summary": "Weight management reference tables",
+        "description": "Krause chapter 21 tables: BMI classes, Table 21.3 disease risk, metabolic syndrome, rate bands, energy floors, AMDR, diet adequacy, activity targets, Table 21.11 and 21.12, and the places the chapter contradicts itself. Optional section filter.",
+        "parameters": [
+          {
+            "name": "section",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "bmi_classes",
+                "disease_risk",
+                "body_fat",
+                "metabolic_syndrome",
+                "rates",
+                "energy_floors",
+                "macronutrients",
+                "diets",
+                "activity",
+                "treatment",
+                "unintentional_loss",
+                "energy_boosters",
+                "bariatric",
+                "known_issues"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Reference"
+          },
+          "400": {
+            "description": "Unknown section"
+          },
+          "401": {
+            "description": "Missing or invalid API key"
+          }
+        }
+      }
+    },
+    "/weight-management/bariatric": {
+      "get": {
+        "tags": [
+          "Weight Management"
+        ],
+        "summary": "Bariatric diet stages and supplementation (Tables 21.9 and 21.10)",
+        "description": "Diet progression (sleeve gastrectomy and Roux-en-Y bypass) and vitamin/mineral supplementation by procedure. Misprinted values in Table 21.10 are returned as printed with suspect: true, not corrected.",
+        "parameters": [
+          {
+            "name": "procedure",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "lagb",
+                "lsg",
+                "rygb",
+                "bpd_ds"
+              ]
+            }
+          },
+          {
+            "name": "sex",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "male",
+                "female"
+              ]
+            }
+          },
+          {
+            "name": "childbearing_age",
+            "in": "query",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "pregnant",
+            "in": "query",
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Guidance"
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "401": {
+            "description": "Missing or invalid API key"
+          }
+        }
+      }
+    },
+    "/weight-management/assess": {
+      "post": {
+        "tags": [
+          "Weight Management"
+        ],
+        "summary": "Assess weight status: BMI class, disease risk, metabolic syndrome, treatment options",
+        "description": "Adults (19 and over): BMI class, Table 21.3 disease risk with waist circumference, waist-hip ratio, body-fat obesity, metabolic syndrome (3 of 5), older-adult flags, unintentional weight-loss significance (the same Blackburn rule as $assess-nutrition) and treatment-option eligibility flags. Children and adolescents (2 to under 19): BMI-for-age percentile band (looked up in the WHO tables for ages 3-18 when weight and height are given) and the chapter's age-based goals. Eligibility flags are screening aids, not prescriptions.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "sex": {
+                    "type": "string",
+                    "enum": [
+                      "male",
+                      "female"
+                    ]
+                  },
+                  "age_years": {
+                    "type": "number"
+                  },
+                  "weight_kg": {
+                    "type": "number"
+                  },
+                  "height_cm": {
+                    "type": "number"
+                  },
+                  "waist_cm": {
+                    "type": "number"
+                  },
+                  "hip_cm": {
+                    "type": "number"
+                  },
+                  "body_fat_percent": {
+                    "type": "number"
+                  },
+                  "usual_weight_kg": {
+                    "type": "number"
+                  },
+                  "period_days": {
+                    "type": "number"
+                  },
+                  "comorbidity_count": {
+                    "type": "number"
+                  },
+                  "systolic_mmhg": {
+                    "type": "number"
+                  },
+                  "diastolic_mmhg": {
+                    "type": "number"
+                  },
+                  "triglycerides_mg_dl": {
+                    "type": "number"
+                  },
+                  "hdl_mg_dl": {
+                    "type": "number"
+                  },
+                  "fasting_glucose_mg_dl": {
+                    "type": "number"
+                  },
+                  "bmi_for_age_percentile": {
+                    "type": "number",
+                    "description": "Children"
+                  },
+                  "secondary_complications": {
+                    "type": "boolean",
+                    "description": "Children"
+                  }
+                },
+                "required": [
+                  "sex",
+                  "age_years"
+                ]
+              },
+              "example": {
+                "sex": "female",
+                "age_years": 45,
+                "weight_kg": 88.45,
+                "height_cm": 162.56,
+                "waist_cm": 100,
+                "systolic_mmhg": 160,
+                "diastolic_mmhg": 90
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Result with steps, warnings and sources"
+          },
+          "400": {
+            "description": "Invalid input, or a request the chapter does not support (below 800 kcal, age 65+ deficit, BMI under 25 for loss, 25 or more for gain, pregnancy)"
+          },
+          "401": {
+            "description": "Missing or invalid API key"
+          },
+          "429": {
+            "description": "Rate limited"
+          }
+        }
+      }
+    },
+    "/weight-management/loss-plan": {
+      "post": {
+        "tags": [
+          "Weight Management"
+        ],
+        "summary": "Weight-loss plan: intake, expected rate, goal weights",
+        "description": "Maintenance energy from POST /energy/requirements (or maintenance_kcal), minus a 500-1000 kcal deficit (or a chosen intake). Returns the chapter's rate band by BMI beside the static expectation (deficit x 7 / 3500), 5% and 10% goal weights with timelines, protein at 1.2 g/kg, a macro split checked against the AMDR, supplement flag (below 1200 kcal women, 1800 kcal men), maintenance energy at the goal weight and treatment options. Refuses: intake below 800 kcal (VLCD is medically supervised), BMI under 25, under 19 years, pregnancy or lactation. From age 65 only maintenance is returned.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "sex": {
+                    "type": "string",
+                    "enum": [
+                      "male",
+                      "female"
+                    ]
+                  },
+                  "age_years": {
+                    "type": "number"
+                  },
+                  "weight_kg": {
+                    "type": "number"
+                  },
+                  "height_cm": {
+                    "type": "number"
+                  },
+                  "pal_category": {
+                    "type": "string",
+                    "enum": [
+                      "sedentary",
+                      "low_active",
+                      "active",
+                      "very_active"
+                    ]
+                  },
+                  "pal": {
+                    "type": "number"
+                  },
+                  "activities": {
+                    "type": "array",
+                    "items": {
+                      "type": "object"
+                    }
+                  },
+                  "activity_log": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "activity": {
+                          "type": "string"
+                        },
+                        "type": {
+                          "type": "string"
+                        },
+                        "minutes": {
+                          "type": "number"
+                        },
+                        "hours": {
+                          "type": "number"
+                        }
+                      }
+                    }
+                  },
+                  "activity_factor": {
+                    "type": "string",
+                    "enum": [
+                      "minimal",
+                      "moderate",
+                      "strenuous"
+                    ]
+                  },
+                  "maintenance_kcal": {
+                    "type": "number",
+                    "description": "Replaces the energy engine estimate (800-8000)"
+                  },
+                  "deficit_kcal": {
+                    "type": "number",
+                    "description": "500-1000, default 500"
+                  },
+                  "intake_kcal": {
+                    "type": "number",
+                    "description": "Alternative to deficit_kcal, 800 or more"
+                  },
+                  "target_weight_kg": {
+                    "type": "number"
+                  },
+                  "comorbidity_count": {
+                    "type": "number"
+                  }
+                },
+                "required": [
+                  "sex",
+                  "age_years",
+                  "weight_kg",
+                  "height_cm"
+                ]
+              },
+              "example": {
+                "sex": "female",
+                "age_years": 35,
+                "weight_kg": 81.8,
+                "height_cm": 165.1,
+                "pal_category": "sedentary",
+                "target_weight_kg": 72
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Result with steps, warnings and sources"
+          },
+          "400": {
+            "description": "Invalid input, or a request the chapter does not support (below 800 kcal, age 65+ deficit, BMI under 25 for loss, 25 or more for gain, pregnancy)"
+          },
+          "401": {
+            "description": "Missing or invalid API key"
+          },
+          "429": {
+            "description": "Rate limited"
+          }
+        }
+      }
+    },
+    "/weight-management/gain-plan": {
+      "post": {
+        "tags": [
+          "Weight Management"
+        ],
+        "summary": "Weight-gain plan for underweight adults",
+        "description": "Maintenance energy (POST /energy/requirements, or maintenance_kcal) plus 500-1000 kcal a day (the chapter's example: 2400 maintains, 2900-3400 gains), protein 12-15% and fat about 30% of energy, expected rate (derived from the 3500 kcal/lb rule), the target weight range (BMI 18.5-24.9, or 23-24.9 in older adults) and the Table 21.12 foods for the +500 and +1000 tiers. Below BMI 18.5 no IOM equation applies, so send activity_factor or maintenance_kcal. Refuses BMI 25 or more and ages under 19.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "sex": {
+                    "type": "string",
+                    "enum": [
+                      "male",
+                      "female"
+                    ]
+                  },
+                  "age_years": {
+                    "type": "number"
+                  },
+                  "weight_kg": {
+                    "type": "number"
+                  },
+                  "height_cm": {
+                    "type": "number"
+                  },
+                  "pal_category": {
+                    "type": "string",
+                    "enum": [
+                      "sedentary",
+                      "low_active",
+                      "active",
+                      "very_active"
+                    ]
+                  },
+                  "pal": {
+                    "type": "number"
+                  },
+                  "activities": {
+                    "type": "array",
+                    "items": {
+                      "type": "object"
+                    }
+                  },
+                  "activity_log": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "activity": {
+                          "type": "string"
+                        },
+                        "type": {
+                          "type": "string"
+                        },
+                        "minutes": {
+                          "type": "number"
+                        },
+                        "hours": {
+                          "type": "number"
+                        }
+                      }
+                    }
+                  },
+                  "activity_factor": {
+                    "type": "string",
+                    "enum": [
+                      "minimal",
+                      "moderate",
+                      "strenuous"
+                    ]
+                  },
+                  "maintenance_kcal": {
+                    "type": "number",
+                    "description": "Replaces the energy engine estimate (800-8000)"
+                  },
+                  "surplus_kcal": {
+                    "type": "number",
+                    "description": "500-1000; omit for the whole range"
+                  },
+                  "target_weight_kg": {
+                    "type": "number"
+                  }
+                },
+                "required": [
+                  "sex",
+                  "age_years",
+                  "weight_kg",
+                  "height_cm"
+                ]
+              },
+              "example": {
+                "sex": "male",
+                "age_years": 30,
+                "weight_kg": 50,
+                "height_cm": 175,
+                "maintenance_kcal": 2400
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Result with steps, warnings and sources"
+          },
+          "400": {
+            "description": "Invalid input, or a request the chapter does not support (below 800 kcal, age 65+ deficit, BMI under 25 for loss, 25 or more for gain, pregnancy)"
+          },
+          "401": {
+            "description": "Missing or invalid API key"
+          },
+          "429": {
+            "description": "Rate limited"
+          }
+        }
+      }
+    },
+    "/weight-management/progress": {
+      "post": {
+        "tags": [
+          "Weight Management"
+        ],
+        "summary": "Track progress from weigh-ins",
+        "description": "Stateless: send the weigh-ins. Returns total and recent rate, whether the rate is inside the guideline band, 5% and 10% milestones, a plateau flag (derived from the lowest guideline rate), target progress, a National Weight Control Registry check for maintenance, and Blackburn significance when weight falls while the goal is not loss.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "goal": {
+                    "type": "string",
+                    "enum": [
+                      "loss",
+                      "gain",
+                      "maintain"
+                    ]
+                  },
+                  "weigh_ins": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "date": {
+                          "type": "string",
+                          "format": "date"
+                        },
+                        "weight_kg": {
+                          "type": "number"
+                        }
+                      }
+                    }
+                  },
+                  "height_cm": {
+                    "type": "number"
+                  },
+                  "start_weight_kg": {
+                    "type": "number"
+                  },
+                  "target_weight_kg": {
+                    "type": "number"
+                  },
+                  "recent_days": {
+                    "type": "number",
+                    "description": "14-90, default 28"
+                  },
+                  "weight_before_loss_kg": {
+                    "type": "number",
+                    "description": "Maintain goal"
+                  }
+                },
+                "required": [
+                  "goal",
+                  "weigh_ins"
+                ]
+              },
+              "example": {
+                "goal": "loss",
+                "height_cm": 170,
+                "weigh_ins": [
+                  {
+                    "date": "2026-01-01",
+                    "weight_kg": 100
+                  },
+                  {
+                    "date": "2026-02-05",
+                    "weight_kg": 97.5
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Result with steps, warnings and sources"
+          },
+          "400": {
+            "description": "Invalid input, or a request the chapter does not support (below 800 kcal, age 65+ deficit, BMI under 25 for loss, 25 or more for gain, pregnancy)"
+          },
+          "401": {
+            "description": "Missing or invalid API key"
+          },
+          "429": {
+            "description": "Rate limited"
+          }
+        }
+      }
+    },
+    "/weight-management/diet-pattern": {
+      "post": {
+        "tags": [
+          "Weight Management"
+        ],
+        "summary": "Classify a daily macronutrient pattern",
+        "description": "From daily grams: energy, comparison with the AMDR (the chapter's own ranges for children), pattern tags (very low fat, low fat below AMDR, ketogenic under 50 g carbohydrate, low carbohydrate, high-protein low-carbohydrate), nutrients at risk and metabolic effects from Table 21.6, alcohol share of energy and protein g/kg (1.2 g/kg during energy restriction, 0.8-1.5 for a VLCD).",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "carbohydrate_g": {
+                    "type": "number"
+                  },
+                  "protein_g": {
+                    "type": "number"
+                  },
+                  "fat_g": {
+                    "type": "number"
+                  },
+                  "alcohol_g": {
+                    "type": "number"
+                  },
+                  "weight_kg": {
+                    "type": "number"
+                  },
+                  "age_years": {
+                    "type": "number"
+                  },
+                  "energy_restriction": {
+                    "type": "boolean"
+                  },
+                  "vlcd": {
+                    "type": "boolean"
+                  }
+                }
+              },
+              "example": {
+                "carbohydrate_g": 30,
+                "protein_g": 100,
+                "fat_g": 140
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Result with steps, warnings and sources"
+          },
+          "400": {
+            "description": "Invalid input, or a request the chapter does not support (below 800 kcal, age 65+ deficit, BMI under 25 for loss, 25 or more for gain, pregnancy)"
+          },
+          "401": {
+            "description": "Missing or invalid API key"
+          },
+          "429": {
+            "description": "Rate limited"
+          }
+        }
+      }
+    },
+    "/pregnancy/reference": {
+      "get": {
+        "tags": [
+          "Pregnancy"
+        ],
+        "summary": "Pregnancy and lactation reference tables",
+        "description": "Krause chapter 14 tables: IOM weight gain (Table 14.11), energy add-ons, protein, twins (Table 14.12), lab ranges (14.4), anemia cut-points with altitude and smoking (14.5), GDM glucose criteria (14.14), preeclampsia criteria (Box 14.4), adolescent risk factors (Box 14.3), lactation, and the places the chapter contradicts itself. Optional section filter.",
+        "parameters": [
+          {
+            "name": "section",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "weight_gain",
+                "energy",
+                "protein",
+                "twins",
+                "lab_ranges",
+                "anemia",
+                "gdm",
+                "preeclampsia",
+                "nutrients",
+                "adolescent",
+                "lactation",
+                "known_issues"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Reference"
+          },
+          "400": {
+            "description": "Unknown section"
+          },
+          "401": {
+            "description": "Missing or invalid API key"
+          }
+        }
+      }
+    },
+    "/pregnancy/gestational-age": {
+      "post": {
+        "tags": [
+          "Pregnancy"
+        ],
+        "summary": "Gestational age, trimester and due date",
+        "description": "From the last menstrual period, a due date, or weeks (and days) as at a reference date (default today, UTC). Returns weeks and days, trimester, due date and chapter-anchored milestones (protein phase, GDM screening window 24-28 weeks, preeclampsia criteria after 20 weeks). The chapter gives no dating rules: 280 days from the LMP, and trimesters at under 14, 14 to under 28, and 28 weeks or more, are conventions and are stated as such.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "lmp": {
+                    "type": "string",
+                    "format": "date",
+                    "description": "Last menstrual period"
+                  },
+                  "edd": {
+                    "type": "string",
+                    "format": "date",
+                    "description": "Due date"
+                  },
+                  "ga_weeks": {
+                    "type": "number",
+                    "description": "Whole weeks, as at reference_date"
+                  },
+                  "ga_days": {
+                    "type": "number",
+                    "description": "0-6"
+                  },
+                  "reference_date": {
+                    "type": "string",
+                    "format": "date",
+                    "description": "Default: today (UTC)"
+                  }
+                }
+              },
+              "example": {
+                "lmp": "2026-04-01"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Result with steps, warnings and sources"
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "401": {
+            "description": "Missing or invalid API key"
+          },
+          "429": {
+            "description": "Rate limited"
+          }
+        }
+      }
+    },
+    "/pregnancy/weight-gain": {
+      "post": {
+        "tags": [
+          "Pregnancy"
+        ],
+        "summary": "Pre-pregnancy BMI category and gestational weight gain",
+        "description": "IOM totals and weekly rates by pre-pregnancy BMI (Table 14.11, Appendix 3), first-trimester allowance (1-3 kg, 0.5-2 kg if obese), twin totals (provisional; none for underweight), notes for triplets and quadruplets. With current_weight_kg and a gestational age, returns below/within/above against an approximate expected range (a straight line from the first-trimester allowance at 13 weeks to the printed total at 40 weeks). weigh_ins gives a series and the recent weekly rate. Pregnant adolescents get the Box 14.3 risk factors.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "pre_pregnancy_weight_kg": {
+                    "type": "number"
+                  },
+                  "height_cm": {
+                    "type": "number"
+                  },
+                  "prepregnancy_bmi": {
+                    "type": "number",
+                    "description": "Instead of weight and height"
+                  },
+                  "multiples": {
+                    "type": "number",
+                    "description": "1-4, default 1"
+                  },
+                  "age_years": {
+                    "type": "number"
+                  },
+                  "current_weight_kg": {
+                    "type": "number"
+                  },
+                  "lmp": {
+                    "type": "string",
+                    "format": "date",
+                    "description": "Last menstrual period"
+                  },
+                  "edd": {
+                    "type": "string",
+                    "format": "date",
+                    "description": "Due date"
+                  },
+                  "ga_weeks": {
+                    "type": "number",
+                    "description": "Whole weeks, as at reference_date"
+                  },
+                  "ga_days": {
+                    "type": "number",
+                    "description": "0-6"
+                  },
+                  "reference_date": {
+                    "type": "string",
+                    "format": "date",
+                    "description": "Default: today (UTC)"
+                  },
+                  "weigh_ins": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "date": {
+                          "type": "string",
+                          "format": "date"
+                        },
+                        "weight_kg": {
+                          "type": "number"
+                        }
+                      }
+                    }
+                  }
+                }
+              },
+              "example": {
+                "pre_pregnancy_weight_kg": 60,
+                "height_cm": 165,
+                "current_weight_kg": 66,
+                "lmp": "2026-04-01"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Result with steps, warnings and sources"
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "401": {
+            "description": "Missing or invalid API key"
+          },
+          "429": {
+            "description": "Rate limited"
+          }
+        }
+      }
+    },
+    "/pregnancy/plan": {
+      "post": {
+        "tags": [
+          "Pregnancy"
+        ],
+        "summary": "Pregnancy or lactation nutrition plan",
+        "description": "Pregnant: works the trimester out from gestational age and takes energy from POST /energy/requirements (add-ons 0, +340, +452 kcal), protein at 0.8 g/kg before 20 weeks and 1.1 g/kg after (on current weight), DRI pregnancy targets with percent of the non-pregnant value (GET /dri), nutrient notes, the weight-gain goal, and for twins the Table 14.12 targets. Lactating: +330 kcal (0-6 months) or +400 (7-12), the 1800 kcal minimum, +25 g protein and the weight-loss rule. No deficit advice.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "status": {
+                    "type": "string",
+                    "enum": [
+                      "pregnant",
+                      "lactating"
+                    ]
+                  },
+                  "age_years": {
+                    "type": "number",
+                    "description": "14-50"
+                  },
+                  "pre_pregnancy_weight_kg": {
+                    "type": "number"
+                  },
+                  "height_cm": {
+                    "type": "number"
+                  },
+                  "pal_category": {
+                    "type": "string",
+                    "enum": [
+                      "sedentary",
+                      "low_active",
+                      "active",
+                      "very_active"
+                    ]
+                  },
+                  "pal": {
+                    "type": "number"
+                  },
+                  "activities": {
+                    "type": "array",
+                    "items": {
+                      "type": "object"
+                    }
+                  },
+                  "activity_factor": {
+                    "type": "string",
+                    "enum": [
+                      "minimal",
+                      "moderate",
+                      "strenuous"
+                    ]
+                  },
+                  "maintenance_kcal": {
+                    "type": "number",
+                    "description": "Pre-pregnancy requirement; replaces the engine estimate"
+                  },
+                  "lmp": {
+                    "type": "string",
+                    "format": "date",
+                    "description": "Last menstrual period"
+                  },
+                  "edd": {
+                    "type": "string",
+                    "format": "date",
+                    "description": "Due date"
+                  },
+                  "ga_weeks": {
+                    "type": "number",
+                    "description": "Whole weeks, as at reference_date"
+                  },
+                  "ga_days": {
+                    "type": "number",
+                    "description": "0-6"
+                  },
+                  "reference_date": {
+                    "type": "string",
+                    "format": "date",
+                    "description": "Default: today (UTC)"
+                  },
+                  "current_weight_kg": {
+                    "type": "number"
+                  },
+                  "multiples": {
+                    "type": "number",
+                    "description": "1-4"
+                  },
+                  "months_postpartum": {
+                    "type": "number",
+                    "description": "Lactating: 0-24"
+                  }
+                },
+                "required": [
+                  "status",
+                  "age_years",
+                  "pre_pregnancy_weight_kg",
+                  "height_cm"
+                ]
+              },
+              "example": {
+                "status": "pregnant",
+                "age_years": 28,
+                "pre_pregnancy_weight_kg": 60,
+                "height_cm": 162,
+                "pal_category": "low_active",
+                "lmp": "2026-04-01",
+                "current_weight_kg": 66
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Result with steps, warnings and sources"
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "401": {
+            "description": "Missing or invalid API key"
+          },
+          "429": {
+            "description": "Rate limited"
+          }
+        }
+      }
+    },
+    "/pregnancy/assess": {
+      "post": {
+        "tags": [
+          "Pregnancy"
+        ],
+        "summary": "Pregnancy lab and clinical screens",
+        "description": "Sections, each independent (a bad value only errors its own): anemia from hemoglobin or hematocrit by trimester with altitude and smoking adjustments (Table 14.5); Table 14.4 lab ranges by trimester; GDM glucose tests (50 g screen at 130/135/140, 100 g Carpenter-Coustan and NDDG, 75 g IADPSG and WHO, random glucose); preeclampsia blood pressure, proteinuria and organ-feature criteria (Box 14.4). Screening aids, not diagnoses.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "lmp": {
+                    "type": "string",
+                    "format": "date",
+                    "description": "Last menstrual period"
+                  },
+                  "edd": {
+                    "type": "string",
+                    "format": "date",
+                    "description": "Due date"
+                  },
+                  "ga_weeks": {
+                    "type": "number",
+                    "description": "Whole weeks, as at reference_date"
+                  },
+                  "ga_days": {
+                    "type": "number",
+                    "description": "0-6"
+                  },
+                  "reference_date": {
+                    "type": "string",
+                    "format": "date",
+                    "description": "Default: today (UTC)"
+                  },
+                  "trimester": {
+                    "type": "number",
+                    "description": "1-3, instead of a gestational age"
+                  },
+                  "hemoglobin_g_dl": {
+                    "type": "number"
+                  },
+                  "hematocrit_percent": {
+                    "type": "number"
+                  },
+                  "altitude_m": {
+                    "type": "number"
+                  },
+                  "smoker": {
+                    "type": "boolean"
+                  },
+                  "cigarettes_per_day": {
+                    "type": "number"
+                  },
+                  "labs": {
+                    "type": "object",
+                    "description": "for example { ferritin_ng_ml: 9, albumin_g_dl: 3.0 }"
+                  },
+                  "glucose": {
+                    "type": "object",
+                    "description": "{ test: screen_50g | ogtt_100g | ogtt_75g | random, fasting_mg_dl, one_hour_mg_dl, two_hour_mg_dl, three_hour_mg_dl, random_mg_dl, symptoms }"
+                  },
+                  "blood_pressure": {
+                    "type": "object",
+                    "description": "{ systolic_mmhg, diastolic_mmhg, bp_confirmed, urine_protein_24h_mg, protein_creatinine_ratio, dipstick_plus, previously_normal, pulmonary_edema, cerebral_or_visual_symptoms, labs: { platelets_per_ul, creatinine_mg_dl } }"
+                  }
+                }
+              },
+              "example": {
+                "lmp": "2026-04-01",
+                "hemoglobin_g_dl": 10.4,
+                "glucose": {
+                  "test": "screen_50g",
+                  "one_hour_mg_dl": 142
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Result with steps, warnings and sources"
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "401": {
+            "description": "Missing or invalid API key"
+          },
+          "429": {
+            "description": "Rate limited"
+          }
+        }
+      }
+    },
+    "/renal-nutrition/reference": {
+      "get": {
+        "tags": [
+          "Renal Nutrition"
+        ],
+        "summary": "Renal nutrition reference tables",
+        "description": "KDOQI 2020 statements with grades, the older Krause Table 35.9 as legacy figures, Table 35.10 blood-value ranges, adequacy targets, the body-weight adjustment rules, monitoring, CKD stage categories, Box 35.3 and the places the two sources disagree. Optional section filter.",
+        "parameters": [
+          {
+            "name": "section",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "kdoqi_2020",
+                "legacy_krause",
+                "labs",
+                "adequacy",
+                "weight_adjustment",
+                "monitoring",
+                "ckd_stages",
+                "emergency_diet",
+                "known_issues"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Result"
+          },
+          "400": {
+            "description": "Unknown section"
+          },
+          "401": {
+            "description": "Missing or invalid API key"
+          }
+        }
+      }
+    },
+    "/renal-nutrition/emergency-diet": {
+      "get": {
+        "tags": [
+          "Renal Nutrition"
+        ],
+        "summary": "Emergency dialysis diet plan",
+        "description": "Box 35.3: for 5 days or less when dialysis is not possible. Choices per day by food group, the emergency kit and storage tips. The foods are US products and units; the source gives no local equivalents.",
+        "responses": {
+          "200": {
+            "description": "Result"
+          },
+          "401": {
+            "description": "Missing or invalid API key"
+          }
+        }
+      }
+    },
+    "/renal-nutrition/stage": {
+      "post": {
+        "tags": [
+          "Renal Nutrition"
+        ],
+        "summary": "eGFR and CKD stage",
+        "description": "CKD-EPI 2021 creatinine equation (race-free) and KDIGO G categories, with an optional A category from the urine albumin-creatinine ratio. Returns the status and ckd_stage to send to /renal-nutrition/requirements. These equations are not in the KDOQI or Krause documents. Adults only; a single value is a screen, not a diagnosis.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "sex": {
+                    "type": "string",
+                    "description": "male or female"
+                  },
+                  "age_years": {
+                    "type": "number",
+                    "description": "18 or more"
+                  },
+                  "creatinine_mg_dl": {
+                    "type": "number",
+                    "description": "Serum creatinine, mg/dL"
+                  },
+                  "creatinine_umol_l": {
+                    "type": "number",
+                    "description": "Serum creatinine, umol/L (used if mg/dL is not sent)"
+                  },
+                  "acr_mg_g": {
+                    "type": "number",
+                    "description": "Urine albumin-creatinine ratio, mg/g"
+                  }
+                }
+              },
+              "example": {
+                "sex": "male",
+                "age_years": 67,
+                "creatinine_mg_dl": 3.3
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Result with steps, warnings and sources"
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "401": {
+            "description": "Missing or invalid API key"
+          },
+          "429": {
+            "description": "Rate limited"
+          }
+        }
+      }
+    },
+    "/renal-nutrition/requirements": {
+      "post": {
+        "tags": [
+          "Renal Nutrition"
+        ],
+        "summary": "Nutrient targets by CKD status",
+        "description": "KDOQI 2020 targets for metabolically stable adults: protein (0.55-0.60 g/kg in CKD 3-5, 0.6-0.8 with diabetes, 1.0-1.2 on dialysis), energy 25-35 kcal/kg, sodium under 2.3 g/day, calcium 800-1000 mg in CKD 3-4, bicarbonate 24-26 mmol/L, and the potassium and phosphorus rules (adjust to serum, no numeric intake target). Amounts per day use the actual weight when it is 95-115% of Hamwi ideal weight, otherwise the adjusted weight. The older Krause Table 35.9 figures come back separately as legacy_krause. Gaps in the 2020 guideline are returned as null with the reason.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "status": {
+                    "type": "string",
+                    "description": "ckd_1_2, ckd_3_5, hd, pd or transplant"
+                  },
+                  "weight_kg": {
+                    "type": "number",
+                    "description": "Actual weight"
+                  },
+                  "edema_free_weight_kg": {
+                    "type": "number",
+                    "description": "Used instead of weight_kg when sent"
+                  },
+                  "height_cm": {
+                    "type": "number",
+                    "description": "With sex, gives ideal body weight (Hamwi)"
+                  },
+                  "sex": {
+                    "type": "string",
+                    "description": "male or female"
+                  },
+                  "frame": {
+                    "type": "string",
+                    "description": "small, medium or large (Hamwi -10% or +10%)"
+                  },
+                  "diabetes": {
+                    "type": "boolean",
+                    "description": "Changes the CKD 3-5 and dialysis protein statement"
+                  },
+                  "ckd_stage": {
+                    "type": "number",
+                    "description": "3-5; the calcium statement covers stages 3-4 only"
+                  },
+                  "weeks_post_transplant": {
+                    "type": "number",
+                    "description": "Picks the legacy Krause transplant row"
+                  },
+                  "weight_basis": {
+                    "type": "string",
+                    "description": "auto (default), actual, ibw or adjusted"
+                  },
+                  "metabolically_stable": {
+                    "type": "boolean",
+                    "description": "Default true; false adds a warning"
+                  }
+                }
+              },
+              "example": {
+                "status": "hd",
+                "weight_kg": 60,
+                "height_cm": 165,
+                "sex": "female"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Result with steps, warnings and sources"
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "401": {
+            "description": "Missing or invalid API key"
+          },
+          "429": {
+            "description": "Rate limited"
+          }
+        }
+      }
+    },
+    "/renal-nutrition/labs": {
+      "post": {
+        "tags": [
+          "Renal Nutrition"
+        ],
+        "summary": "Blood values with diet actions",
+        "description": "Krause Table 35.10: each value is flagged low, in range or high against the dialysis column (default) or the normal-kidney column, with the diet action. Accepts mg/dL, mEq/L and SI units (umol/L, mmol/L, g/L). Also the calcium x phosphorus product (limit 59). Where KDOQI 2020 differs (phosphate, bicarbonate) the row carries kdoqi_2020_target. Albumin, prealbumin and nPCR are not read alone.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "labs": {
+                    "type": "object",
+                    "description": "Keys such as sodium_meq_l, potassium_meq_l, bun_mg_dl or urea_mmol_l, creatinine_mg_dl or creatinine_umol_l, albumin_g_dl or albumin_g_l, calcium_mg_dl or calcium_mmol_l, phosphorus_mg_dl or phosphate_mmol_l, pth_pg_ml, aluminum_mcg_l, magnesium_mg_dl, ferritin_mcg_l, co2_meq_l, glucose_mg_dl or glucose_mmol_l"
+                  },
+                  "context": {
+                    "type": "string",
+                    "description": "dialysis (default) or general"
+                  },
+                  "diabetes": {
+                    "type": "boolean",
+                    "description": "Changes the dialysis glucose limit"
+                  },
+                  "on_epo": {
+                    "type": "boolean",
+                    "description": "Changes the dialysis ferritin range (default true)"
+                  },
+                  "sex": {
+                    "type": "string",
+                    "description": "Used for the female ferritin range in the general context"
+                  }
+                }
+              },
+              "example": {
+                "labs": {
+                  "potassium_meq_l": 6.1,
+                  "phosphorus_mg_dl": 6.7,
+                  "calcium_mg_dl": 9.0
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Result with steps, warnings and sources"
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "401": {
+            "description": "Missing or invalid API key"
+          },
+          "429": {
+            "description": "Rate limited"
+          }
+        }
+      }
+    },
+    "/renal-nutrition/adequacy": {
+      "post": {
+        "tags": [
+          "Renal Nutrition"
+        ],
+        "summary": "Dialysis adequacy",
+        "description": "URR from pre and post BUN or urea (65% or more), Kt/V and eKt/V against 1.2, weekly Kt/V of 2 on peritoneal dialysis, nPNA (nPCR) against 0.8-1.4 g/kg/day, and interdialytic weight gain against 4% of dry weight. With session_hours, uf_litres and post_weight_kg it also computes the Daugirdas second-generation spKt/V and rate-adjusted eKt/V, which are not in the supplied sources.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "modality": {
+                    "type": "string",
+                    "description": "hd or pd"
+                  },
+                  "pre_bun_mg_dl": {
+                    "type": "number",
+                    "description": "Pre-dialysis BUN"
+                  },
+                  "post_bun_mg_dl": {
+                    "type": "number",
+                    "description": "Post-dialysis BUN"
+                  },
+                  "pre_urea_mmol_l": {
+                    "type": "number",
+                    "description": "Pre-dialysis urea, used if BUN is not sent"
+                  },
+                  "post_urea_mmol_l": {
+                    "type": "number",
+                    "description": "Post-dialysis urea"
+                  },
+                  "session_hours": {
+                    "type": "number",
+                    "description": "Session length"
+                  },
+                  "uf_litres": {
+                    "type": "number",
+                    "description": "Ultrafiltration volume"
+                  },
+                  "post_weight_kg": {
+                    "type": "number",
+                    "description": "Post-dialysis weight"
+                  },
+                  "kt_v": {
+                    "type": "number",
+                    "description": "Reported Kt/V (hemodialysis)"
+                  },
+                  "ekt_v": {
+                    "type": "number",
+                    "description": "Reported eKt/V"
+                  },
+                  "weekly_kt_v": {
+                    "type": "number",
+                    "description": "Peritoneal dialysis"
+                  },
+                  "npna": {
+                    "type": "number",
+                    "description": "Also accepted as npcr"
+                  },
+                  "pre_dialysis_weight_kg": {
+                    "type": "number",
+                    "description": "With dry_weight_kg, gives interdialytic gain"
+                  },
+                  "dry_weight_kg": {
+                    "type": "number",
+                    "description": "Previous post-dialysis weight"
+                  }
+                }
+              },
+              "example": {
+                "modality": "hd",
+                "pre_bun_mg_dl": 60,
+                "post_bun_mg_dl": 20,
+                "session_hours": 4,
+                "uf_litres": 2.5,
+                "post_weight_kg": 70
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Result with steps, warnings and sources"
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "401": {
+            "description": "Missing or invalid API key"
+          },
+          "429": {
+            "description": "Rate limited"
+          }
+        }
+      }
+    },
+    "/diabetes/reference": {
+      "get": {
+        "tags": [
+          "Diabetes Nutrition"
+        ],
+        "summary": "Diabetes nutrition reference tables",
+        "description": "Krause chapter 30, ADA Standards of Care 2026 and UCT tables. section = diagnosis, a1c_eag, glycemic_targets, pregnancy_targets, hypoglycemia, insulin_rules, insulin_action_times, exercise, sick_day, nutrition_recommendations, food_list_values, medication_nutrition or known_issues. Without a section, lists them.",
+        "parameters": [
+          {
+            "name": "section",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Reference table"
+          },
+          "400": {
+            "description": "Unknown section"
+          },
+          "401": {
+            "description": "Missing or invalid API key"
+          }
+        }
+      }
+    },
+    "/diabetes/status": {
+      "post": {
+        "tags": [
+          "Diabetes Nutrition"
+        ],
+        "summary": "Diagnosis category and estimated average glucose",
+        "description": "A1C, fasting, 2-hour OGTT or random glucose (mg/dL or mmol/L) to normal, prediabetes or diabetes per Krause Table 30.1, plus A1C to eAG and mmol/mol.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              },
+              "example": {
+                "a1c_percent": 6.8,
+                "fpg_mg_dl": 130
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Result with sources and disclaimer"
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "401": {
+            "description": "Missing or invalid API key"
+          },
+          "429": {
+            "description": "Rate limited"
+          }
+        }
+      }
+    },
+    "/diabetes/glucose-targets": {
+      "post": {
+        "tags": [
+          "Diabetes Nutrition"
+        ],
+        "summary": "Glucose targets",
+        "description": "population nonpregnant_adult (ADA 2026) or pregnancy.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              },
+              "example": {
+                "population": "nonpregnant_adult"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Result with sources and disclaimer"
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "401": {
+            "description": "Missing or invalid API key"
+          },
+          "429": {
+            "description": "Rate limited"
+          }
+        }
+      }
+    },
+    "/diabetes/carb-plan": {
+      "post": {
+        "tags": [
+          "Diabetes Nutrition"
+        ],
+        "summary": "Carbohydrate prescription and distribution",
+        "description": "Daily carbohydrate from carb_g_per_day, energy_kcal with carb_pct, or the Krause starting servings by sex, split across meals and snacks in grams and 15 g exchanges. population gdm applies the pregnancy pattern.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              },
+              "example": {
+                "energy_kcal": 1900,
+                "carb_pct": 50,
+                "meals": 3,
+                "snacks": 3
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Result with sources and disclaimer"
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "401": {
+            "description": "Missing or invalid API key"
+          },
+          "429": {
+            "description": "Rate limited"
+          }
+        }
+      }
+    },
+    "/diabetes/carb-count": {
+      "post": {
+        "tags": [
+          "Diabetes Nutrition"
+        ],
+        "summary": "Carbohydrate counting from a food label",
+        "description": "Subtracts half of fibre and sugar alcohol only when together they exceed 5 g per serving (Krause p.637).",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              },
+              "example": {
+                "total_carb_g": 30,
+                "fibre_g": 8
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Result with sources and disclaimer"
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "401": {
+            "description": "Missing or invalid API key"
+          },
+          "429": {
+            "description": "Rate limited"
+          }
+        }
+      }
+    },
+    "/diabetes/exchange-plan": {
+      "post": {
+        "tags": [
+          "Diabetes Nutrition"
+        ],
+        "summary": "Carbohydrate targets linked to the exchange list",
+        "description": "Reads exchange_lists (read only). exchanges, meals or carb_plan; otherwise returns exchange types and items.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              },
+              "example": {
+                "exchanges": {
+                  "starch": 10,
+                  "fruit": 3,
+                  "milk": 2
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Result with sources and disclaimer"
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "401": {
+            "description": "Missing or invalid API key"
+          },
+          "429": {
+            "description": "Rate limited"
+          }
+        }
+      }
+    },
+    "/diabetes/glycemic-load": {
+      "post": {
+        "tags": [
+          "Diabetes Nutrition"
+        ],
+        "summary": "Glycaemic load of foods and a meal",
+        "description": "Reads glycaemic_index_data (read only). GL = GI x available carbohydrate / 100.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              },
+              "example": {
+                "foods": [
+                  {
+                    "food": "nsima",
+                    "carbs_g": 50
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Result with sources and disclaimer"
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "401": {
+            "description": "Missing or invalid API key"
+          },
+          "429": {
+            "description": "Rate limited"
+          }
+        }
+      }
+    },
+    "/diabetes/insulin": {
+      "post": {
+        "tags": [
+          "Diabetes Nutrition"
+        ],
+        "summary": "Insulin-to-carbohydrate ratio, correction factor and dose",
+        "description": "500 and 1700 rules from total daily dose (Krause) or clinician-set ratios. A starting estimate for the prescriber. No dose below 70 mg/dL.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              },
+              "example": {
+                "tdd_units": 50,
+                "carbs_g": 60,
+                "current_glucose_mg_dl": 204,
+                "target_glucose_mg_dl": 100
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Result with sources and disclaimer"
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "401": {
+            "description": "Missing or invalid API key"
+          },
+          "429": {
+            "description": "Rate limited"
+          }
+        }
+      }
+    },
+    "/diabetes/hypoglycemia": {
+      "post": {
+        "tags": [
+          "Diabetes Nutrition"
+        ],
+        "summary": "Hypoglycaemia level and treatment steps",
+        "description": "ADA 2026 levels 1-3 and treatment.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              },
+              "example": {
+                "glucose_mg_dl": 60
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Result with sources and disclaimer"
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "401": {
+            "description": "Missing or invalid API key"
+          },
+          "429": {
+            "description": "Rate limited"
+          }
+        }
+      }
+    },
+    "/diabetes/exercise": {
+      "post": {
+        "tags": [
+          "Diabetes Nutrition"
+        ],
+        "summary": "Extra carbohydrate for exercise",
+        "description": "15 g per 30-60 min of activity on insulin or a secretagogue (Krause p.639).",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              },
+              "example": {
+                "duration_min": 60,
+                "on_insulin_or_secretagogue": true
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Result with sources and disclaimer"
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "401": {
+            "description": "Missing or invalid API key"
+          },
+          "429": {
+            "description": "Rate limited"
+          }
+        }
+      }
+    },
+    "/diabetes/plan": {
+      "post": {
+        "tags": [
+          "Diabetes Nutrition"
+        ],
+        "summary": "Glycaemic status, targets and carbohydrate plan",
+        "description": "labs, population and carb in one call.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              },
+              "example": {
+                "labs": {
+                  "a1c_percent": 8.1
+                },
+                "carb": {
+                  "energy_kcal": 1800,
+                  "carb_pct": 45
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Result with sources and disclaimer"
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "401": {
+            "description": "Missing or invalid API key"
+          },
+          "429": {
+            "description": "Rate limited"
+          }
+        }
+      }
+    },
+    "/renal-nutrition/food-plan": {
+      "post": {
+        "tags": [
+          "Renal Nutrition"
+        ],
+        "summary": "Renal targets linked to the food exchange list",
+        "description": "Runs /renal-nutrition/requirements, reads exchange_lists and renal_foods (read only) and returns each exchange item as a percentage of the daily protein (KDOQI 2020), sodium (KDOQI 2020), potassium and phosphorus limits, per-group averages with the exchanges that fit before the tightest limit, and the matching renal_foods row. KDOQI 2020 has no potassium or phosphorus intake number, so those budgets need a clinician-set limit or legacy_krause_limits. Column names are detected, not assumed: field_map and missing_fields show what was found.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "status": {
+                    "type": "string",
+                    "description": "ckd_1_2, ckd_3_5, hd, pd or transplant (same as /requirements)"
+                  },
+                  "weight_kg": {
+                    "type": "number",
+                    "description": "Required"
+                  },
+                  "exchange_type": {
+                    "type": "string",
+                    "description": "Only items in this exchange group"
+                  },
+                  "q": {
+                    "type": "string",
+                    "description": "Only items whose name contains this"
+                  },
+                  "limit": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 300,
+                    "default": 100
+                  },
+                  "share_flag_pct": {
+                    "type": "number",
+                    "minimum": 5,
+                    "maximum": 100,
+                    "default": 25,
+                    "description": "An item at or above this percentage of a daily limit is flagged high_share"
+                  },
+                  "potassium_mg_per_day_max": {
+                    "type": "number",
+                    "description": "Clinician-set limit"
+                  },
+                  "phosphorus_mg_per_day_max": {
+                    "type": "number",
+                    "description": "Clinician-set limit"
+                  },
+                  "legacy_krause_limits": {
+                    "type": "boolean",
+                    "description": "Use the older Krause Table 35.9 potassium and phosphorus maxima when no clinician limit is sent"
+                  }
+                }
+              },
+              "example": {
+                "status": "hd",
+                "weight_kg": 60,
+                "potassium_mg_per_day_max": 2000,
+                "exchange_type": "protein"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Daily budget, field_map, per-group exchanges and items with percentage of daily limit"
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "401": {
+            "description": "Missing or invalid API key"
+          },
+          "429": {
+            "description": "Rate limited"
+          }
+        }
+      }
+    },
+    "/renal-nutrition/plan": {
+      "post": {
+        "tags": [
+          "Renal Nutrition"
+        ],
+        "summary": "Renal nutrition plan in one call",
+        "description": "Runs stage (from creatinine), requirements, labs and adequacy for the parts sent, plus the KDOQI 2020 monitoring schedule (weight monthly on dialysis, every 3 months in CKD 4-5 or after transplant, every 6 months in CKD 1-3; screening twice a year; full assessment within 90 days of starting dialysis; 3-day food record; 7-point SGA on dialysis). A part that fails is reported in errors and does not stop the others. Without status, the status is taken from the eGFR stage.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "status": {
+                    "type": "string",
+                    "description": "ckd_1_2, ckd_3_5, hd, pd or transplant; optional if creatinine, sex and age_years are sent"
+                  },
+                  "weight_kg": {
+                    "type": "number",
+                    "description": "Required"
+                  },
+                  "labs": {
+                    "type": "object",
+                    "description": "Same keys as /renal-nutrition/labs"
+                  },
+                  "adequacy": {
+                    "type": "object",
+                    "description": "Same keys as /renal-nutrition/adequacy (hd and pd only)"
+                  }
+                }
+              },
+              "example": {
+                "sex": "male",
+                "age_years": 67,
+                "creatinine_mg_dl": 3.3,
+                "weight_kg": 48,
+                "height_cm": 170,
+                "diabetes": true
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Result with steps, warnings and sources"
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "401": {
+            "description": "Missing or invalid API key"
+          },
+          "429": {
+            "description": "Rate limited"
           }
         }
       }

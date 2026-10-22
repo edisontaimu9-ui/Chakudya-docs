@@ -13,7 +13,7 @@ it's a separate, deployable-on-its-own frontend.
 Everything documented here was verified against the actual repository
 (`src/index.js`'s router and `routePolicy()`, the `src/fhir*.js` modules,
 `src/ragPipeline.js` and `wrangler.toml`) - nothing here was
-invented. Currently in line with API **v1.43.0**.
+invented. Currently in line with API **v1.53.0**.
 
 ---
 
@@ -216,11 +216,11 @@ of the OpenAPI document - they're read out of `routePolicy()` in
 
 ---
 
-## 6. Endpoints documented (168 of 168)
+## 6. Endpoints documented (214 of 214)
 
 Every route the Worker actually serves is documented - nothing was skipped.
 `/manufacturers`, `/products`, and `/nutrition` were removed from the API in
-v1.15.0-v1.16.0 and no longer appear here. The list below matches API v1.43.0.
+v1.15.0-v1.16.0 and no longer appear here. The list below matches API v1.53.0.
 
 The portal UI renders **every** route in `openapi.json`: public, API-key, admin,
 root-only, login-token and webhook routes alike. Each endpoint page carries a
@@ -246,6 +246,7 @@ only)" summary in the spec.
 - `GET /admin/activity` - Recent admin actions (root key only)
 - `GET /admin/monitoring` - Failed calls and slow endpoints (root key only)
 - `GET /admin/usage` - Calls per endpoint (root key only)
+- `GET /admin/health-history` - Uptime, upstream status and outage timeline (root key only)
 
 **Developer keys** (self-service consumer keys; authenticate with a developer login token, not an API key)
 - `GET /developer/keys` - List your consumer API keys
@@ -263,6 +264,10 @@ only)" summary in the spec.
 - `GET /foods/substitutes` - Nutritionally close substitutes for a food (public, rate-limited)
 - `GET /foods/compare` - Side-by-side nutrient comparison of 2-6 foods (public, rate-limited)
 - `GET /foods/by-category` - Browse foods by category (public, rate-limited)
+- `GET /foods/local-categories` - Categories used by the local food table (API key, rate-limited)
+- `GET /foods/baby-foods` - Baby and infant foods (API key, rate-limited)
+- `GET /foods/convert` - Household and standard measures for one food, either way round (API key, rate-limited)
+- `GET /foods/{id}/convert` - Household and standard measures for the food with this id (API key, rate-limited)
 - `GET /foods/{id}/label` - Codex-oriented nutrition label for one food
 - `GET /foods/{id}` - Get a food by id
 - `PUT /foods/{id}` - Replace a food (admin)
@@ -375,6 +380,59 @@ only)" summary in the spec.
 - `GET /activity-energy` - Physical activity energy table (kcal per hour by body weight), read from the database
 - `POST /activity-energy/calculate` - Energy spent on one or more activities at a given body weight
 - `POST /activity-energy/bulk` - Bulk-create activity energy rows (admin)
+
+**Measures**
+- `GET /measures` - Every unit, the printed reference tables and the scoop sizes (API key, rate-limited)
+- `GET /measures/convert` - Unit to unit, no food (API key, rate-limited)
+
+**Diabetes nutrition** (calculations, nothing stored)
+- `GET /diabetes/reference` - Diabetes nutrition reference tables
+- `POST /diabetes/status` - Diagnosis category and estimated average glucose
+- `POST /diabetes/glucose-targets` - Glucose targets
+- `POST /diabetes/carb-plan` - Carbohydrate prescription and distribution
+- `POST /diabetes/carb-count` - Carbohydrate counting from a food label
+- `POST /diabetes/exchange-plan` - Carbohydrate targets linked to the exchange list
+- `POST /diabetes/glycemic-load` - Glycaemic load of foods and a meal
+- `POST /diabetes/insulin` - Insulin-to-carbohydrate ratio, correction factor and dose
+- `POST /diabetes/hypoglycemia` - Hypoglycaemia level and treatment steps
+- `POST /diabetes/exercise` - Extra carbohydrate for exercise
+- `POST /diabetes/plan` - Glycaemic status, targets and carbohydrate plan
+
+**Renal nutrition** (calculators; the renal food list stays at `/renal`)
+- `GET /renal-nutrition/reference` - Renal nutrition reference tables
+- `GET /renal-nutrition/emergency-diet` - Emergency dialysis diet plan
+- `POST /renal-nutrition/stage` - eGFR and CKD stage
+- `POST /renal-nutrition/requirements` - Nutrient targets by CKD status
+- `POST /renal-nutrition/labs` - Blood values with diet actions
+- `POST /renal-nutrition/adequacy` - Dialysis adequacy
+- `POST /renal-nutrition/food-plan` - Renal targets linked to the food exchange list
+- `POST /renal-nutrition/plan` - Renal nutrition plan in one call
+
+**Pregnancy and lactation**
+- `GET /pregnancy/reference` - Pregnancy and lactation reference tables
+- `POST /pregnancy/gestational-age` - Gestational age, trimester and due date
+- `POST /pregnancy/weight-gain` - Pre-pregnancy BMI category and gestational weight gain
+- `POST /pregnancy/plan` - Pregnancy or lactation nutrition plan
+- `POST /pregnancy/assess` - Pregnancy lab and clinical screens
+
+**Sports nutrition**
+- `GET /sports/reference` - Sports nutrition reference tables and known chapter issues
+- `POST /sports/energy` - Athlete energy requirement (Cunningham REE, Box 23.2)
+- `POST /sports/macros` - Athlete macronutrient targets (g/kg by training profile)
+- `POST /sports/fuel-timing` - Carbohydrate before, during and after exercise
+- `POST /sports/hydration` - Hydration: body-mass loss, rehydration, in-exercise fluid and sodium
+- `POST /sports/body-composition` - Fat mass, lean mass, lowest safe weight and weekly rates
+- `POST /sports/supplement-dose` - Weight-based supplement doses from Table 23.4
+- `POST /sports/plan` - One-athlete sports nutrition plan
+
+**Weight management**
+- `GET /weight-management/reference` - Weight management reference tables
+- `GET /weight-management/bariatric` - Bariatric diet stages and supplementation (Tables 21.9 and 21.10)
+- `POST /weight-management/assess` - Assess weight status: BMI class, disease risk, metabolic syndrome, treatment options
+- `POST /weight-management/loss-plan` - Weight-loss plan: intake, expected rate, goal weights
+- `POST /weight-management/gain-plan` - Weight-gain plan for underweight adults
+- `POST /weight-management/progress` - Track progress from weigh-ins
+- `POST /weight-management/diet-pattern` - Classify a daily macronutrient pattern
 
 **Fenton Preterm** (licensed data — no list/dump route; every read returns a computed result, static metadata, or a rendered image, never raw L/M/S)
 - `GET /fenton-preterm/classify` - Classify a preterm infant measurement (weight, length, or head circumference)

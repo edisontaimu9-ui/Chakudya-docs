@@ -215,6 +215,50 @@
     },
     {
       "method": "GET",
+      "path": "/foods/local-categories",
+      "auth": "key",
+      "rateLimit": {
+        "limit": 60,
+        "windowSeconds": 60,
+        "scope": "ip"
+      },
+      "note": "One local query, same tier as /foods/search."
+    },
+    {
+      "method": "GET",
+      "path": "/foods/baby-foods",
+      "auth": "key",
+      "rateLimit": {
+        "limit": 60,
+        "windowSeconds": 60,
+        "scope": "ip"
+      },
+      "note": "One local query, same tier as /foods/search."
+    },
+    {
+      "method": "GET",
+      "path": "/foods/convert",
+      "auth": "key",
+      "rateLimit": {
+        "limit": 30,
+        "windowSeconds": 60,
+        "scope": "ip"
+      },
+      "note": "Resolves a food by name (local first, then the external lookup cascade) and does arithmetic on it."
+    },
+    {
+      "method": "GET",
+      "path": "/foods/{id}/convert",
+      "auth": "key",
+      "rateLimit": {
+        "limit": 30,
+        "windowSeconds": 60,
+        "scope": "ip"
+      },
+      "note": "Same cost profile as /foods/convert, with the food chosen by id."
+    },
+    {
+      "method": "GET",
       "path": "/foods/{id}/label",
       "auth": "public",
       "rateLimit": {
@@ -1703,6 +1747,18 @@
       "note": "Root ADMIN_API_KEY only - calls per endpoint for the admin monitor."
     },
     {
+      "method": "GET",
+      "path": "/admin/health-history",
+      "auth": "admin",
+      "requiredRole": "root",
+      "rateLimit": {
+        "limit": 30,
+        "windowSeconds": 60,
+        "scope": "admin"
+      },
+      "note": "Root ADMIN_API_KEY only - uptime and outage history from the scheduled health probe."
+    },
+    {
       "method": "POST",
       "path": "/energy/requirements",
       "auth": "key",
@@ -1766,6 +1822,457 @@
         "windowSeconds": 60,
         "scope": "admin"
       }
+    },
+    {
+      "method": "GET",
+      "path": "/measures",
+      "auth": "key",
+      "rateLimit": {
+        "limit": 100,
+        "windowSeconds": 60,
+        "scope": "ip"
+      },
+      "note": "Units, printed tables and scoop sizes. Pure computation, no database."
+    },
+    {
+      "method": "GET",
+      "path": "/measures/convert",
+      "auth": "key",
+      "rateLimit": {
+        "limit": 100,
+        "windowSeconds": 60,
+        "scope": "ip"
+      },
+      "note": "Unit to unit conversion, no food. Pure computation, no database."
+    },
+    {
+      "method": "GET",
+      "path": "/pregnancy/reference",
+      "auth": "key",
+      "rateLimit": {
+        "limit": 100,
+        "windowSeconds": 60,
+        "scope": "ip"
+      },
+      "note": "Static chapter tables, no database."
+    },
+    {
+      "method": "POST",
+      "path": "/pregnancy/gestational-age",
+      "auth": "key",
+      "rateLimit": {
+        "limit": 100,
+        "windowSeconds": 60,
+        "scope": "ip"
+      },
+      "note": "Calculation from the request body. Nothing is stored."
+    },
+    {
+      "method": "POST",
+      "path": "/pregnancy/weight-gain",
+      "auth": "key",
+      "rateLimit": {
+        "limit": 100,
+        "windowSeconds": 60,
+        "scope": "ip"
+      },
+      "note": "Calculation from the request body. Nothing is stored."
+    },
+    {
+      "method": "POST",
+      "path": "/pregnancy/plan",
+      "auth": "key",
+      "rateLimit": {
+        "limit": 100,
+        "windowSeconds": 60,
+        "scope": "ip"
+      },
+      "note": "Calculation from the request body. Nothing is stored."
+    },
+    {
+      "method": "POST",
+      "path": "/pregnancy/assess",
+      "auth": "key",
+      "rateLimit": {
+        "limit": 100,
+        "windowSeconds": 60,
+        "scope": "ip"
+      },
+      "note": "Calculation from the request body. Nothing is stored."
+    },
+    {
+      "method": "GET",
+      "path": "/renal-nutrition/reference",
+      "auth": "key",
+      "rateLimit": {
+        "limit": 100,
+        "windowSeconds": 60,
+        "scope": "ip"
+      },
+      "note": "Static guideline tables, no database."
+    },
+    {
+      "method": "GET",
+      "path": "/renal-nutrition/emergency-diet",
+      "auth": "key",
+      "rateLimit": {
+        "limit": 100,
+        "windowSeconds": 60,
+        "scope": "ip"
+      },
+      "note": "Static guideline tables, no database."
+    },
+    {
+      "method": "POST",
+      "path": "/renal-nutrition/stage",
+      "auth": "key",
+      "rateLimit": {
+        "limit": 100,
+        "windowSeconds": 60,
+        "scope": "ip"
+      },
+      "note": "Calculation from the request body. Nothing is stored."
+    },
+    {
+      "method": "POST",
+      "path": "/renal-nutrition/requirements",
+      "auth": "key",
+      "rateLimit": {
+        "limit": 100,
+        "windowSeconds": 60,
+        "scope": "ip"
+      },
+      "note": "Calculation from the request body. Nothing is stored."
+    },
+    {
+      "method": "POST",
+      "path": "/renal-nutrition/labs",
+      "auth": "key",
+      "rateLimit": {
+        "limit": 100,
+        "windowSeconds": 60,
+        "scope": "ip"
+      },
+      "note": "Calculation from the request body. Nothing is stored."
+    },
+    {
+      "method": "POST",
+      "path": "/renal-nutrition/adequacy",
+      "auth": "key",
+      "rateLimit": {
+        "limit": 100,
+        "windowSeconds": 60,
+        "scope": "ip"
+      },
+      "note": "Calculation from the request body. Nothing is stored."
+    },
+    {
+      "method": "POST",
+      "path": "/renal-nutrition/plan",
+      "auth": "key",
+      "rateLimit": {
+        "limit": 100,
+        "windowSeconds": 60,
+        "scope": "ip"
+      },
+      "note": "Calculation from the request body. Nothing is stored."
+    },
+    {
+      "method": "POST",
+      "path": "/renal-nutrition/food-plan",
+      "auth": "key",
+      "rateLimit": {
+        "limit": 100,
+        "windowSeconds": 60,
+        "scope": "ip"
+      },
+      "note": "Also reads exchange_lists and renal_foods (read only). Nothing is stored."
+    },
+    {
+      "method": "GET",
+      "path": "/diabetes/reference",
+      "auth": "key",
+      "rateLimit": {
+        "limit": 100,
+        "windowSeconds": 60,
+        "scope": "ip"
+      },
+      "note": "Static reference tables, no database."
+    },
+    {
+      "method": "POST",
+      "path": "/diabetes/status",
+      "auth": "key",
+      "rateLimit": {
+        "limit": 100,
+        "windowSeconds": 60,
+        "scope": "ip"
+      },
+      "note": "Calculation from the request body. Nothing is stored."
+    },
+    {
+      "method": "POST",
+      "path": "/diabetes/glucose-targets",
+      "auth": "key",
+      "rateLimit": {
+        "limit": 100,
+        "windowSeconds": 60,
+        "scope": "ip"
+      },
+      "note": "Calculation from the request body. Nothing is stored."
+    },
+    {
+      "method": "POST",
+      "path": "/diabetes/carb-plan",
+      "auth": "key",
+      "rateLimit": {
+        "limit": 100,
+        "windowSeconds": 60,
+        "scope": "ip"
+      },
+      "note": "Calculation from the request body. Nothing is stored."
+    },
+    {
+      "method": "POST",
+      "path": "/diabetes/carb-count",
+      "auth": "key",
+      "rateLimit": {
+        "limit": 100,
+        "windowSeconds": 60,
+        "scope": "ip"
+      },
+      "note": "Calculation from the request body. Nothing is stored."
+    },
+    {
+      "method": "POST",
+      "path": "/diabetes/exchange-plan",
+      "auth": "key",
+      "rateLimit": {
+        "limit": 100,
+        "windowSeconds": 60,
+        "scope": "ip"
+      },
+      "note": "Also reads exchange_lists (read only). Nothing is stored."
+    },
+    {
+      "method": "POST",
+      "path": "/diabetes/glycemic-load",
+      "auth": "key",
+      "rateLimit": {
+        "limit": 100,
+        "windowSeconds": 60,
+        "scope": "ip"
+      },
+      "note": "Also reads glycaemic_index_data (read only). Nothing is stored."
+    },
+    {
+      "method": "POST",
+      "path": "/diabetes/insulin",
+      "auth": "key",
+      "rateLimit": {
+        "limit": 100,
+        "windowSeconds": 60,
+        "scope": "ip"
+      },
+      "note": "Calculation from the request body. Nothing is stored."
+    },
+    {
+      "method": "POST",
+      "path": "/diabetes/hypoglycemia",
+      "auth": "key",
+      "rateLimit": {
+        "limit": 100,
+        "windowSeconds": 60,
+        "scope": "ip"
+      },
+      "note": "Calculation from the request body. Nothing is stored."
+    },
+    {
+      "method": "POST",
+      "path": "/diabetes/exercise",
+      "auth": "key",
+      "rateLimit": {
+        "limit": 100,
+        "windowSeconds": 60,
+        "scope": "ip"
+      },
+      "note": "Calculation from the request body. Nothing is stored."
+    },
+    {
+      "method": "POST",
+      "path": "/diabetes/plan",
+      "auth": "key",
+      "rateLimit": {
+        "limit": 100,
+        "windowSeconds": 60,
+        "scope": "ip"
+      },
+      "note": "Calculation from the request body. Nothing is stored."
+    },
+    {
+      "method": "GET",
+      "path": "/weight-management/reference",
+      "auth": "key",
+      "rateLimit": {
+        "limit": 100,
+        "windowSeconds": 60,
+        "scope": "ip"
+      },
+      "note": "Static chapter tables, no database."
+    },
+    {
+      "method": "GET",
+      "path": "/weight-management/bariatric",
+      "auth": "key",
+      "rateLimit": {
+        "limit": 100,
+        "windowSeconds": 60,
+        "scope": "ip"
+      },
+      "note": "Static chapter tables, no database."
+    },
+    {
+      "method": "POST",
+      "path": "/weight-management/assess",
+      "auth": "key",
+      "rateLimit": {
+        "limit": 100,
+        "windowSeconds": 60,
+        "scope": "ip"
+      },
+      "note": "Calculation from the request body. A child's BMI percentile reads an existing reference table (read only). Nothing is stored."
+    },
+    {
+      "method": "POST",
+      "path": "/weight-management/loss-plan",
+      "auth": "key",
+      "rateLimit": {
+        "limit": 100,
+        "windowSeconds": 60,
+        "scope": "ip"
+      },
+      "note": "Uses the energy engine. An activity_log reads the activity table (read only). Nothing is stored."
+    },
+    {
+      "method": "POST",
+      "path": "/weight-management/gain-plan",
+      "auth": "key",
+      "rateLimit": {
+        "limit": 100,
+        "windowSeconds": 60,
+        "scope": "ip"
+      },
+      "note": "Uses the energy engine. An activity_log reads the activity table (read only). Nothing is stored."
+    },
+    {
+      "method": "POST",
+      "path": "/weight-management/progress",
+      "auth": "key",
+      "rateLimit": {
+        "limit": 100,
+        "windowSeconds": 60,
+        "scope": "ip"
+      },
+      "note": "Calculation from the request body. Nothing is stored."
+    },
+    {
+      "method": "POST",
+      "path": "/weight-management/diet-pattern",
+      "auth": "key",
+      "rateLimit": {
+        "limit": 100,
+        "windowSeconds": 60,
+        "scope": "ip"
+      },
+      "note": "Calculation from the request body. Nothing is stored."
+    },
+    {
+      "method": "GET",
+      "path": "/sports/reference",
+      "auth": "key",
+      "rateLimit": {
+        "limit": 100,
+        "windowSeconds": 60,
+        "scope": "ip"
+      },
+      "note": "Static reference tables, no database."
+    },
+    {
+      "method": "POST",
+      "path": "/sports/energy",
+      "auth": "key",
+      "rateLimit": {
+        "limit": 100,
+        "windowSeconds": 60,
+        "scope": "ip"
+      },
+      "note": "Calculation from the request body. Nothing is stored."
+    },
+    {
+      "method": "POST",
+      "path": "/sports/macros",
+      "auth": "key",
+      "rateLimit": {
+        "limit": 100,
+        "windowSeconds": 60,
+        "scope": "ip"
+      },
+      "note": "Calculation from the request body. Nothing is stored."
+    },
+    {
+      "method": "POST",
+      "path": "/sports/fuel-timing",
+      "auth": "key",
+      "rateLimit": {
+        "limit": 100,
+        "windowSeconds": 60,
+        "scope": "ip"
+      },
+      "note": "Calculation from the request body. Nothing is stored."
+    },
+    {
+      "method": "POST",
+      "path": "/sports/hydration",
+      "auth": "key",
+      "rateLimit": {
+        "limit": 100,
+        "windowSeconds": 60,
+        "scope": "ip"
+      },
+      "note": "Calculation from the request body. Nothing is stored."
+    },
+    {
+      "method": "POST",
+      "path": "/sports/body-composition",
+      "auth": "key",
+      "rateLimit": {
+        "limit": 100,
+        "windowSeconds": 60,
+        "scope": "ip"
+      },
+      "note": "Calculation from the request body. Nothing is stored."
+    },
+    {
+      "method": "POST",
+      "path": "/sports/supplement-dose",
+      "auth": "key",
+      "rateLimit": {
+        "limit": 100,
+        "windowSeconds": 60,
+        "scope": "ip"
+      },
+      "note": "Calculation from the request body. Nothing is stored."
+    },
+    {
+      "method": "POST",
+      "path": "/sports/plan",
+      "auth": "key",
+      "rateLimit": {
+        "limit": 100,
+        "windowSeconds": 60,
+        "scope": "ip"
+      },
+      "note": "Calculation from the request body. An activity_log reads the activity table (read only). Nothing is stored."
     }
   ]
 }
