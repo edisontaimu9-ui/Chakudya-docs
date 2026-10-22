@@ -22,6 +22,7 @@
     ["review.html", "Food review", "review"],
     ["usage.html", "Usage", "usage"],
     ["monitoring.html", "Errors & latency", "monitoring"],
+    ["health.html", "Uptime", "health"],
     ["activity.html", "Admin actions", "activity"],
     ["ingest.html", "RAG ingest", "ingest"],
     ["audit.html", "FHIR audit", "audit"],

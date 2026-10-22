@@ -9,6 +9,7 @@ Internal admin panel, one page per job. Not indexed (`noindex`), not part of the
 | `review.html` | Packaged food review queue (approve or reject) | `/admin/overview`, `/packaged/pending` |
 | `usage.html` | Calls per endpoint (today, 7 or 30 days) | `/admin/usage` |
 | `monitoring.html` | Failing and slow endpoints, latest failed and slow calls | `/admin/monitoring` |
+| `health.html` | Uptime, per-service latency, outages and daily uptime from the scheduled health probe | `/admin/health-history` |
 | `activity.html` | Recent admin actions (keys created and revoked, foods reviewed) | `/admin/activity` |
 | `ingest.html` | RAG ingest jobs (read-only) | `/admin/overview`, `/rag/jobs` |
 | `audit.html` | FHIR audit log search | `/fhir/AuditEvent` |

@@ -1,7 +1,7 @@
 {
   "_source": "Derived from routePolicy() in src/index.js (Chakudya API). Not part of the OpenAPI spec on purpose - this describes runtime policy (rate limits, role gates), not shape.",
   "default": {
-    "auth": "public",
+    "auth": "key",
     "rateLimit": {
       "limit": 100,
       "windowSeconds": 60,
@@ -29,7 +29,7 @@
     {
       "method": "POST",
       "path": "/batch",
-      "auth": "public",
+      "auth": "key",
       "rateLimit": {
         "limit": 10,
         "windowSeconds": 60,
@@ -76,7 +76,7 @@
     {
       "method": "GET",
       "path": "/developer/keys",
-      "auth": "public",
+      "auth": "login",
       "rateLimit": {
         "limit": 30,
         "windowSeconds": 60,
@@ -87,7 +87,7 @@
     {
       "method": "POST",
       "path": "/developer/keys",
-      "auth": "public",
+      "auth": "login",
       "rateLimit": {
         "limit": 10,
         "windowSeconds": 60,
@@ -98,7 +98,7 @@
     {
       "method": "DELETE",
       "path": "/developer/keys/{id}",
-      "auth": "public",
+      "auth": "login",
       "rateLimit": {
         "limit": 30,
         "windowSeconds": 60,
@@ -109,7 +109,7 @@
     {
       "method": "GET",
       "path": "/foods",
-      "auth": "public",
+      "auth": "key",
       "rateLimit": {
         "limit": 100,
         "windowSeconds": 60,
@@ -139,7 +139,7 @@
     {
       "method": "GET",
       "path": "/foods/lookup",
-      "auth": "public",
+      "auth": "key",
       "rateLimit": {
         "limit": 20,
         "windowSeconds": 60,
@@ -150,7 +150,7 @@
     {
       "method": "GET",
       "path": "/foods/autocomplete",
-      "auth": "public",
+      "auth": "key",
       "rateLimit": {
         "limit": 60,
         "windowSeconds": 60,
@@ -161,7 +161,7 @@
     {
       "method": "GET",
       "path": "/foods/categories",
-      "auth": "public",
+      "auth": "key",
       "rateLimit": {
         "limit": 30,
         "windowSeconds": 60,
@@ -172,7 +172,7 @@
     {
       "method": "GET",
       "path": "/foods/search",
-      "auth": "public",
+      "auth": "key",
       "rateLimit": {
         "limit": 60,
         "windowSeconds": 60,
@@ -183,7 +183,7 @@
     {
       "method": "GET",
       "path": "/foods/substitutes",
-      "auth": "public",
+      "auth": "key",
       "rateLimit": {
         "limit": 30,
         "windowSeconds": 60,
@@ -194,7 +194,7 @@
     {
       "method": "GET",
       "path": "/foods/compare",
-      "auth": "public",
+      "auth": "key",
       "rateLimit": {
         "limit": 20,
         "windowSeconds": 60,
@@ -205,7 +205,7 @@
     {
       "method": "GET",
       "path": "/foods/by-category",
-      "auth": "public",
+      "auth": "key",
       "rateLimit": {
         "limit": 60,
         "windowSeconds": 60,
@@ -260,7 +260,7 @@
     {
       "method": "GET",
       "path": "/foods/{id}/label",
-      "auth": "public",
+      "auth": "key",
       "rateLimit": {
         "limit": 100,
         "windowSeconds": 60,
@@ -270,7 +270,7 @@
     {
       "method": "GET",
       "path": "/foods/{id}",
-      "auth": "public",
+      "auth": "key",
       "rateLimit": {
         "limit": 100,
         "windowSeconds": 60,
@@ -310,7 +310,7 @@
     {
       "method": "GET",
       "path": "/glycaemic-index",
-      "auth": "public",
+      "auth": "key",
       "rateLimit": {
         "limit": 100,
         "windowSeconds": 60,
@@ -340,7 +340,7 @@
     {
       "method": "GET",
       "path": "/glycaemic-index/{id}",
-      "auth": "public",
+      "auth": "key",
       "rateLimit": {
         "limit": 100,
         "windowSeconds": 60,
@@ -380,7 +380,7 @@
     {
       "method": "GET",
       "path": "/exchange",
-      "auth": "public",
+      "auth": "key",
       "rateLimit": {
         "limit": 100,
         "windowSeconds": 60,
@@ -440,7 +440,7 @@
     {
       "method": "GET",
       "path": "/renal",
-      "auth": "public",
+      "auth": "key",
       "rateLimit": {
         "limit": 100,
         "windowSeconds": 60,
@@ -500,7 +500,7 @@
     {
       "method": "GET",
       "path": "/formulas",
-      "auth": "public",
+      "auth": "key",
       "rateLimit": {
         "limit": 100,
         "windowSeconds": 60,
@@ -560,7 +560,7 @@
     {
       "method": "GET",
       "path": "/drug-interactions",
-      "auth": "public",
+      "auth": "key",
       "rateLimit": {
         "limit": 100,
         "windowSeconds": 60,
@@ -590,7 +590,7 @@
     {
       "method": "GET",
       "path": "/drug-interactions/search",
-      "auth": "public",
+      "auth": "key",
       "rateLimit": {
         "limit": 30,
         "windowSeconds": 60,
@@ -601,7 +601,7 @@
     {
       "method": "GET",
       "path": "/drug-interactions/{id}",
-      "auth": "public",
+      "auth": "key",
       "rateLimit": {
         "limit": 100,
         "windowSeconds": 60,
@@ -641,7 +641,7 @@
     {
       "method": "GET",
       "path": "/bmi-for-age/classify",
-      "auth": "public",
+      "auth": "key",
       "rateLimit": {
         "limit": 100,
         "windowSeconds": 60,
@@ -651,7 +651,7 @@
     {
       "method": "GET",
       "path": "/bmi-for-age",
-      "auth": "public",
+      "auth": "key",
       "rateLimit": {
         "limit": 100,
         "windowSeconds": 60,
@@ -671,7 +671,7 @@
     {
       "method": "GET",
       "path": "/hc-velocity/classify",
-      "auth": "public",
+      "auth": "key",
       "rateLimit": {
         "limit": 100,
         "windowSeconds": 60,
@@ -681,7 +681,7 @@
     {
       "method": "GET",
       "path": "/hc-velocity",
-      "auth": "public",
+      "auth": "key",
       "rateLimit": {
         "limit": 100,
         "windowSeconds": 60,
@@ -701,7 +701,7 @@
     {
       "method": "GET",
       "path": "/length-velocity/classify",
-      "auth": "public",
+      "auth": "key",
       "rateLimit": {
         "limit": 100,
         "windowSeconds": 60,
@@ -711,7 +711,7 @@
     {
       "method": "GET",
       "path": "/length-velocity",
-      "auth": "public",
+      "auth": "key",
       "rateLimit": {
         "limit": 100,
         "windowSeconds": 60,
@@ -731,7 +731,7 @@
     {
       "method": "GET",
       "path": "/weight-velocity/classify",
-      "auth": "public",
+      "auth": "key",
       "rateLimit": {
         "limit": 100,
         "windowSeconds": 60,
@@ -741,7 +741,7 @@
     {
       "method": "GET",
       "path": "/weight-velocity",
-      "auth": "public",
+      "auth": "key",
       "rateLimit": {
         "limit": 100,
         "windowSeconds": 60,
@@ -761,7 +761,7 @@
     {
       "method": "GET",
       "path": "/muac-for-age/classify",
-      "auth": "public",
+      "auth": "key",
       "rateLimit": {
         "limit": 100,
         "windowSeconds": 60,
@@ -771,7 +771,7 @@
     {
       "method": "GET",
       "path": "/muac-for-age",
-      "auth": "public",
+      "auth": "key",
       "rateLimit": {
         "limit": 100,
         "windowSeconds": 60,
@@ -791,7 +791,7 @@
     {
       "method": "GET",
       "path": "/muac/classify",
-      "auth": "public",
+      "auth": "key",
       "rateLimit": {
         "limit": 100,
         "windowSeconds": 60,
@@ -801,7 +801,7 @@
     {
       "method": "GET",
       "path": "/length-height-for-age/classify",
-      "auth": "public",
+      "auth": "key",
       "rateLimit": {
         "limit": 100,
         "windowSeconds": 60,
@@ -811,7 +811,7 @@
     {
       "method": "GET",
       "path": "/length-height-for-age",
-      "auth": "public",
+      "auth": "key",
       "rateLimit": {
         "limit": 100,
         "windowSeconds": 60,
@@ -831,7 +831,7 @@
     {
       "method": "GET",
       "path": "/weight-for-age/classify",
-      "auth": "public",
+      "auth": "key",
       "rateLimit": {
         "limit": 100,
         "windowSeconds": 60,
@@ -841,7 +841,7 @@
     {
       "method": "GET",
       "path": "/weight-for-age",
-      "auth": "public",
+      "auth": "key",
       "rateLimit": {
         "limit": 100,
         "windowSeconds": 60,
@@ -861,7 +861,7 @@
     {
       "method": "GET",
       "path": "/weight-for-length-height/classify",
-      "auth": "public",
+      "auth": "key",
       "rateLimit": {
         "limit": 100,
         "windowSeconds": 60,
@@ -871,7 +871,7 @@
     {
       "method": "GET",
       "path": "/weight-for-length-height",
-      "auth": "public",
+      "auth": "key",
       "rateLimit": {
         "limit": 100,
         "windowSeconds": 60,
@@ -891,7 +891,7 @@
     {
       "method": "GET",
       "path": "/bmi-for-age-under-5/classify",
-      "auth": "public",
+      "auth": "key",
       "rateLimit": {
         "limit": 100,
         "windowSeconds": 60,
@@ -901,7 +901,7 @@
     {
       "method": "GET",
       "path": "/bmi-for-age-under-5",
-      "auth": "public",
+      "auth": "key",
       "rateLimit": {
         "limit": 100,
         "windowSeconds": 60,
@@ -921,7 +921,7 @@
     {
       "method": "GET",
       "path": "/hc-for-age/classify",
-      "auth": "public",
+      "auth": "key",
       "rateLimit": {
         "limit": 100,
         "windowSeconds": 60,
@@ -931,7 +931,7 @@
     {
       "method": "GET",
       "path": "/hc-for-age",
-      "auth": "public",
+      "auth": "key",
       "rateLimit": {
         "limit": 100,
         "windowSeconds": 60,
@@ -951,7 +951,7 @@
     {
       "method": "GET",
       "path": "/growth/assess",
-      "auth": "public",
+      "auth": "key",
       "rateLimit": {
         "limit": 60,
         "windowSeconds": 60,
@@ -962,7 +962,7 @@
     {
       "method": "GET",
       "path": "/fenton-preterm/classify",
-      "auth": "public",
+      "auth": "key",
       "rateLimit": {
         "limit": 100,
         "windowSeconds": 60,
@@ -972,7 +972,7 @@
     {
       "method": "POST",
       "path": "/fenton-preterm/profile",
-      "auth": "public",
+      "auth": "key",
       "rateLimit": {
         "limit": 100,
         "windowSeconds": 60,
@@ -982,7 +982,7 @@
     {
       "method": "POST",
       "path": "/fenton-preterm/growth",
-      "auth": "public",
+      "auth": "key",
       "rateLimit": {
         "limit": 100,
         "windowSeconds": 60,
@@ -992,7 +992,7 @@
     {
       "method": "POST",
       "path": "/fenton-preterm/velocity",
-      "auth": "public",
+      "auth": "key",
       "rateLimit": {
         "limit": 100,
         "windowSeconds": 60,
@@ -1002,7 +1002,7 @@
     {
       "method": "GET",
       "path": "/fenton-preterm/chart",
-      "auth": "public",
+      "auth": "key",
       "rateLimit": {
         "limit": 60,
         "windowSeconds": 60,
@@ -1012,7 +1012,7 @@
     {
       "method": "GET",
       "path": "/fenton-preterm/references",
-      "auth": "public",
+      "auth": "key",
       "rateLimit": {
         "limit": 100,
         "windowSeconds": 60,
@@ -1043,7 +1043,7 @@
     {
       "method": "POST",
       "path": "/fhir/Observation/$evaluate-growth",
-      "auth": "public",
+      "auth": "key",
       "rateLimit": {
         "limit": 100,
         "windowSeconds": 60,
@@ -1054,7 +1054,7 @@
     {
       "method": "POST",
       "path": "/fhir/Observation/$screen",
-      "auth": "public",
+      "auth": "key",
       "rateLimit": {
         "limit": 100,
         "windowSeconds": 60,
@@ -1065,7 +1065,7 @@
     {
       "method": "POST",
       "path": "/fhir/Observation/$assess-nutrition",
-      "auth": "public",
+      "auth": "key",
       "rateLimit": {
         "limit": 100,
         "windowSeconds": 60,
@@ -1076,7 +1076,7 @@
     {
       "method": "POST",
       "path": "/fhir/Condition/$diagnose",
-      "auth": "public",
+      "auth": "key",
       "rateLimit": {
         "limit": 100,
         "windowSeconds": 60,
@@ -1087,7 +1087,7 @@
     {
       "method": "POST",
       "path": "/fhir/CarePlan/$intervene",
-      "auth": "public",
+      "auth": "key",
       "rateLimit": {
         "limit": 100,
         "windowSeconds": 60,
@@ -1098,7 +1098,7 @@
     {
       "method": "POST",
       "path": "/fhir/CarePlan/$monitor",
-      "auth": "public",
+      "auth": "key",
       "rateLimit": {
         "limit": 100,
         "windowSeconds": 60,
@@ -1109,7 +1109,7 @@
     {
       "method": "POST",
       "path": "/fhir/Goal/$evaluate",
-      "auth": "public",
+      "auth": "key",
       "rateLimit": {
         "limit": 100,
         "windowSeconds": 60,
@@ -1120,7 +1120,7 @@
     {
       "method": "POST",
       "path": "/fhir/Bundle/$ncp-document",
-      "auth": "public",
+      "auth": "key",
       "rateLimit": {
         "limit": 100,
         "windowSeconds": 60,
@@ -1131,7 +1131,7 @@
     {
       "method": "POST",
       "path": "/fhir/Bundle/$care-context",
-      "auth": "public",
+      "auth": "key",
       "rateLimit": {
         "limit": 100,
         "windowSeconds": 60,
@@ -1142,7 +1142,7 @@
     {
       "method": "POST",
       "path": "/fhir/$validate",
-      "auth": "public",
+      "auth": "key",
       "rateLimit": {
         "limit": 100,
         "windowSeconds": 60,
@@ -1153,7 +1153,7 @@
     {
       "method": "POST",
       "path": "/fhir/ConceptMap/$translate",
-      "auth": "public",
+      "auth": "key",
       "rateLimit": {
         "limit": 100,
         "windowSeconds": 60,
@@ -1197,7 +1197,7 @@
     {
       "method": "POST",
       "path": "/fhir/Bundle/$validate-document",
-      "auth": "public",
+      "auth": "key",
       "rateLimit": {
         "limit": 100,
         "windowSeconds": 60,
@@ -1208,7 +1208,7 @@
     {
       "method": "POST",
       "path": "/fhir/Bundle/$nutrition-assessment",
-      "auth": "public",
+      "auth": "key",
       "rateLimit": {
         "limit": 100,
         "windowSeconds": 60,
@@ -1219,7 +1219,7 @@
     {
       "method": "POST",
       "path": "/fhir/QuestionnaireResponse/$validate",
-      "auth": "public",
+      "auth": "key",
       "rateLimit": {
         "limit": 100,
         "windowSeconds": 60,
@@ -1296,7 +1296,7 @@
     {
       "method": "GET",
       "path": "/packaged",
-      "auth": "public",
+      "auth": "key",
       "rateLimit": {
         "limit": 100,
         "windowSeconds": 60,
@@ -1318,7 +1318,7 @@
     {
       "method": "POST",
       "path": "/packaged/submit",
-      "auth": "public",
+      "auth": "key",
       "rateLimit": {
         "limit": 10,
         "windowSeconds": 60,
@@ -1328,7 +1328,7 @@
     {
       "method": "POST",
       "path": "/packaged/scan",
-      "auth": "public",
+      "auth": "key",
       "rateLimit": {
         "limit": 5,
         "windowSeconds": 60,
@@ -1391,7 +1391,7 @@
     {
       "method": "GET",
       "path": "/favorites",
-      "auth": "public",
+      "auth": "key",
       "rateLimit": {
         "limit": 100,
         "windowSeconds": 60,
@@ -1402,7 +1402,7 @@
     {
       "method": "POST",
       "path": "/favorites",
-      "auth": "public",
+      "auth": "key",
       "rateLimit": {
         "limit": 30,
         "windowSeconds": 60,
@@ -1413,7 +1413,7 @@
     {
       "method": "DELETE",
       "path": "/favorites",
-      "auth": "public",
+      "auth": "key",
       "rateLimit": {
         "limit": 30,
         "windowSeconds": 60,
@@ -1423,7 +1423,7 @@
     {
       "method": "GET",
       "path": "/history",
-      "auth": "public",
+      "auth": "key",
       "rateLimit": {
         "limit": 100,
         "windowSeconds": 60,
@@ -1434,7 +1434,7 @@
     {
       "method": "POST",
       "path": "/history",
-      "auth": "public",
+      "auth": "key",
       "rateLimit": {
         "limit": 30,
         "windowSeconds": 60,
@@ -1445,7 +1445,7 @@
     {
       "method": "GET",
       "path": "/log",
-      "auth": "public",
+      "auth": "key",
       "rateLimit": {
         "limit": 100,
         "windowSeconds": 60,
@@ -1455,7 +1455,7 @@
     {
       "method": "POST",
       "path": "/log",
-      "auth": "public",
+      "auth": "key",
       "rateLimit": {
         "limit": 30,
         "windowSeconds": 60,
@@ -1465,7 +1465,7 @@
     {
       "method": "GET",
       "path": "/log/{id}",
-      "auth": "public",
+      "auth": "key",
       "rateLimit": {
         "limit": 100,
         "windowSeconds": 60,
@@ -1475,7 +1475,7 @@
     {
       "method": "DELETE",
       "path": "/log/{id}",
-      "auth": "public",
+      "auth": "key",
       "rateLimit": {
         "limit": 30,
         "windowSeconds": 60,
@@ -1486,7 +1486,7 @@
     {
       "method": "GET",
       "path": "/log/summary",
-      "auth": "public",
+      "auth": "key",
       "rateLimit": {
         "limit": 100,
         "windowSeconds": 60,
@@ -1496,7 +1496,7 @@
     {
       "method": "POST",
       "path": "/recipes/calculate",
-      "auth": "public",
+      "auth": "key",
       "rateLimit": {
         "limit": 15,
         "windowSeconds": 60,
@@ -1507,7 +1507,7 @@
     {
       "method": "POST",
       "path": "/meals/analyze",
-      "auth": "public",
+      "auth": "key",
       "rateLimit": {
         "limit": 15,
         "windowSeconds": 60,
@@ -1518,7 +1518,7 @@
     {
       "method": "POST",
       "path": "/ingredients/parse",
-      "auth": "public",
+      "auth": "key",
       "rateLimit": {
         "limit": 20,
         "windowSeconds": 60,
@@ -1529,7 +1529,7 @@
     {
       "method": "GET",
       "path": "/dri/life-stages",
-      "auth": "public",
+      "auth": "key",
       "rateLimit": {
         "limit": 100,
         "windowSeconds": 60,
@@ -1539,7 +1539,7 @@
     {
       "method": "GET",
       "path": "/dri",
-      "auth": "public",
+      "auth": "key",
       "rateLimit": {
         "limit": 100,
         "windowSeconds": 60,
@@ -1549,7 +1549,7 @@
     {
       "method": "POST",
       "path": "/dri/compare",
-      "auth": "public",
+      "auth": "key",
       "rateLimit": {
         "limit": 100,
         "windowSeconds": 60,
@@ -1560,7 +1560,7 @@
     {
       "method": "POST",
       "path": "/rag/retrieve",
-      "auth": "public",
+      "auth": "key",
       "rateLimit": {
         "limit": 20,
         "windowSeconds": 60,
@@ -1592,7 +1592,7 @@
     {
       "method": "POST",
       "path": "/rag/ask",
-      "auth": "public",
+      "auth": "key",
       "rateLimit": {
         "limit": 15,
         "windowSeconds": 60,
@@ -1647,7 +1647,7 @@
     {
       "method": "POST",
       "path": "/rag/webhook",
-      "auth": "public",
+      "auth": "secret",
       "rateLimit": {
         "limit": 60,
         "windowSeconds": 60,
@@ -1658,7 +1658,7 @@
     {
       "method": "POST",
       "path": "/memory/write",
-      "auth": "public",
+      "auth": "key",
       "rateLimit": {
         "limit": 30,
         "windowSeconds": 60,
@@ -1668,7 +1668,7 @@
     {
       "method": "POST",
       "path": "/memory/recall",
-      "auth": "public",
+      "auth": "key",
       "rateLimit": {
         "limit": 30,
         "windowSeconds": 60,
@@ -1679,7 +1679,7 @@
     {
       "method": "GET",
       "path": "/memory/recall",
-      "auth": "public",
+      "auth": "key",
       "rateLimit": {
         "limit": 30,
         "windowSeconds": 60,

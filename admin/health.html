@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<meta name="robots" content="noindex, nofollow, noarchive" />
+<meta name="theme-color" content="#0e1210" />
+<title>Chakudya admin · Uptime</title>
+<link rel="stylesheet" href="admin.css" />
+</head>
+<body>
+<main id="root"></main>
+
+<template id="tpl">
+  <h2>Uptime and outages</h2>
+  <div class="bar" style="gap:6px;margin:0 0 8px" id="hFilter">
+    <button data-h="24" class="chip on">24 hours</button><button data-h="168" class="chip">7 days</button><button data-h="720" class="chip">30 days</button>
+  </div>
+  <p id="hMsg" class="muted" role="status"></p>
+  <div id="hStats" class="grid"></div>
+  <h3 class="muted" style="margin:14px 0 6px;font-size:14px">Services</h3>
+  <div id="hServices"></div>
+  <h3 class="muted" style="margin:14px 0 6px;font-size:14px">Outages</h3>
+  <div id="hIncidents"></div>
+  <h3 class="muted" style="margin:14px 0 6px;font-size:14px">By day</h3>
+  <div id="hDaily"></div>
+  <p class="muted">A scheduled probe runs the same checks as <code>/health</code> every 5 minutes. Only Supabase, Cohere and Groq can make a probe degraded. An outage is a run of degraded probes, accurate to about 5 minutes. Needs <code>HEALTH_CHECK_STORE=true</code> and <code>sql/034</code> on the API.</p>
+</template>
+
+<script src="../js/config.js"></script>
+<script src="admin.js"></script>
+<script>
+(() => {
+  "use strict";
+  const { $, esc, fmt, ago, msFmt, call } = Admin;
+  let hHours = 24;
+  const IDS = ["hStats", "hServices", "hIncidents", "hDaily"];
+  const pct = (n) => (typeof n === "number" ? n + "%" : "n/a");
+  const box = (label, text, cls) => `<div class="stat${text === "n/a" ? " null" : ""}"><b${cls ? ` class="${cls}"` : ""}>${esc(text)}</b><span>${esc(label)}</span></div>`;
+  const dur = (m) => (typeof m !== "number" ? "n/a" : m >= 120 ? (m / 60).toFixed(1) + " h" : m + " min");
+  const clear = () => IDS.forEach((id) => ($(id).innerHTML = ""));
+
+  function serviceRow(name, s) {
+    const cls = s.errors ? (s.uptime_pct < 99 ? "bad" : "warn") : "ok";
+    const req = s.required ? " · required" : "";
+    return `<div class="ev"><div class="head"><div class="op">${esc(name)}</div><span class="pill ${cls}">${esc(pct(s.uptime_pct))}</span></div>
+      <div class="muted">${fmt(s.checks)} checks · ${fmt(s.errors)} error${s.errors === 1 ? "" : "s"} · avg ${esc(msFmt(s.avg_ms))} · p95 ${esc(msFmt(s.p95_ms))} · max ${esc(msFmt(s.max_ms))}${req}</div></div>`;
+  }
+
+  function incidentRow(i) {
+    const state = i.ongoing ? '<span class="pill bad">ongoing</span>' : '<span class="pill ok">resolved</span>';
+    const svc = (i.failing_services || []).join(", ") || "unknown";
+    return `<div class="ev"><div class="head"><div>${state}</div>
+      <span class="muted">${esc(new Date(i.started_at).toLocaleString())} · ${esc(ago(i.started_at))}</span></div>
+      <div class="op">${esc(svc)}</div>
+      <div class="muted">${esc(dur(i.duration_minutes))}${i.detail ? " · " + esc(i.detail) : ""}</div></div>`;
+  }
+
+  function dayRow(d) {
+    const cls = d.uptime_pct >= 99.9 ? "ok" : d.uptime_pct >= 99 ? "warn" : "bad";
+    return `<div class="ev"><div class="head"><div class="op">${esc(d.day)}</div><span class="pill ${cls}">${esc(pct(d.uptime_pct))}</span></div>
+      <div class="muted">${fmt(d.healthy)} healthy of ${fmt(d.checks)} checks</div></div>`;
+  }
+
+  async function loadHealth() {
+    const r = await call(`/admin/health-history?hours=${hHours}`);
+    const d = r.body?.data;
+    if (Admin.authFail(r)) { $("hMsg").textContent = ""; clear(); return; }
+    if (r.status !== 200 || !d) {
+      $("hMsg").textContent = r.status === 403 ? "The gateway has not enabled uptime history yet (add /admin/health-history to ADMIN_GET_PATHS)."
+        : r.status === 404 ? "The API does not have /admin/health-history yet. Deploy API v1.52.0."
+        : `Couldn't load uptime history (${r.status || "network"}).`;
+      clear();
+      return;
+    }
+    if (!d.available) { $("hMsg").textContent = d.note || "Uptime storage is not ready."; clear(); return; }
+    const cur = d.current;
+    $("hMsg").textContent = (d.storage_enabled ? "" : "Recording is off on the API (HEALTH_CHECK_STORE is not true). ")
+      + (cur ? `Latest probe ${ago(cur.at)}${cur.stale ? ", which is old: the scheduled probe may have stopped." : "."}` : "No probes recorded in this period.")
+      + (d.truncated ? " Very long period: only the newest rows were read." : "");
+    const status = cur ? cur.status : "n/a";
+    $("hStats").innerHTML = box("Status now", status, cur ? (status === "healthy" ? "ok" : "bad") : "")
+      + box(`Uptime, last ${d.window_hours} h`, pct(d.uptime_pct))
+      + box("Probes that ran", pct(d.coverage_pct));
+    const svc = Object.entries(d.services || {});
+    $("hServices").innerHTML = svc.map(([n, s]) => serviceRow(n, s)).join("") || '<p class="muted">No probes in this period.</p>';
+    $("hIncidents").innerHTML = (d.incidents || []).map(incidentRow).join("") || '<p class="muted">No outages in this period.</p>';
+    $("hDaily").innerHTML = (d.daily || []).slice().reverse().map(dayRow).join("") || '<p class="muted">No days recorded.</p>';
+  }
+
+  Admin.mount({
+    id: "health",
+    title: "Uptime",
+    init() { Admin.chips("hFilter", "h", (v) => { hHours = Number(v); loadHealth(); }); },
+    refresh: loadHealth,
+  });
+})();
+</script>
+</body>
+</html>

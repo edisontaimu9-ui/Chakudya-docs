@@ -1,6 +1,6 @@
-# Chakudya Nutrition Registry (CNR) 🌽
+# Chakudya API Reference
 
-**Malawi's Intelligent Food & Nutrition Knowledge Platform**
+Full reference for the Chakudya Nutrition Registry (CNR) API: setup, authentication, rate limits, caching and every endpoint. For a short overview, see the [README](../README.md).
 
 Chakudya is a Malawi focused nutrition data and intelligence API. It
 provides structured, searchable nutrition information for health
@@ -8,6 +8,33 @@ applications, researchers, students, dietitians, and developers building
 tools for clinical or public health nutrition work. It's a Cloudflare
 Worker backed by Supabase, and includes retrieval augmented (RAG) search
 for AI assisted nutrition tools.
+
+
+## Contents
+
+- [What the API provides](#what-the-api-provides)
+- [Who it's for](#who-its-for)
+- [Runtime & Tech](#runtime--tech)
+- [Project Structure](#project-structure)
+- [Required Environment Variables / Bindings](#required-environment-variables--bindings)
+- [Setup](#setup)
+- [Authentication Model](#authentication-model)
+- [API keys](#api-keys)
+- [Developer portal and consumer keys (`v1.32.0+`)](#developer-portal-and-consumer-keys-v1320)
+- [Getting a key](#getting-a-key)
+- [Rate Limits (from `index.js` policy)](#rate-limits-from-indexjs-policy)
+- [Caching (Cloudflare Cache API, `v1.4.0+`)](#caching-cloudflare-cache-api-v140)
+- [RAG / Memory Query Cache (Cloudflare KV, `v1.6.0+`)](#rag--memory-query-cache-cloudflare-kv-v160)
+- [Smoke Test](#smoke-test)
+- [Endpoints](#endpoints)
+- [Request IDs & logging](#request-ids--logging)
+- [Pagination](#pagination)
+- [Bulk insert](#bulk-insert)
+- [Response Format](#response-format)
+- [HTTP Status Codes](#http-status-codes)
+- [CORS](#cors)
+- [JS Client SDK](#js-client-sdk)
+- [Quick Examples](#quick-examples)
 
 ---
 
@@ -47,7 +74,7 @@ Chakudya can be used to build:
 - **Database:** Supabase REST (`/rest/v1`)
 - **Embeddings:** Cohere (`embed-multilingual-v3.0`)
 - **Rate limiting:** Cloudflare KV
-- **Current CNR version:** `1.21.1`
+- **Current CNR version:** `1.45.0` (`GET /` always reports the live version)
 
 ---
 
@@ -55,10 +82,14 @@ Chakudya can be used to build:
 
 ```text
 chakudya-api/
-├── src/
-│   └── index.js       # Worker entry, all route handlers, caching, rate limiting
+├── src/                # Worker entry (index.js) and one module per feature
+├── sql/                # Numbered Supabase migrations
+├── scripts/            # Seed files and loaders
+├── test/               # node --test suites
+├── docs/               # This reference
+├── openapi.yaml        # OpenAPI 3.0.3 spec
 ├── smoke-test.sh       # Post-deploy verification script (see "Smoke Test" below)
-├── wrangler.toml       # Cloudflare Worker config — KV binding, cron trigger, account ID
+├── wrangler.toml       # Cloudflare Worker config: KV binding, cron trigger, account ID
 └── README.md
 ```
 
@@ -154,7 +185,7 @@ npx wrangler deploy
 ### 6) Verify
 
 ```bash
-bash smoke-test.sh https://your-worker.workers.dev
+CNR_API_KEY=your_key bash smoke-test.sh https://your-worker.workers.dev
 ```
 
 Runs the full MISS→HIT / rate-limit / cascade verification pass in one command instead of testing each piece by hand. See "Smoke Test" below for details.
@@ -163,34 +194,44 @@ Runs the full MISS→HIT / rate-limit / cascade verification pass in one command
 
 ## Authentication Model
 
-`Authorization: Bearer <key>` is required for:
+Every operational route needs `Authorization: Bearer <API key>`. Authentication is always on
+(there is no switch to turn it off). A request without a valid key gets `401` with
+`code: "api_key_required"` and a `WWW-Authenticate: Bearer` header.
 
-- All write routes (`POST`, `PUT`, `PATCH`, `DELETE`) on:
-  - `/foods`
-  - `/exchange`
-  - `/renal`
-  - `/formulas`
-  - `/packaged/:id`
-- `GET /packaged/pending`, `POST /packaged/:id/approve`, `POST /packaged/:id/reject`
-- `GET /admin/keys`, `POST /admin/keys`, `DELETE /admin/keys/:id` — **root key only**, see [API keys](#api-keys)
-- `POST /oauth/token` — OAuth 2.0 `client_credentials` token endpoint, see [OAuth 2.0](#oauth-20-machine-to-machine)
-- `GET /admin/oauth-clients`, `POST /admin/oauth-clients`, `DELETE /admin/oauth-clients/:id` — **root key only**
-- `POST /rag/ingest`
+**Works with no key** (the complete list):
+
+- `GET /`
+- `GET /health` (rate-limited)
+- FHIR conformance reads: `GET /fhir/metadata`, `/fhir/CodeSystem/{name}`,
+  `/fhir/OperationDefinition/{id}`, `/fhir/StructureDefinition/{name}`,
+  `/fhir/ConceptMap/{id}`, `/fhir/Questionnaire[/{id}]`
+
+**Carry their own credential instead of an API key** (a request without it is rejected):
+
+- `POST/GET/DELETE /developer/keys`: the caller's Supabase login access token, see [Developer portal](#developer-portal-and-consumer-keys-v1320)
+- `POST /rag/webhook`: the shared secret in the `x-webhook-secret` header (`INGEST_WEBHOOK_SECRET`)
+
+**Any valid API key** (a consumer key from the developer console, or a reviewer or admin key) is enough for
+everything else that reads data or computes, plus user-scoped data: all other `GET` routes,
+`GET /foods/lookup`, `POST /packaged/submit`, `POST /packaged/scan`, `POST /rag/retrieve`,
+`POST /rag/ask`, `/memory/*` (except consolidate), `/favorites`, `/history`, `/log`,
+`/recipes/calculate`, `/meals/analyze`, `/ingredients/parse`, `/dri/compare`, `POST /batch`, the FHIR
+operations (with the right FHIR scope) and the Fenton compute routes.
+
+**Admin key required** for privileged registry writes and privileged reads:
+
+- All write routes (`POST`, `PUT`, `PATCH`, `DELETE`) on `/foods`, `/exchange`, `/renal`, `/formulas`,
+  `/drug-interactions`, `/glycaemic-index`, the WHO and Fenton reference tables, `/packaged/:id`, and every
+  `POST /:resource/bulk`
+- `GET /packaged/pending`, `POST /packaged/:id/approve`, `POST /packaged/:id/reject` (a `reviewer` key also works here)
+- `POST /rag/ingest`, `/rag/upload`, `/rag/enqueue`, `GET /rag/jobs`, `DELETE /rag/source`
 - `POST /memory/consolidate` (also runs automatically via hourly cron, bypassing HTTP auth)
+- `GET /fhir/AuditEvent` (admin role or an explicit `system/AuditEvent.read` scope)
+- `GET /admin/keys`, `POST /admin/keys`, `DELETE /admin/keys/:id`: **root key only**, see [API keys](#api-keys)
+- `GET /admin/usage`, `GET /admin/health-history`, `GET /admin/monitoring`, `GET /admin/activity`, `GET /admin/overview`: **root key only**, read-only monitoring, see [Usage by endpoint](#usage-by-endpoint-v1390), [Health history](#health-history-v1520), [Failed and slow calls](#failed-and-slow-calls-v1380), [Recent admin actions](#recent-admin-actions-v1370) and [Admin snapshot](#admin-snapshot-v1350)
 
-The `<key>` can be either the root `ADMIN_API_KEY` or a per-consumer key
-minted via `POST /admin/keys` — see [API keys](#api-keys) for the
-difference.
-
-Public exceptions:
-
-- `GET /health` (public, rate-limited)
-- `POST /packaged/submit`, `POST /packaged/scan` (public, rate-limited)
-- `POST /rag/retrieve`, `POST /rag/ask` (public, rate-limited)
-- `POST /memory/write` (public, rate-limited)
-- `GET /memory/recall` (public, rate-limited)
-- `GET /foods/lookup` (public, rate-limited)
-- All other `GET` endpoints
+A consumer key is refused on every admin route. Bearer tokens are API keys only: OAuth 2.0 was
+removed in v1.34.0 (see the note at the end of the Developer portal section).
 
 ---
 
@@ -216,7 +257,7 @@ admin credential:
   managing other keys.
 - `reviewer` — can only reach the packaged review queue
   (`GET /packaged/pending`, `POST /packaged/:id/approve`,
-  `POST /packaged/:id/reject`) plus all public/`GET` routes. Blocked from
+  `POST /packaged/:id/reject`) plus every route any API key can use. Blocked from
   everything else admin-gated — editing foods, deleting packaged foods, bulk
   inserts, RAG ingest, memory consolidation, key management, etc. A
   reviewer key that leaks can't do much beyond what a reviewer is
@@ -307,10 +348,9 @@ Rules:
 - Keys have the `consumer` role. They fail every admin route (the role ranks below
   `reviewer`), so a consumer key can read and compute but never write data, manage
   keys or reach the packaged review queue.
-- On public routes a consumer key gets **3x** that route's rate limit, counted in its
+- On every non-admin route a consumer key gets **3x** that route's rate limit, counted in its
   own per-key bucket instead of the shared per-IP one. Batch sub-requests count too.
-- FHIR: consumer keys carry `system/*.*`, so every `/fhir` operation works in enforce
-  mode. A wildcard never covers `AuditEvent`, so audit reads stay admin-only.
+- FHIR: consumer keys carry `system/*.*`, so every `/fhir` operation works. A wildcard never covers `AuditEvent`, so audit reads stay admin-only.
 - Usage counts are approximate daily counters in KV (`usage:<key id>:<day>`, kept 8 days).
 - Only the SHA-256 hash of a key is stored, plus a short prefix for display.
 
@@ -325,71 +365,20 @@ Setup (once):
 
 ---
 
-## OAuth 2.0 (machine-to-machine)
+## Getting a key
 
-For services that call the API on their own behalf (MCP server, Thanzi Coach,
-apps) there's an OAuth 2.0 **client_credentials** flow, so a service holds a
-revocable client secret instead of a long-lived admin key. A client exchanges
-its credentials for a **1-hour bearer token**, then uses it exactly like an API
-key (`Authorization: Bearer <token>`) on any admin route, including `/batch`.
-Tokens carry the client's role (`admin` or `reviewer`), so role limits apply
-unchanged. Existing API keys keep working.
+Sign in on the docs site (Supabase Auth), confirm your email, then create a key on the account page
+(or `POST /developer/keys`). Send it as `Authorization: Bearer YOUR_API_KEY` on every route.
+`/batch` needs a key, and it is passed on to every sub-request. Server apps that need to write
+registry data use an admin key minted with `POST /admin/keys`.
 
-**One-time setup**
+Browser apps cannot keep a key secret. Treat a key shipped in front-end code as public: give it
+its own label, never reuse it elsewhere, and revoke it if it is abused.
 
-1. Run `sql/014_add_oauth_clients.sql` in the Supabase SQL editor.
-2. Add a Worker secret `OAUTH_SIGNING_SECRET` in the Cloudflare dashboard
-   (Workers & Pages → chakudya-api → Settings → Variables and Secrets).
-   Generate one with `openssl rand -hex 32`. Rotating it invalidates all
-   outstanding tokens (clients simply fetch a new one).
-
-**Create a client** (root key only; the secret is shown once):
-
-```bash
-curl -X POST https://your-worker-url/admin/oauth-clients \
-  -H "Authorization: Bearer <ADMIN_API_KEY>" -H "Content-Type: application/json" \
-  -d '{"label":"thanzi-coach","role":"admin"}'
-# -> client_id: cnr_client_..., client_secret: cnr_secret_...
-```
-
-**Get a token** (HTTP Basic, or `client_id`/`client_secret` form fields):
-
-```bash
-curl -X POST https://your-worker-url/oauth/token \
-  -u "$CLIENT_ID:$CLIENT_SECRET" -d "grant_type=client_credentials"
-# -> {"access_token":"eyJ...","token_type":"Bearer","expires_in":3600,"scope":"admin"}
-```
-
-Optional `scope=reviewer` requests a narrower token than the client's role;
-asking for more than the client's role returns `invalid_scope`.
-
-**Use it, caching until shortly before expiry:**
-
-```js
-let cached = { token: null, exp: 0 };
-async function getToken(env, base) {
-  if (cached.token && Date.now() < cached.exp - 60_000) return cached.token;
-  const res = await fetch(`${base}/oauth/token`, {
-    method: "POST",
-    headers: {
-      Authorization: "Basic " + btoa(`${env.CNR_CLIENT_ID}:${env.CNR_CLIENT_SECRET}`),
-      "Content-Type": "application/x-www-form-urlencoded",
-    },
-    body: "grant_type=client_credentials",
-  });
-  if (!res.ok) throw new Error(`token request failed: ${res.status}`);
-  const { access_token, expires_in } = await res.json();
-  cached = { token: access_token, exp: Date.now() + expires_in * 1000 };
-  return access_token;
-}
-```
-
-**Revoke:** `DELETE /admin/oauth-clients/:id` (root key). New tokens stop
-immediately and already-issued tokens are rejected too (KV denylist; if
-`RATE_LIMIT_KV` isn't bound they live out their hour). `GET /admin/oauth-clients`
-lists clients without secrets. Discovery metadata (RFC 8414):
-`GET /.well-known/oauth-authorization-server`. The token endpoint is limited
-to 10 requests/min per IP.
+**OAuth 2.0 was removed (v1.34.0).** `POST /oauth/token`, `GET /.well-known/oauth-authorization-server`
+and `/admin/oauth-clients` no longer exist, and the `OAUTH_SIGNING_SECRET` secret is unused. A service that
+used a client id and secret should switch to an API key. Before dropping the old table, run step 1 of
+`sql/030_drop_oauth_clients.sql` to see whether any client was still using it.
 
 ---
 
@@ -403,7 +392,7 @@ to 10 requests/min per IP.
 - **Admin writes (general)**: `60/min` per admin token
 - **RAG ingest (`POST /rag/ingest`)**: `30/min` per admin token
 - **Developer keys (`/developer/keys`)**: `10/min` per IP to create, `30/min` to list or revoke
-- **Consumer keys**: 3x every public limit above, per key (see Developer portal)
+- **Consumer keys**: 3x every per-IP limit above, per key (see Developer portal)
 - **Batch (`POST /batch`)**: `10/min` per IP — on top of whatever limit each sub-request's own resource applies
 
 When exceeded:
@@ -420,7 +409,8 @@ GET responses for reference-style resources are cached at the Cloudflare edge, k
 | Resource | Cached? | TTL |
 |---|---|---|
 | `GET /foods`, `/exchange`, `/renal`, `/formulas`, `/glycaemic-index`, `/bmi-for-age`, `/hc-velocity`, `/length-velocity`, `/weight-velocity`, `/muac-for-age`, `/muac`, `/length-height-for-age`, `/weight-for-age`, `/weight-for-length-height`, `/bmi-for-age-under-5`, `/hc-for-age`, `/growth/assess` | ✅ | 1 hour |
-| `GET /foods/compare` | ✅ | 1 hour |
+| `GET /foods/compare`, `GET /foods/convert`, `GET /foods/:id/convert` | ✅ | 1 hour |
+| `GET /measures`, `GET /measures/convert` | ✅ | 24 hours |
 | `GET /foods/lookup` | ✅ | 30 min |
 | `GET /foods/autocomplete` | ✅ | 1 hour |
 | `GET /foods/categories` | ✅ | 24 hours |
@@ -477,9 +467,9 @@ curl -s -X POST "https://your-worker.workers.dev/rag/retrieve" \
 `smoke-test.sh` re-runs the full manual verification pass (KV binding, RAG cache, edge cache, rate limiting, memory recall cache + session isolation, foods lookup cascade) in one command instead of doing it by hand after every deploy or dashboard change:
 
 ```bash
-bash smoke-test.sh
+CNR_API_KEY=your_key bash smoke-test.sh
 # or against a different deployment:
-bash smoke-test.sh https://your-worker.workers.dev
+CNR_API_KEY=your_key bash smoke-test.sh https://your-worker.workers.dev
 ```
 
 Takes about 90 seconds (most of that is a deliberate 60s pause to let the rate-limit window reset before the script continues). Exits non-zero if anything fails, so it's safe to wire into a CI step later if useful.
@@ -489,7 +479,7 @@ Takes about 90 seconds (most of that is a deliberate 60s pause to let the rate-l
 ## Endpoints
 
 The full list below is also available as a machine-readable
-[OpenAPI 3.0.3 spec](./openapi.yaml) — import it into Swagger UI, Postman,
+[OpenAPI 3.0.3 spec](../openapi.yaml) — import it into Swagger UI, Postman,
 or an SDK generator. It's a static file (not served by the Worker) kept in
 sync by hand alongside this section; if they ever disagree, this README
 and `src/index.js` are the source of truth. Row shapes for the nutrition
@@ -504,7 +494,7 @@ column list per table lives here in the README and evolves on its own.
 
 ### Health
 
-- `GET /health` *(public, rate-limited)* — pings Supabase, Cohere, Groq,
+- `GET /health` *(no key needed, rate-limited)* — pings Supabase, Cohere, Groq,
   and Open Food Facts in parallel and reports per-service status plus an
   overall `healthy`/`degraded` verdict. Useful for quickly narrowing down
   which upstream is the cause when a route starts failing, instead of
@@ -542,9 +532,217 @@ Returns `200` when `status: "healthy"`, `503` when `status: "degraded"`
 (i.e. Supabase, Cohere, or Groq — the required upstreams — failed to
 respond).
 
+Each pinged service also reports `ms`, how long its check took (`v1.52.0+`).
+
+#### Health history (`v1.52.0+`)
+
+- `GET /admin/health-history` *(root admin key only)* — uptime and outage history
+  from a scheduled probe. A cron (`*/5 * * * *`) runs the same checks as
+  `GET /health` and stores one row per run in `health_checks` (about 288 a
+  day, 30 days kept). `?hours=` sets the window (default 24, max 720).
+
+Setup: run `sql/034_add_health_checks.sql` in Supabase, keep
+`HEALTH_CHECK_STORE = "true"` and the `*/5 * * * *` cron in `wrangler.toml` (it also runs the hourly memory consolidation, so only one cron slot is used), then
+`npx wrangler deploy`. Nothing is stored unless `HEALTH_CHECK_STORE=true`.
+
+Response (shortened):
+
+```json
+{
+  "window_hours": 24,
+  "available": true,
+  "uptime_pct": 99.7,
+  "coverage_pct": 100,
+  "current": { "at": "2026-10-22T10:05:00.000Z", "status": "healthy", "age_minutes": 2, "stale": false,
+               "services": { "supabase": "ok", "cohere": "ok", "groq": "ok", "open_food_facts": "ok" } },
+  "services": {
+    "groq": { "checks": 288, "errors": 1, "uptime_pct": 99.7, "avg_ms": 140, "p95_ms": 310, "max_ms": 5003, "required": true }
+  },
+  "incidents": [
+    { "started_at": "2026-10-22T04:15:00.000Z", "resolved_at": "2026-10-22T04:20:00.000Z", "ongoing": false,
+      "checks": 1, "duration_minutes": 5, "failing_services": ["groq"], "detail": "groq: Timed out" }
+  ],
+  "daily": [ { "day": "2026-10-22", "checks": 288, "healthy": 287, "uptime_pct": 99.7 } ]
+}
+```
+
+- `uptime_pct` is healthy probes over all probes. Only Supabase, Cohere and
+  Groq can make a probe `degraded`, the same rule as `/health`.
+- `coverage_pct` is probes that ran over probes expected since the first one
+  in the window. Below 100 means missed cron runs.
+- `current.stale` is `true` when the latest probe is over 15 minutes old,
+  usually because the cron stopped.
+- An incident is a run of consecutive degraded probes. Its length is
+  measured to the first healthy probe, so it is accurate to about 5 minutes.
+- If a probe cannot reach the database it is held in KV and written with the
+  next successful one, so a Supabase outage still appears in the timeline.
+- `storage_enabled` shows whether `HEALTH_CHECK_STORE` is `true`. `truncated` is
+  `true` when the window held more rows than one request reads (30 days is about
+  8,600 rows, read in pages of 1,000, up to 10 pages).
+- If `health_checks` cannot be read (`sql/034` not run), the response is
+  `available: false` with a `note`, empty `services`, `incidents` and `daily`,
+  and `null` uptime, instead of an error.
+- Only the root key is accepted: no key gets `401`, a consumer key is refused,
+  and any method other than `GET` gets `405`.
+
+#### Verdict alerts (`v1.53.0+`)
+
+When the secret `ALERT_WEBHOOK_URL` is set (an `https://` URL), the probe POSTs a JSON alert when the verdict flips from `healthy` to `degraded`, and again when it
+recovers. A flip must hold for `ALERT_CONFIRM_CHECKS` probes in a row (default 2, about 10 minutes) so one slow probe does not alert. The last confirmed verdict is
+kept in KV, so an outage of the database still alerts. If the webhook call fails, the next probe tries again. Alerts work even when `HEALTH_CHECK_STORE` is off.
+
+```json
+{ "text": "Chakudya API is DEGRADED: groq (Timed out)", "content": "Chakudya API is DEGRADED: groq (Timed out)",
+  "event": "health.degraded", "status": "degraded", "at": "2026-10-22T10:10:00.000Z",
+  "failing_services": ["groq (Timed out)"], "degraded_since": "2026-10-22T10:05:00.000Z" }
+```
+
+`event` is `health.degraded` or `health.recovered`. `text` suits Slack-style webhooks and `content` suits Discord.
+
+#### Usage by endpoint (`v1.39.0+`)
+
+- `GET /admin/usage` *(root admin key only)* — which endpoints get called most,
+  with an estimated p95 latency (`p95_ms`, `v1.53.0+`). Every counted request
+  adds one to a row in `route_usage` for its UTC day, method and route, with
+  ids replaced (`/foods/:id`). Not counted: `OPTIONS`, `/`, `/health` and
+  `/admin/*`. Counts and timings only, no keys, IPs, queries or bodies.
+  `?days=` sets the window (default 7, max 30).
+
+Setup: run `sql/032_add_route_usage.sql` in Supabase and keep
+`ROUTE_USAGE_STORE = "true"` in `wrangler.toml`. For `p95_ms`, also run
+`sql/036_add_latency_buckets.sql`. Nothing is stored unless
+`ROUTE_USAGE_STORE=true`.
+
+Response (shortened):
+
+```json
+{
+  "window_days": 7,
+  "available": true,
+  "storage_enabled": true,
+  "truncated": false,
+  "totals": { "calls": 120, "errors": 3, "routes": 4, "p95_ms": 1750, "p95_over_cap": false },
+  "daily": [ { "day": "2026-10-21", "count": 40 }, { "day": "2026-10-22", "count": 80 } ],
+  "top": [
+    { "method": "GET", "route": "/foods", "calls": 80, "errors": 3, "last_day": "2026-10-22",
+      "avg_ms": 95, "p95_ms": 243, "error_rate": 3.8, "share": 66.7 }
+  ]
+}
+```
+
+- `daily` is oldest first, with a zero for days that had no calls. `top` is the
+  25 busiest routes by `calls`. `share` is the percent of all calls in the
+  window, and `error_rate` is the percent of that route's calls that errored.
+- An error here means a `5xx`, a `429`, or a `4xx` other than `401` and `404`.
+- `p95_ms` is estimated from latency buckets (50, 100, 250, 500, 1000, 2500
+  and 5000 ms, plus above 5000 ms). It is interpolated inside the bucket that
+  holds the 95th-percentile request, so it is only as fine as the buckets.
+  It is `null` for a route until it has requests counted after `sql/036` ran,
+  and only those requests count toward it. With few requests it is rough.
+- `totals.p95_over_cap` is `true` when the 95th percentile falls above 5000 ms.
+  `p95_ms` is then a floor, not an estimate.
+- Timings use the Worker's clock, which only advances while it waits on
+  something. A fast or cached route can read `0` ms, and a `p95_ms` just under
+  50 means "under 50 ms", not a measured value.
+- If `route_usage` cannot be read (`sql/032` not run), the response is
+  `available: false` with a `note`, zero totals and an empty `top`.
+  `truncated` is `true` if the window held more than 5,000 rows.
+- Without `sql/036` the endpoint still works and `p95_ms` stays `null`.
+- Only the root key is accepted: no key gets `401`, a consumer key is refused,
+  and any method other than `GET` gets `405`.
+
+#### Failed and slow calls (`v1.38.0+`)
+
+- `GET /admin/monitoring` *(root admin key only)*: which endpoints are failing and which are slow. The Worker stores one row in `request_log` for each failed or slow request (fast successes are never stored), so this answers "what is breaking and what is slow", not "what is the overall error rate". Rows hold method, route (ids replaced, `/foods/:id`), status, duration and request id. No query strings, bodies, keys or IPs. `?hours=` sets the window (default 24, max 168).
+
+Setup: run `sql/031_add_request_log.sql` in Supabase and keep `REQUEST_LOG_STORE = "true"` in `wrangler.toml`. `REQUEST_LOG_SLOW_MS` sets what counts as slow (default 1500, minimum 100). Nothing is stored unless `REQUEST_LOG_STORE=true`.
+
+Response (shortened):
+
+```json
+{
+  "generated_at": "2026-10-22T10:00:00.000Z",
+  "window_hours": 24,
+  "available": true,
+  "storage_enabled": true,
+  "slow_ms": 1500,
+  "truncated": false,
+  "totals": { "failed": 4, "slow": 2, "by_status": { "429": 3, "500": 1 } },
+  "failing_endpoints": [
+    { "method": "GET", "route": "/foods", "count": 3, "statuses": { "429": 3 }, "last_at": "2026-10-22T09:41:00.000Z" }
+  ],
+  "slow_endpoints": [
+    { "method": "POST", "route": "/rag/query", "count": 2, "max_ms": 4100, "last_at": "2026-10-22T08:12:00.000Z", "avg_ms": 3300 }
+  ],
+  "recent": [
+    { "at": "2026-10-22T09:41:00.000Z", "request_id": "…", "method": "GET", "route": "/foods", "status": 429, "duration_ms": 12, "kind": "error" }
+  ]
+}
+```
+
+- A failure is a `5xx`, a `429`, or a `4xx` other than `401` and `404`. A request that is both failed and slow has `kind: "both"` and counts in both lists.
+- `failing_endpoints` is sorted by `count` and `slow_endpoints` by `max_ms`, 15 each. `recent` is the 40 newest rows.
+- Only the newest 2,000 rows in the window are read. `truncated` is `true` when the window held more.
+- If `request_log` cannot be read (`sql/031` not run), the response is `available: false` with a `note`, zero totals and empty lists, instead of an error.
+- Only the root key is accepted: no key gets `401`, a consumer key is refused, and any method other than `GET` gets `405`.
+
+#### Recent admin actions (`v1.37.0+`)
+
+- `GET /admin/activity` *(root admin key only)*: a feed of recent admin actions, newest first. It is built from data the API already stores, so it needs no SQL and no setting. `?limit=` sets the number of events (default 30, max 100).
+
+Response (shortened):
+
+```json
+{
+  "generated_at": "2026-10-22T10:00:00.000Z",
+  "sources": { "api_keys": true, "packaged_reviews": true },
+  "events": [
+    { "type": "packaged_approved", "at": "2026-10-22T09:30:00.000Z", "actor": "reviewer-1",
+      "subject": "Maize flour 2kg", "detail": "BrandName · 6001234567890", "ref": "42" },
+    { "type": "key_created", "at": "2026-10-21T14:02:00.000Z", "actor": null,
+      "subject": "clinic-app", "detail": "role reviewer", "ref": "7" }
+  ]
+}
+```
+
+- `type` is `key_created`, `key_revoked`, `packaged_approved` or `packaged_rejected`.
+- Key events come from the newest 200 keys. Keys made through developer self-service are left out, because they are not admin actions. Key events have `actor: null`, since the API does not record who made a change. Review events carry `reviewed_by` as `actor`, and a rejection shows its reason in `detail`.
+- Review events come from the 100 most recently reviewed packaged foods.
+- `sources` shows which of the two reads worked. If one fails, its events are missing and the other source still returns.
+- Key hashes and raw keys are never returned. Nothing here writes.
+- Only the root key is accepted: no key gets `401`, a consumer key is refused, and any method other than `GET` gets `405`.
+
+#### Admin snapshot (`v1.35.0+`)
+
+- `GET /admin/overview` *(root admin key only)*: one read-only snapshot for the admin monitor page. No setup needed.
+
+Response (shortened):
+
+```json
+{
+  "generated_at": "2026-10-22T10:00:00.000Z",
+  "registry": [ { "label": "Foods", "table": "foods", "count": 1200 } ],
+  "packaged_review": { "pending": 5, "approved": 80, "rejected": 3 },
+  "rag_ingest_jobs": { "queued": 0, "processing": 1, "done": 40, "failed": 2 },
+  "api_keys": {
+    "total": 12, "active": 10, "by_role": { "admin": 2, "reviewer": 3 },
+    "usage_today": 150, "usage_last_7_days": 900,
+    "usage_daily": [ { "day": "2026-10-16", "count": 120 } ],
+    "top": [ { "id": 7, "label": "clinic-app", "role": "reviewer", "last_used_at": "2026-10-22T09:50:00.000Z",
+               "today": 40, "last_7_days": 250, "daily": [30, 35, 40, 38, 32, 35, 40] } ]
+  }
+}
+```
+
+- `registry` counts rows in 11 reference tables (foods, packaged foods, glycaemic index entries, exchange list items, renal foods, enteral formulas, drug-nutrient interactions, food synonyms, NCP diagnosis terms, Fenton preterm rows and BMI-for-age rows). A count is `null` if that table cannot be read.
+- `packaged_review` and `rag_ingest_jobs` are counts by status.
+- `api_keys` counts the newest 200 keys. Per-key usage comes from the KV counters the API already keeps, so it is approximate. It covers the last 7 UTC days, oldest first, and is read for up to 100 active keys. `usage_daily` is the total across those keys, and each `top` entry (up to 20, busiest first) has `daily` aligned with `usage_daily[].day`.
+- Key hashes and raw keys are never returned. Nothing here writes.
+- Only the root key is accepted: no key gets `401`, a consumer key is refused, and any method other than `GET` gets `405`.
+
 ### Batch
 
-- `POST /batch` *(public, rate-limited, max 20 sub-requests)* — runs several
+- `POST /batch` *(API key, rate-limited, max 20 sub-requests)* — runs several
   sub-requests in one HTTP call and returns all their results together.
   Built for clients (the MCP server, the SDK, or any caller) that would
   otherwise make several separate calls per user action — e.g. a few
@@ -744,13 +942,13 @@ GET /foods/45?with_servings=true
 - `offset` (default `0`)
 - `with_servings` → `true` to add `serving_sizes` (see above)
 
-**`GET /foods/autocomplete?q=...&max_results=`** *(public, rate-limited, cached 1h)* — search-as-you-type suggestions via FatSecret's Premier-exclusive `foods.autocomplete.v2`. `max_results` defaults to `4`, capped at `10` (FatSecret's own limit). Returns a plain array of strings:
+**`GET /foods/autocomplete?q=...&max_results=`** *(API key, rate-limited, cached 1h)* — search-as-you-type suggestions via FatSecret's Premier-exclusive `foods.autocomplete.v2`. `max_results` defaults to `4`, capped at `10` (FatSecret's own limit). Returns a plain array of strings:
 
 ```json
 { "status": "success", "data": ["chicken", "chicken breast", "chicken salad"] }
 ```
 
-**`GET /foods/categories`** *(public, rate-limited, cached 24h)* — the full FatSecret food category list (near-static reference data), via the Premier-exclusive `food_categories.get.v2`:
+**`GET /foods/categories`** *(API key, rate-limited, cached 24h)* — the full FatSecret food category list (near-static reference data), via the Premier-exclusive `food_categories.get.v2`:
 
 ```json
 { "status": "success", "data": [{ "id": "1", "name": "Beans & Legumes", "description": "..." }] }
@@ -758,7 +956,7 @@ GET /foods/45?with_servings=true
 
 Both of the above require `FATSECRET_CONSUMER_KEY`/`FATSECRET_CONSUMER_SECRET` on a **Premier or Premier Free** plan — a Basic/free-tier key returns FatSecret error 14 ("Missing scope"), which surfaces here as a `503` ("not configured on this deployment"). See [Required Environment Variables](#required-environment-variables--bindings).
 
-**`GET /foods/substitutes?food_name=chicken&limit=`** *(public, rate-limited, cached 1h)* — Malawi-specific substitution suggestions, entirely local (no FatSecret dependency). Resolves `food_name` the same way a `/meals/analyze` ingredient resolves (local `foods` match, falling back to the external lookup cascade), classifies it into a substitution group, then ranks candidates from `foods` by nutritional closeness on that group's primary nutrient.
+**`GET /foods/substitutes?food_name=chicken&limit=`** *(API key, rate-limited, cached 1h)* — Malawi-specific substitution suggestions, entirely local (no FatSecret dependency). Resolves `food_name` the same way a `/meals/analyze` ingredient resolves (local `foods` match, falling back to the external lookup cascade), classifies it into a substitution group, then ranks candidates from `foods` by nutritional closeness on that group's primary nutrient.
 
 The grouping deliberately overrides the plain category taxonomy where it matters for how people actually substitute: chicken/fish/eggs (category `Protein`) and beans/soya/groundnuts (category `Legumes`) are treated as one combined "Protein / body-building foods" group, ranked by protein per 100g; grains plus cassava/potatoes are one "Starches / staples" group, ranked by carbohydrate. Everything else falls back to its own plain category. `limit` defaults to `5`, capped at `15`.
 
@@ -786,7 +984,22 @@ The grouping deliberately overrides the plain category taxonomy where it matters
 
 Ranking is a single primary nutrient's closeness, not a full dietary-equivalence judgment — it doesn't know about cost, local availability, taste, or realistic portion size, and every candidate's full `comparison_vs_original` (kcal/protein/carbs/fat/iron/calcium) is included precisely so a clinician or cook can see *how* it differs, not just that it's "close".
 
-**`GET /foods/compare?foods=nsima,rice,potatoes`** *(public, rate-limited, cached 1h)* — Nutrient Comparison: lines up 2-6 foods side by side. Resolves each name the same way `/foods/substitutes` does (local match, falling back to the external lookup cascade), then returns per-100g energy, protein, carbohydrate, fiber, fat, and the full micronutrient panel for each — plus `nutrient_comparison`, the same fields pivoted per-nutrient with the highest/lowest food flagged, so "which has more iron" doesn't need re-deriving client-side.
+**`GET /foods/compare?foods=nsima,rice,potatoes`** *(API key, rate-limited, cached 1h)* — Nutrient Comparison: lines up 2-6 foods side by side. Resolves each name the same way `/foods/substitutes` does (local match, falling back to the external lookup cascade), then returns per-100g energy, protein, carbohydrate, fiber, fat, and the full micronutrient panel for each — plus `nutrient_comparison`, the same fields pivoted per-nutrient with the highest/lowest food flagged, so "which has more iron" doesn't need re-deriving client-side.
+
+**`GET /foods/convert?q=rice&amount=2&unit=cup`** *(API key, rate-limited, cached 1h)* — Household and standard measures for one food, either way round. Also `GET /foods/:id/convert?amount=&unit=` and `?id=`. Give a household measure (`tsp`, `tbsp`, `dsp`, `h dsp`, `cup`, `us cup`, `scoop 16`, or the food's own `chipande`, `piece`, `slice`) and get the standard weight; give a standard measure (`g`, `kg`, `oz`, `lb`, `ml`, `l`, `fl oz`) and get the household equivalents. Every reply carries both, plus the nutrients for that amount. It uses the same food matching and gram conversion as `POST /recipes/calculate`, so the numbers agree.
+
+```
+GET /foods/convert?q=rice&amount=2&unit=cup      → 300 g, 500 ml, 2 × "1 cup cooked rice (150g)", 33.3 tbsp, 10.6 oz, nutrients for 300 g
+GET /foods/convert?q=rice&amount=300&unit=g      → the same, starting from grams: 2 cups, 33.3 tbsp
+GET /foods/convert?q=nsima&amount=2&unit=chipande → 350 g
+GET /foods/convert?q=nsima&amount=350&unit=g     → 2 chipande
+```
+
+How a volume becomes grams: the food's own serving in that unit first (a "1 cup cooked rice (150g)" serving answers `cup`); otherwise the food's density, worked out from any cup or spoon serving it has (150 g in 250 ml = 0.6 g/ml, so 1 tbsp is 9 g); otherwise 1 g/ml, which is flagged in `assumptions[]`. When a weight is asked for and the food has no density, spoon and cup equivalents are left out rather than guessed, and the food's own servings (chipande, piece) are still given. `cup` is the 250 ml metric household cup; `us cup` is the 240 ml nutrition cup.
+
+When a name matches more than one food, the reply uses the best match, lists up to five others under `food.other_matches` and says so in `warnings[]`; repeat with `id=` to pick a different one. `warnings[]` also flags a cooked-food cup or spoon serving applied to a food that isn't named as cooked (for example *Rice, soaked* using the "1 cup cooked rice (150g)" serving), because a cup of raw or soaked rice weighs differently. The food's own servings under `household.servings` leave out the plain "100g" restatement.
+
+**`GET /measures`** *(API key, rate-limited, cached 24h)* — every unit with its size, aliases and source, the printed reference tables as published, and the #6-#60 portion scoop sizes. Sources: the University of Cape Town Division of Human Nutrition *Household Measurements Guide*, the *Kitchen Measurement Conversion Tables*, and Krause and Mahan's *Food & the Nutrition Care Process* (16th ed.) Appendix 2. `?section=units|scoop_sizes|reference_tables|sources` returns one part. **`GET /measures/convert?amount=3&from=tbsp&to=ml`** converts unit to unit with no food (volume to volume, weight to weight; leave out `to` for every unit of that kind). The printed kitchen table rounds ounces (8 oz is printed as 240 g); calculations use 28.35 g per ounce.
 
 Glycaemic considerations are included **only where a published, sourced value exists** — nothing is estimated or guessed. Each food gets either a `glycaemic.entries[]` (measured GI/GL with citation, from the `glycaemic_index_data` reference table — see below) or `glycaemic: null` plus a clearly-labelled `glycaemic_note` heuristic (fiber-to-carbohydrate ratio only, explicitly not presented as a GI value).
 
@@ -823,23 +1036,23 @@ Note the Malawi-specific nsima entries above come from an actual local study (Ml
 
 ### Glycaemic Index / Load Reference (`/glycaemic-index`)
 
-Standalone reference table backing the `glycaemic` block on `GET /foods/compare` (see [`sql/004_add_glycaemic_index.sql`](sql/004_add_glycaemic_index.sql)). Kept separate from `foods` because GI/GL is measured per specific preparation/variety and rarely lines up 1:1 with an FCT row — rows are matched to a food name by keyword (`match_keywords`, e.g. `["nsima", "maize", "cornmeal"]`) at query time instead of a foreign key.
+Standalone reference table backing the `glycaemic` block on `GET /foods/compare` (see [`sql/004_add_glycaemic_index.sql`](../sql/004_add_glycaemic_index.sql)). Kept separate from `foods` because GI/GL is measured per specific preparation/variety and rarely lines up 1:1 with an FCT row — rows are matched to a food name by keyword (`match_keywords`, e.g. `["nsima", "maize", "cornmeal"]`) at query time instead of a foreign key.
 
 - `GET /glycaemic-index` — `search` (matches `food_name`), standard pagination
 - `GET /glycaemic-index/:id`
 - `POST /glycaemic-index` *(admin)* — requires `food_name`, `match_keywords` (non-empty array), and `source` (citation) — GI/GL values are never accepted without a traceable source
-- `POST /glycaemic-index/bulk` *(admin)* — see [Bulk insert](#bulk-insert); seed file: [`scripts/glycaemic_index_seed.json`](scripts/glycaemic_index_seed.json)
+- `POST /glycaemic-index/bulk` *(admin)* — see [Bulk insert](#bulk-insert); seed file: [`scripts/glycaemic_index_seed.json`](../scripts/glycaemic_index_seed.json)
 - `PUT` / `PATCH` / `DELETE /glycaemic-index/:id` *(admin)*
 
 The bundled seed covers Malawi's three nsima processing variants (Mlotha et al. 2016 — the only Malawi-specific GI study found), white/brown rice, boiled/mashed potato, boiled sweet potato, and cassava (flagged as high-variance/no regional consensus rather than given a single confident number). Extend it the same way as `drug_nutrient_interactions_seed.json` — add rows with a real citation, then `POST /glycaemic-index/bulk`.
 
 ### BMI-for-Age (`/bmi-for-age`)
 
-WHO 2007 BMI-for-age reference for children and adolescents from 5y 1m to 19y 0m (61 to 228 completed months), as printed in the Malawi Ministry of Health guide *Eat Well to Live Well* (2021), Annex 2. Table: [`sql/012_add_bmi_for_age.sql`](sql/012_add_bmi_for_age.sql), 336 rows (168 girls, 168 boys), one per sex per age in months, each with the -3SD to +3SD BMI cut-offs. Values are transcribed from the guide, not estimated. Classification logic: [`src/bmiForAge.js`](src/bmiForAge.js).
+WHO 2007 BMI-for-age reference for children and adolescents from 5y 1m to 19y 0m (61 to 228 completed months), as printed in the Malawi Ministry of Health guide *Eat Well to Live Well* (2021), Annex 2. Table: [`sql/012_add_bmi_for_age.sql`](../sql/012_add_bmi_for_age.sql), 336 rows (168 girls, 168 boys), one per sex per age in months, each with the -3SD to +3SD BMI cut-offs. Values are transcribed from the guide, not estimated. Classification logic: [`src/bmiForAge.js`](../src/bmiForAge.js).
 
-- `GET /bmi-for-age/classify` *(public, rate-limited, cached 1h)* — `sex` (`girls` or `boys`; `girl`/`boy`/`female`/`male`/`f`/`m` also accepted), `age_months` (whole number, years x 12 + months, so 7y 11m = 95), and either `bmi` or both `weight_kg` and `height_cm`. Returns `status`, the rounded `bmi`, and the `cutoffs` used.
+- `GET /bmi-for-age/classify` *(API key, rate-limited, cached 1h)* — `sex` (`girls` or `boys`; `girl`/`boy`/`female`/`male`/`f`/`m` also accepted), `age_months` (whole number, years x 12 + months, so 7y 11m = 95), and either `bmi` or both `weight_kg` and `height_cm`. Returns `status`, the rounded `bmi`, and the `cutoffs` used.
 - `GET /bmi-for-age` — the raw reference rows; optional `sex` and `age_months` filters, standard pagination.
-- `POST /bmi-for-age/bulk` *(admin)* — see [Bulk insert](#bulk-insert); seed file: [`scripts/bmi_for_age_seed.json`](scripts/bmi_for_age_seed.json). A unique `(sex, age_months)` constraint rejects a second seeding attempt instead of duplicating rows.
+- `POST /bmi-for-age/bulk` *(admin)* — see [Bulk insert](#bulk-insert); seed file: [`scripts/bmi_for_age_seed.json`](../scripts/bmi_for_age_seed.json). A unique `(sex, age_months)` constraint rejects a second seeding attempt instead of duplicating rows.
 
 ```
 GET /bmi-for-age/classify?sex=girls&age_months=95&weight_kg=26&height_cm=121.1
@@ -862,11 +1075,11 @@ Cut-offs (strict inequalities, compared against the **unrounded** BMI, so a disp
 
 ### Head Circumference Velocity (`/hc-velocity`)
 
-WHO Child Growth Standards 6-month head circumference **increments** (simplified field tables), birth to 24 months, -3 SD to +3 SD, for girls and boys. Table: [`sql/018_add_who_hc_velocity.sql`](sql/018_add_who_hc_velocity.sql), 38 rows (19 girls + 19 boys), one per sex per 6-month window (0-6, 1-7, ... 18-24 months). Values are transcribed from the printed tables, not estimated. Logic: [`src/hcVelocity.js`](src/hcVelocity.js). This is how fast the head grew over a window, **not** head circumference for age.
+WHO Child Growth Standards 6-month head circumference **increments** (simplified field tables), birth to 24 months, -3 SD to +3 SD, for girls and boys. Table: [`sql/018_add_who_hc_velocity.sql`](../sql/018_add_who_hc_velocity.sql), 38 rows (19 girls + 19 boys), one per sex per 6-month window (0-6, 1-7, ... 18-24 months). Values are transcribed from the printed tables, not estimated. Logic: [`src/hcVelocity.js`](../src/hcVelocity.js). This is how fast the head grew over a window, **not** head circumference for age.
 
-- `GET /hc-velocity/classify` *(public, rate-limited, cached 1h)* — `sex`, `start_age_months` (0-18, whole months at the first measurement; 3 means the 3-9 month window), and either `increment_cm` or both `hc_start_cm` and `hc_end_cm`. Optional `end_age_months` must equal start + 6. Returns `status`, `increment_cm`, `z_approx` (interpolated between the printed SDs, null beyond -3 or +3) and the `cutoffs` used.
+- `GET /hc-velocity/classify` *(API key, rate-limited, cached 1h)* — `sex`, `start_age_months` (0-18, whole months at the first measurement; 3 means the 3-9 month window), and either `increment_cm` or both `hc_start_cm` and `hc_end_cm`. Optional `end_age_months` must equal start + 6. Returns `status`, `increment_cm`, `z_approx` (interpolated between the printed SDs, null beyond -3 or +3) and the `cutoffs` used.
 - `GET /hc-velocity` — the raw reference rows; optional `sex` and `start_age_months` filters, standard pagination.
-- `POST /hc-velocity/bulk` *(admin)* — see [Bulk insert](#bulk-insert); seed file: [`scripts/who_hc_velocity_seed.json`](scripts/who_hc_velocity_seed.json). A unique `(sex, interval_start_months)` constraint rejects a second seeding attempt.
+- `POST /hc-velocity/bulk` *(admin)* — see [Bulk insert](#bulk-insert); seed file: [`scripts/who_hc_velocity_seed.json`](../scripts/who_hc_velocity_seed.json). A unique `(sex, interval_start_months)` constraint rejects a second seeding attempt.
 
 Bands (strict): very low < -3SD, low < -2SD, within expected range -2SD to +2SD, high > +2SD, very high > +3SD. Screening aid only, not a diagnosis; interpret with head circumference for age and clinical context.
 
@@ -878,11 +1091,11 @@ Setup: run `sql/018_add_who_hc_velocity.sql` in the Supabase SQL editor, then `P
 
 ### Length Velocity (`/length-velocity`)
 
-WHO Child Growth Standards 6-month length **increments** (simplified field tables), birth to 24 months, -3 SD to +3 SD, for girls and boys. Table: [`sql/019_add_who_length_velocity.sql`](sql/019_add_who_length_velocity.sql), 38 rows (19 girls + 19 boys), one per sex per 6-month window (0-6, 1-7, ... 18-24 months). Values are transcribed from the printed tables, not estimated. Logic: [`src/lengthVelocity.js`](src/lengthVelocity.js) (classification shared with `src/hcVelocity.js`). This is how fast the child grew over a window, **not** length for age.
+WHO Child Growth Standards 6-month length **increments** (simplified field tables), birth to 24 months, -3 SD to +3 SD, for girls and boys. Table: [`sql/019_add_who_length_velocity.sql`](../sql/019_add_who_length_velocity.sql), 38 rows (19 girls + 19 boys), one per sex per 6-month window (0-6, 1-7, ... 18-24 months). Values are transcribed from the printed tables, not estimated. Logic: [`src/lengthVelocity.js`](../src/lengthVelocity.js) (classification shared with `src/hcVelocity.js`). This is how fast the child grew over a window, **not** length for age.
 
-- `GET /length-velocity/classify` *(public, rate-limited, cached 1h)* — `sex`, `start_age_months` (0-18, whole months at the first measurement; 3 means the 3-9 month window), and either `increment_cm` or both `length_start_cm` and `length_end_cm`. Optional `end_age_months` must equal start + 6. Returns `status`, `increment_cm`, `z_approx` (interpolated between the printed SDs, null beyond -3 or +3) and the `cutoffs` used.
+- `GET /length-velocity/classify` *(API key, rate-limited, cached 1h)* — `sex`, `start_age_months` (0-18, whole months at the first measurement; 3 means the 3-9 month window), and either `increment_cm` or both `length_start_cm` and `length_end_cm`. Optional `end_age_months` must equal start + 6. Returns `status`, `increment_cm`, `z_approx` (interpolated between the printed SDs, null beyond -3 or +3) and the `cutoffs` used.
 - `GET /length-velocity` — the raw reference rows; optional `sex` and `start_age_months` filters, standard pagination.
-- `POST /length-velocity/bulk` *(admin)* — see [Bulk insert](#bulk-insert); seed file: [`scripts/who_length_velocity_seed.json`](scripts/who_length_velocity_seed.json). A unique `(sex, interval_start_months)` constraint rejects a second seeding attempt.
+- `POST /length-velocity/bulk` *(admin)* — see [Bulk insert](#bulk-insert); seed file: [`scripts/who_length_velocity_seed.json`](../scripts/who_length_velocity_seed.json). A unique `(sex, interval_start_months)` constraint rejects a second seeding attempt.
 
 Bands (strict): very low < -3SD, low < -2SD, within expected range -2SD to +2SD, high > +2SD, very high > +3SD. Screening aid only, not a diagnosis; use recumbent length measured the same way at both visits, and interpret with length-for-age, weight-for-length and clinical context.
 
@@ -894,13 +1107,13 @@ Setup: run `sql/019_add_who_length_velocity.sql` in the Supabase SQL editor, the
 
 ### Weight Velocity (`/weight-velocity`)
 
-WHO Child Growth Standards 6-month weight **increments in grams** (simplified field tables), birth to 24 months, for girls and boys. Table: [`sql/020_add_who_weight_velocity.sql`](sql/020_add_who_weight_velocity.sql), 38 rows (19 girls + 19 boys), one per sex per 6-month window (0-6, 1-7, ... 18-24 months). Logic: [`src/weightVelocity.js`](src/weightVelocity.js). This is how much weight the child gained over a window, **not** weight for age.
+WHO Child Growth Standards 6-month weight **increments in grams** (simplified field tables), birth to 24 months, for girls and boys. Table: [`sql/020_add_who_weight_velocity.sql`](../sql/020_add_who_weight_velocity.sql), 38 rows (19 girls + 19 boys), one per sex per 6-month window (0-6, 1-7, ... 18-24 months). Logic: [`src/weightVelocity.js`](../src/weightVelocity.js). This is how much weight the child gained over a window, **not** weight for age.
 
 **Where the numbers come from:** the -3 SD to +3 SD cut-offs for both sexes are transcribed from the printed WHO z-score tables. Each row also stores that table's L, M, S and Delta parameters, so the API returns an exact z-score and percentile (`z = (((x + Delta) / M)^L - 1) / (L*S)`) as well as the band. A unit test re-checks all 266 stored cut-offs against their own L, M, S and Delta within 1 g.
 
-- `GET /weight-velocity/classify` *(public, rate-limited, cached 1h)* — `sex`, `start_age_months` (0-18, whole months at the first weighing; 3 means the 3-9 month window), and either `increment_g` (grams) or both `weight_start_kg` and `weight_end_kg` (kilograms). Optional `end_age_months` must equal start + 6. Returns `status`, `increment_g`, `z_score`, `percentile` and the `cutoffs` (grams) used. `z_score` and `percentile` are `null` when the Delta-shifted increment is not positive.
+- `GET /weight-velocity/classify` *(API key, rate-limited, cached 1h)* — `sex`, `start_age_months` (0-18, whole months at the first weighing; 3 means the 3-9 month window), and either `increment_g` (grams) or both `weight_start_kg` and `weight_end_kg` (kilograms). Optional `end_age_months` must equal start + 6. Returns `status`, `increment_g`, `z_score`, `percentile` and the `cutoffs` (grams) used. `z_score` and `percentile` are `null` when the Delta-shifted increment is not positive.
 - `GET /weight-velocity` — the raw reference rows including L, M, S and Delta; optional `sex` and `start_age_months` filters, standard pagination.
-- `POST /weight-velocity/bulk` *(admin)* — see [Bulk insert](#bulk-insert); seed file: [`scripts/who_weight_velocity_seed.json`](scripts/who_weight_velocity_seed.json). A unique `(sex, interval_start_months)` constraint rejects a second seeding attempt.
+- `POST /weight-velocity/bulk` *(admin)* — see [Bulk insert](#bulk-insert); seed file: [`scripts/who_weight_velocity_seed.json`](../scripts/who_weight_velocity_seed.json). A unique `(sex, interval_start_months)` constraint rejects a second seeding attempt.
 
 Bands (strict): very low < -3SD, low < -2SD, within expected range -2SD to +2SD, high > +2SD, very high > +3SD. Increments can legitimately be near zero or negative in the second year (the late-window -3 SD cut-offs are around 0 g or below). Screening aid only, not a diagnosis; weight gain varies with illness, feeding and scale error, so repeat on the same scale and interpret with weight-for-age and weight-for-length.
 
@@ -912,13 +1125,13 @@ Setup: run `sql/020_add_who_weight_velocity.sql` in the Supabase SQL editor, the
 
 ### MUAC-for-age (`/muac-for-age`)
 
-WHO Child Growth Standards **arm circumference-for-age** (cm), 3 to 60 months, girls and boys. Table: [`sql/021_add_who_muac_for_age.sql`](sql/021_add_who_muac_for_age.sql), one row per sex per completed month, taken from WHO's expanded daily table at day = round(months x 30.4375). Logic: [`src/muacForAge.js`](src/muacForAge.js). This is MUAC as a **z-score for age**, not the fixed-cut-off MUAC tape used in community screening (115 mm / 125 mm).
+WHO Child Growth Standards **arm circumference-for-age** (cm), 3 to 60 months, girls and boys. Table: [`sql/021_add_who_muac_for_age.sql`](../sql/021_add_who_muac_for_age.sql), one row per sex per completed month, taken from WHO's expanded daily table at day = round(months x 30.4375). Logic: [`src/muacForAge.js`](../src/muacForAge.js). This is MUAC as a **z-score for age**, not the fixed-cut-off MUAC tape used in community screening (115 mm / 125 mm).
 
 **Where the numbers come from:** the -3 SD to +3 SD cut-offs are transcribed from the WHO expanded z-score tables, and each row stores that table's L, M and S, so the API returns an exact z-score and percentile (`z = ((x / M)^L - 1) / (L*S)`; beyond +/-3 SD WHO's linear extension is used). A unit test re-checks every stored cut-off against its own L, M, S within 0.001 cm.
 
-- `GET /muac-for-age/classify` *(public, rate-limited, cached 1h)* — `sex`, `age_months` (3-60, whole months), and `muac_cm` or `muac_mm`. Returns `status`, `muac_cm`, `z_score`, `percentile` and the `cutoffs` (cm) used.
+- `GET /muac-for-age/classify` *(API key, rate-limited, cached 1h)* — `sex`, `age_months` (3-60, whole months), and `muac_cm` or `muac_mm`. Returns `status`, `muac_cm`, `z_score`, `percentile` and the `cutoffs` (cm) used.
 - `GET /muac-for-age` — raw reference rows including L, M, S; optional `sex` and `age_months` filters, standard pagination.
-- `POST /muac-for-age/bulk` *(admin)* — see [Bulk insert](#bulk-insert); seed files: [`scripts/muac_for_age_seed.json`](scripts/muac_for_age_seed.json) (months 3-35) and [`scripts/muac_for_age_seed_36_60.json`](scripts/muac_for_age_seed_36_60.json) (months 36-60, from WHO's monthly 3-5 year tables, cut-offs recomputed from the printed L, M, S); post each once. A unique `(sex, age_months)` constraint rejects re-seeding of months already present, so the table can be loaded in more than one file. Regenerate or extend the seed with `node scripts/build_muac_seed.mjs <girls.txt> <boys.txt>` (months missing from the input are skipped and listed).
+- `POST /muac-for-age/bulk` *(admin)* — see [Bulk insert](#bulk-insert); seed files: [`scripts/muac_for_age_seed.json`](../scripts/muac_for_age_seed.json) (months 3-35) and [`scripts/muac_for_age_seed_36_60.json`](../scripts/muac_for_age_seed_36_60.json) (months 36-60, from WHO's monthly 3-5 year tables, cut-offs recomputed from the printed L, M, S); post each once. A unique `(sex, age_months)` constraint rejects re-seeding of months already present, so the table can be loaded in more than one file. Regenerate or extend the seed with `node scripts/build_muac_seed.mjs <girls.txt> <boys.txt>` (months missing from the input are skipped and listed).
 
 Bands (strict): very low < -3SD, low < -2SD, within expected range -2SD to +2SD, high > +2SD, very high > +3SD. Screening aid only, not a diagnosis.
 
@@ -930,7 +1143,7 @@ Setup: run `sql/021_add_who_muac_for_age.sql` in the Supabase SQL editor, then `
 
 ### MUAC fixed cut-offs (`/muac`)
 
-Severe / moderate / normal classification of mid-upper arm circumference by age group, 6 months to adult. Logic: [`src/muacFixed.js`](src/muacFixed.js). No database table and nothing to seed. Source: WHO, *Guideline for Integrated Approach to the National Care of HIV Infected Children (6 months - 14 years)*, 2008, as reproduced in the FANTA Ethiopia MUAC chart.
+Severe / moderate / normal classification of mid-upper arm circumference by age group, 6 months to adult. Logic: [`src/muacFixed.js`](../src/muacFixed.js). No database table and nothing to seed. Source: WHO, *Guideline for Integrated Approach to the National Care of HIV Infected Children (6 months - 14 years)*, 2008, as reproduced in the FANTA Ethiopia MUAC chart.
 
 | Age | Severe | Moderate | Normal |
 |---|---|---|---|
@@ -940,7 +1153,7 @@ Severe / moderate / normal classification of mid-upper arm circumference by age 
 | 10-14 years | < 16 cm | 16-18 cm | > 18 cm |
 | Adults (15 y+) | < 18 cm | 18-21 cm | > 21 cm |
 
-- `GET /muac/classify` *(public, rate-limited, cached 1h)* — `age_months` (6 or more, whole months), `muac_cm` or `muac_mm`, optional `scheme` (`who_hiv_2008` default, or `cmam`). Returns `age_group`, `status`, `muac_cm` and the `cutoffs_cm` used. Moderate includes both end values.
+- `GET /muac/classify` *(API key, rate-limited, cached 1h)* — `age_months` (6 or more, whole months), `muac_cm` or `muac_mm`, optional `scheme` (`who_hiv_2008` default, or `cmam`). Returns `age_group`, `status`, `muac_cm` and the `cutoffs_cm` used. Moderate includes both end values.
 
 **`scheme=cmam` (6-59 months only):** add `&scheme=cmam` for the WHO/UNICEF community screening cut-offs used by CMAM programmes: below 11.5 cm severe, 11.5 to below 12.5 cm moderate, 12.5 cm and above normal (note 12.5 itself is normal here, unlike the chart above where the upper end value is moderate). The default is `scheme=who_hiv_2008`, the chart above. The two differ for 6-59 months, so check which one your programme follows. For MUAC as a z-score for age see [`/muac-for-age`](#muac-for-age-muac-for-age).
 
@@ -950,13 +1163,13 @@ GET /muac/classify?age_months=18&muac_cm=11.8
 
 ### Length/height-for-age (`/length-height-for-age`)
 
-WHO **length/height-for-age** (cm), birth to 19 years, girls and boys (the stunting indicator): the 2006 Child Growth Standards for 0-60 months and the 2007 growth reference for 61-228 months (5y 1m to 19y 0m). Table: [`sql/022_add_who_length_height_for_age.sql`](sql/022_add_who_length_height_for_age.sql), widened to 19 years by [`sql/023_extend_length_height_for_age_to_19y.sql`](sql/023_extend_length_height_for_age_to_19y.sql); 460 rows in total (124 + 336). Logic: [`src/lengthHeightForAge.js`](src/lengthHeightForAge.js). Source: WHO monthly z-score tables, length-for-age (birth to 2 years, lying down) and height-for-age (2 to 5 years, standing). Month 24 is in both tables, so it has a lying row and a standing row (they differ by about 0.7 cm).
+WHO **length/height-for-age** (cm), birth to 19 years, girls and boys (the stunting indicator): the 2006 Child Growth Standards for 0-60 months and the 2007 growth reference for 61-228 months (5y 1m to 19y 0m). Table: [`sql/022_add_who_length_height_for_age.sql`](../sql/022_add_who_length_height_for_age.sql), widened to 19 years by [`sql/023_extend_length_height_for_age_to_19y.sql`](../sql/023_extend_length_height_for_age_to_19y.sql); 460 rows in total (124 + 336). Logic: [`src/lengthHeightForAge.js`](../src/lengthHeightForAge.js). Source: WHO monthly z-score tables, length-for-age (birth to 2 years, lying down) and height-for-age (2 to 5 years, standing). Month 24 is in both tables, so it has a lying row and a standing row (they differ by about 0.7 cm).
 
 **Where the numbers come from:** each row stores the table's L, M, S, and the -3 SD to +3 SD cut-offs are recomputed from them to 3 decimals (the printed ones are rounded to 1 decimal). A unit test re-checks every row. L is 1 in these tables, so `z = (x - M) / (M*S)`. Rebuild the 0-5 year seed with `python3 scripts/build_lhfa_seed.py <girls_0_2.xlsx> <girls_2_5.xlsx> <boys_0_2.xlsx> <boys_2_5.xlsx>` and the 5-19 year seed with `python3 scripts/build_hfa_5_19_seed.py <girls.xlsx> <boys.xlsx>`. The 5-19 year cut-offs are the printed WHO 3-decimal values.
 
-- `GET /length-height-for-age/classify` *(public, rate-limited, cached 1h)* — `sex`, `age_months` (0-228), and `length_cm` or `height_cm` (or the `_mm` versions). Optional `measured=lying|standing`; the default is lying under 24 months and standing from 24. If the child was measured the other way, 0.7 cm is subtracted (lying value on a child 24 months or older) or added (standing value on a child under 24 months), and `position_adjustment` says so. Returns `status`, `reference`, `value_cm`, `z_score`, `percentile`, `implausible` and the `cutoffs` (cm).
+- `GET /length-height-for-age/classify` *(API key, rate-limited, cached 1h)* — `sex`, `age_months` (0-228), and `length_cm` or `height_cm` (or the `_mm` versions). Optional `measured=lying|standing`; the default is lying under 24 months and standing from 24. If the child was measured the other way, 0.7 cm is subtracted (lying value on a child 24 months or older) or added (standing value on a child under 24 months), and `position_adjustment` says so. Returns `status`, `reference`, `value_cm`, `z_score`, `percentile`, `implausible` and the `cutoffs` (cm).
 - `GET /length-height-for-age` — raw reference rows including L, M, S; optional `sex` and `age_months` filters, standard pagination.
-- `POST /length-height-for-age/bulk` *(admin)* — see [Bulk insert](#bulk-insert); seed files: [`scripts/length_height_for_age_seed.json`](scripts/length_height_for_age_seed.json) (0-60 months) and [`scripts/height_for_age_5_19_seed.json`](scripts/height_for_age_5_19_seed.json) (61-228 months; run `sql/023` first). A unique `(sex, age_months, measured)` constraint rejects re-seeding.
+- `POST /length-height-for-age/bulk` *(admin)* — see [Bulk insert](#bulk-insert); seed files: [`scripts/length_height_for_age_seed.json`](../scripts/length_height_for_age_seed.json) (0-60 months) and [`scripts/height_for_age_5_19_seed.json`](../scripts/height_for_age_5_19_seed.json) (61-228 months; run `sql/023` first). A unique `(sex, age_months, measured)` constraint rejects re-seeding.
 
 Bands (strict): severely stunted < -3SD, stunted < -2SD, normal -2SD to +2SD, tall > +2SD, very tall > +3SD. `implausible` is true when |z| > 6 (usually a measuring or recording error). Screening aid only, not a diagnosis.  Note the small step at 60/61 months where WHO switches from the 2006 standards to the 2007 reference.
 
@@ -968,13 +1181,13 @@ Setup: run `sql/022_add_who_length_height_for_age.sql` then `sql/023_extend_leng
 
 ### Weight-for-age (`/weight-for-age`)
 
-WHO **weight-for-age** (kg), birth to 10 years, girls and boys (the underweight indicator): the 2006 Child Growth Standards for 0-60 months and the 2007 growth reference for 61-120 months. WHO does not publish weight-for-age beyond 10 years; older children use [BMI-for-age](#bmi-for-age-bmi-for-age). Table: [`sql/024_add_who_weight_for_age.sql`](sql/024_add_who_weight_for_age.sql), 242 rows. Logic: [`src/weightForAge.js`](src/weightForAge.js).
+WHO **weight-for-age** (kg), birth to 10 years, girls and boys (the underweight indicator): the 2006 Child Growth Standards for 0-60 months and the 2007 growth reference for 61-120 months. WHO does not publish weight-for-age beyond 10 years; older children use [BMI-for-age](#bmi-for-age-bmi-for-age). Table: [`sql/024_add_who_weight_for_age.sql`](../sql/024_add_who_weight_for_age.sql), 242 rows. Logic: [`src/weightForAge.js`](../src/weightForAge.js).
 
 **Where the numbers come from:** each row stores the table's L, M, S. The 0-60 month cut-offs are recomputed from them to 3 decimals (the printed ones are rounded to 1 decimal); the 61-120 month cut-offs are WHO's printed 3-decimal values. A unit test re-checks every row. `z = ((x/M)^L - 1) / (L*S)`, and beyond +/-3 SD WHO's linear extension is used. Rebuild the seed with `python3 scripts/build_wfa_seed.py <girls_0_5.xlsx> <boys_0_5.xlsx> <girls_5_10.xlsx> <boys_5_10.xlsx>`.
 
-- `GET /weight-for-age/classify` *(public, rate-limited, cached 1h)* — `sex`, `age_months` (0-120), and `weight_kg` or `weight_g`. Returns `status`, `weight_kg`, `z_score`, `percentile`, `implausible` and the `cutoffs` (kg) used.
+- `GET /weight-for-age/classify` *(API key, rate-limited, cached 1h)* — `sex`, `age_months` (0-120), and `weight_kg` or `weight_g`. Returns `status`, `weight_kg`, `z_score`, `percentile`, `implausible` and the `cutoffs` (kg) used.
 - `GET /weight-for-age` — raw reference rows including L, M, S; optional `sex` and `age_months` filters, standard pagination.
-- `POST /weight-for-age/bulk` *(admin)* — see [Bulk insert](#bulk-insert); seed file: [`scripts/weight_for_age_seed.json`](scripts/weight_for_age_seed.json). A unique `(sex, age_months)` constraint rejects re-seeding.
+- `POST /weight-for-age/bulk` *(admin)* — see [Bulk insert](#bulk-insert); seed file: [`scripts/weight_for_age_seed.json`](../scripts/weight_for_age_seed.json). A unique `(sex, age_months)` constraint rejects re-seeding.
 
 Bands (strict): severely underweight < -3SD, underweight < -2SD, normal -2SD to +2SD, high weight-for-age > +2SD, very high > +3SD. `implausible` is true when z < -6 or z > +5 (usually a measuring or recording error). Weight-for-age is **not** used to diagnose overweight or obesity (use weight-for-length/height under 5 years, BMI-for-age from 5 years), and it cannot tell wasting from stunting. There is a small step at 60/61 months where WHO switches from the 2006 standards to the 2007 reference. Screening aid only, not a diagnosis.
 
@@ -986,11 +1199,11 @@ Setup: run `sql/024_add_who_weight_for_age.sql` in the Supabase SQL editor, then
 
 ### Weight-for-length/height (`/weight-for-length-height`)
 
-WHO Child Growth Standards **weight-for-length** (birth to 2 years, lying down, 45.0-110.0 cm) and **weight-for-height** (2 to 5 years, standing, 65.0-120.0 cm), girls and boys (the wasting indicator, central to acute malnutrition screening). Table: [`sql/025_add_who_weight_for_length_height.sql`](sql/025_add_who_weight_for_length_height.sql), 2404 rows in 0.1 cm steps. Logic: [`src/weightForLengthHeight.js`](src/weightForLengthHeight.js).
+WHO Child Growth Standards **weight-for-length** (birth to 2 years, lying down, 45.0-110.0 cm) and **weight-for-height** (2 to 5 years, standing, 65.0-120.0 cm), girls and boys (the wasting indicator, central to acute malnutrition screening). Table: [`sql/025_add_who_weight_for_length_height.sql`](../sql/025_add_who_weight_for_length_height.sql), 2404 rows in 0.1 cm steps. Logic: [`src/weightForLengthHeight.js`](../src/weightForLengthHeight.js).
 
 **How it works:** the child's **age** picks the table (lying under 24 months, standing from 24), and the length/height, rounded to the nearest 0.1 cm, picks the row. If the child was measured the other way for their age, 0.7 cm is subtracted (lying value on a child 24 months or older) or added (standing value on a child under 24 months), and `position_adjustment` says so (same convention as `/length-height-for-age`). Each row stores the table's L, M, S and WHO's printed 3-decimal -3 SD to +3 SD cut-offs; a unit test re-checks all 2404 rows. `z = ((x/M)^L - 1) / (L*S)`, with WHO's linear extension beyond +/-3 SD. Rebuild the seed with `python3 scripts/build_wflh_seed.py <wfl_girls.xlsx> <wfh_girls.xlsx> <wfl_boys.xlsx> <wfh_boys.xlsx>`.
 
-- `GET /weight-for-length-height/classify` *(public, rate-limited, cached 1h)* — `sex`, `age_months` (0-60), `weight_kg` or `weight_g`, and `length_cm` or `height_cm` (or the `_mm` versions); optional `measured=lying|standing`. Returns `status`, `reference`, `weight_kg`, `z_score`, `percentile`, `implausible`, the `cutoffs` (kg) and the length/height actually used. A length/height outside the table (under 45 or over 110 cm lying; under 65 or over 120 cm standing) returns 422.
+- `GET /weight-for-length-height/classify` *(API key, rate-limited, cached 1h)* — `sex`, `age_months` (0-60), `weight_kg` or `weight_g`, and `length_cm` or `height_cm` (or the `_mm` versions); optional `measured=lying|standing`. Returns `status`, `reference`, `weight_kg`, `z_score`, `percentile`, `implausible`, the `cutoffs` (kg) and the length/height actually used. A length/height outside the table (under 45 or over 110 cm lying; under 65 or over 120 cm standing) returns 422.
 - `GET /weight-for-length-height` — raw reference rows; optional `sex`, `measured` and `length_height_cm` filters, standard pagination.
 - `POST /weight-for-length-height/bulk` *(admin)* — see [Bulk insert](#bulk-insert); five seed parts of at most 500 rows: `scripts/weight_for_length_height_seed_1.json` to `_5.json`. A unique `(sex, measured, length_height_cm)` constraint rejects re-seeding.
 
@@ -1004,13 +1217,13 @@ Setup: run `sql/025_add_who_weight_for_length_height.sql` in the Supabase SQL ed
 
 ### BMI-for-age under 5 (`/bmi-for-age-under-5`)
 
-WHO Child Growth Standards **BMI-for-age** (kg/m2), birth to 5 years, girls and boys. The 5-19 year table is [`/bmi-for-age`](#bmi-for-age-bmi-for-age) (Malawi MoH guide), which is unchanged. Table: [`sql/026_add_who_bmi_for_age_under_5.sql`](sql/026_add_who_bmi_for_age_under_5.sql), 124 rows (birth to 2 years, lying length; 2 to 5 years, standing height; month 24 has both). Logic: [`src/bmiForAgeUnder5.js`](src/bmiForAgeUnder5.js).
+WHO Child Growth Standards **BMI-for-age** (kg/m2), birth to 5 years, girls and boys. The 5-19 year table is [`/bmi-for-age`](#bmi-for-age-bmi-for-age) (Malawi MoH guide), which is unchanged. Table: [`sql/026_add_who_bmi_for_age_under_5.sql`](../sql/026_add_who_bmi_for_age_under_5.sql), 124 rows (birth to 2 years, lying length; 2 to 5 years, standing height; month 24 has both). Logic: [`src/bmiForAgeUnder5.js`](../src/bmiForAgeUnder5.js).
 
 **How it works:** the child's **age** picks the table (lying under 24 months, standing from 24). Pass `weight_kg` (or `weight_g`) with `length_cm` or `height_cm` and the API computes BMI, or pass `bmi` directly. If the child was measured the other way for their age, 0.7 cm is subtracted (lying value, 24 months or older) or added (standing value, under 24 months) **before** BMI is computed, and `position_adjustment` says so (as in WHO Anthro; a BMI passed directly cannot be adjusted). Each row stores the table's L, M, S; the cut-offs are recomputed from them to 3 decimals (the printed ones are rounded to 1 decimal) and a unit test re-checks every row. Rebuild the seed with `python3 scripts/build_bmi_under5_seed.py <girls_0_2.xlsx> <girls_2_5.xlsx> <boys_0_2.xlsx> <boys_2_5.xlsx>`.
 
-- `GET /bmi-for-age-under-5/classify` *(public, rate-limited, cached 1h)* — `sex`, `age_months` (0-60), and either `bmi`, or `weight_kg`/`weight_g` with `length_cm`/`height_cm` (or `_mm`); optional `measured=lying|standing`. Returns `status`, `reference`, `bmi`, `z_score`, `percentile`, `implausible` and the `cutoffs` (kg/m2).
+- `GET /bmi-for-age-under-5/classify` *(API key, rate-limited, cached 1h)* — `sex`, `age_months` (0-60), and either `bmi`, or `weight_kg`/`weight_g` with `length_cm`/`height_cm` (or `_mm`); optional `measured=lying|standing`. Returns `status`, `reference`, `bmi`, `z_score`, `percentile`, `implausible` and the `cutoffs` (kg/m2).
 - `GET /bmi-for-age-under-5` — raw reference rows including L, M, S; optional `sex` and `age_months` filters, standard pagination.
-- `POST /bmi-for-age-under-5/bulk` *(admin)* — see [Bulk insert](#bulk-insert); seed file: [`scripts/bmi_for_age_under5_seed.json`](scripts/bmi_for_age_under5_seed.json). A unique `(sex, age_months, measured)` constraint rejects re-seeding.
+- `POST /bmi-for-age-under-5/bulk` *(admin)* — see [Bulk insert](#bulk-insert); seed file: [`scripts/bmi_for_age_under5_seed.json`](../scripts/bmi_for_age_under5_seed.json). A unique `(sex, age_months, measured)` constraint rejects re-seeding.
 
 Bands (strict), same wording as weight-for-length/height: severe wasting < -3SD, moderate wasting < -2SD, normal -2SD to +1SD, possible risk of overweight > +1SD, overweight > +2SD, obesity > +3SD. `implausible` is true when |z| > 5. For acute malnutrition screening use it together with `/weight-for-length-height`, MUAC (`/muac/classify`) and clinical signs. Screening aid only, not a diagnosis.
 
@@ -1022,13 +1235,13 @@ Setup: run `sql/026_add_who_bmi_for_age_under_5.sql` in the Supabase SQL editor,
 
 ### Head circumference-for-age (`/hc-for-age`)
 
-WHO Child Growth Standards **head circumference-for-age** (cm), birth to 5 years, girls and boys. Table: [`sql/027_add_who_hc_for_age.sql`](sql/027_add_who_hc_for_age.sql), 122 rows (months 0-60). Logic: [`src/hcForAge.js`](src/hcForAge.js). This is the head size for the child's age; the 6-month **increment** is [`/hc-velocity`](#head-circumference-velocity-hc-velocity).
+WHO Child Growth Standards **head circumference-for-age** (cm), birth to 5 years, girls and boys. Table: [`sql/027_add_who_hc_for_age.sql`](../sql/027_add_who_hc_for_age.sql), 122 rows (months 0-60). Logic: [`src/hcForAge.js`](../src/hcForAge.js). This is the head size for the child's age; the 6-month **increment** is [`/hc-velocity`](#head-circumference-velocity-hc-velocity).
 
 **Where the numbers come from:** each row stores the table's L, M, S (L is 1, so `z = (x - M) / (M*S)`), and the -3 SD to +3 SD cut-offs are recomputed from them to 3 decimals (the printed ones are rounded to 1 decimal). A unit test re-checks every row. Head circumference is not weight-based, so there is no extension beyond +/-3 SD. Rebuild the seed with `python3 scripts/build_hcfa_seed.py <girls_0_5.xlsx> <boys_0_5.xlsx>`.
 
-- `GET /hc-for-age/classify` *(public, rate-limited, cached 1h)* — `sex`, `age_months` (0-60), and `hc_cm` or `hc_mm`. Returns `status`, `hc_cm`, `z_score`, `percentile`, `implausible` and the `cutoffs` (cm).
+- `GET /hc-for-age/classify` *(API key, rate-limited, cached 1h)* — `sex`, `age_months` (0-60), and `hc_cm` or `hc_mm`. Returns `status`, `hc_cm`, `z_score`, `percentile`, `implausible` and the `cutoffs` (cm).
 - `GET /hc-for-age` — raw reference rows including L, M, S; optional `sex` and `age_months` filters, standard pagination.
-- `POST /hc-for-age/bulk` *(admin)* — see [Bulk insert](#bulk-insert); seed file: [`scripts/hc_for_age_seed.json`](scripts/hc_for_age_seed.json). A unique `(sex, age_months)` constraint rejects re-seeding.
+- `POST /hc-for-age/bulk` *(admin)* — see [Bulk insert](#bulk-insert); seed file: [`scripts/hc_for_age_seed.json`](../scripts/hc_for_age_seed.json). A unique `(sex, age_months)` constraint rejects re-seeding.
 
 Bands (strict): severe microcephaly < -3SD, microcephaly < -2SD, normal -2SD to +2SD, macrocephaly > +2SD, severe macrocephaly > +3SD. `implausible` is true when |z| > 5. A single value outside the range is a reason to examine the child and track the trend, not a diagnosis. Screening aid only.
 
@@ -1040,9 +1253,9 @@ Setup: run `sql/027_add_who_hc_for_age.sql` in the Supabase SQL editor, then `PO
 
 ### Combined growth assessment (`/growth/assess`)
 
-One call, every applicable WHO indicator for the measurements you give. It only orchestrates the single-indicator modules ([`src/growthAssess.js`](src/growthAssess.js)), so each number is identical to what that indicator's own endpoint returns. Needs no new table: it reads the tables from sql/012 and sql/021 to sql/027.
+One call, every applicable WHO indicator for the measurements you give. It only orchestrates the single-indicator modules ([`src/growthAssess.js`](../src/growthAssess.js)), so each number is identical to what that indicator's own endpoint returns. Needs no new table: it reads the tables from sql/012 and sql/021 to sql/027.
 
-- `GET /growth/assess` *(public, rate-limited, cached 1h)* — `sex`, `age_months` (0-228) and **at least one** measurement: `weight_kg`/`weight_g`, `length_cm`/`height_cm` (or `_mm`), `hc_cm`/`hc_mm`, `muac_cm`/`muac_mm`. Optional `measured=lying|standing` (default lying under 24 months, standing from 24; a mismatch converts by 0.7 cm and is reported) and `muac_scheme=who_hiv_2008|cmam` (for the fixed MUAC result; default `cmam` for 6-59 months so it agrees with `acute_malnutrition_signals`, `who_hiv_2008` for older children).
+- `GET /growth/assess` *(API key, rate-limited, cached 1h)* — `sex`, `age_months` (0-228) and **at least one** measurement: `weight_kg`/`weight_g`, `length_cm`/`height_cm` (or `_mm`), `hc_cm`/`hc_mm`, `muac_cm`/`muac_mm`. Optional `measured=lying|standing` (default lying under 24 months, standing from 24; a mismatch converts by 0.7 cm and is reported) and `muac_scheme=who_hiv_2008|cmam` (for the fixed MUAC result; default `cmam` for 6-59 months so it agrees with `acute_malnutrition_signals`, `who_hiv_2008` for older children).
 
 | Indicator in the response | Needs | Ages |
 |---|---|---|
@@ -1062,20 +1275,20 @@ GET /growth/assess?sex=girls&age_months=18&weight_kg=9.2&length_cm=78&hc_cm=45&m
 
 ### Fenton Preterm Growth Chart (`/fenton-preterm`)
 
-Weight, length, and head-circumference z-scores/percentiles for preterm infants, both the 2013 (Fenton & Kim, *BMC Pediatrics* 2013;13:59) and 2025 (Fenton, Elmrayed & Alshaikh, *Paediatric and Perinatal Epidemiology* 2025, PMID 40534585) references. LMS parameters provided directly by Dr. Tanis Fenton (University of Calgary) by email. Table: [`sql/013_add_fenton_preterm.sql`](sql/013_add_fenton_preterm.sql), 2284 rows (2013 + 2025, both sexes, all 3 metrics). Calculation logic: [`src/fentonPreterm.js`](src/fentonPreterm.js). Source-data provenance and verification notes (the source file itself is intentionally *not* in this public repo): [`data-sources/fenton/README.md`](data-sources/fenton/README.md).
+Weight, length, and head-circumference z-scores/percentiles for preterm infants, both the 2013 (Fenton & Kim, *BMC Pediatrics* 2013;13:59) and 2025 (Fenton, Elmrayed & Alshaikh, *Paediatric and Perinatal Epidemiology* 2025, PMID 40534585) references. LMS parameters provided directly by Dr. Tanis Fenton (University of Calgary) by email. Table: [`sql/013_add_fenton_preterm.sql`](../sql/013_add_fenton_preterm.sql), 2284 rows (2013 + 2025, both sexes, all 3 metrics). Calculation logic: [`src/fentonPreterm.js`](../src/fentonPreterm.js). Source-data provenance and verification notes (the source file itself is intentionally *not* in this public repo): [`data-sources/fenton/README.md`](../data-sources/fenton/README.md).
 
 **License — this is not open data like the rest of CNR.** Shared under [CC BY-NC-ND 4.0](https://creativecommons.org/licenses/by-nc-nd/4.0/) for non-commercial use in this app only, with two extra conditions from Dr. Fenton: the underlying L/M/S values must never be visible to end users, and must never be shared with other hospitals or organizations. So, unlike every other reference table in CNR:
 
 - There is **no `GET /fenton-preterm` list route** — every read path (`classify`, `profile`, `growth`, `velocity`, `chart`, `references`) only ever returns a computed result (a z-score/percentile/status, a rendered image, or static metadata), never a raw L/M/S row.
 - Don't add one, and don't add a mode to any of the above that echoes L/M/S or the raw curve as JSON — `chart`'s SVG rendering is the one sanctioned way to expose the curve shape, as an image, not data. If this needs to change, that's a conversation with Edison about the data-sharing agreement, not a routine API change.
 
-- `GET /fenton-preterm/classify` *(public, rate-limited, cached 1h)* — `sex` (`boys`/`girls`, or `boy`/`girl`/`male`/`female`/`m`/`f`), `metric` (`weight`/`length`/`hc`), `gest_age_weeks` (22-50), `day` (0-6, day of the gestational week, default 0), `value` (grams for weight, cm for length/hc), and optional `reference_year` (`2013` or `2025`, default `2025`). Returns `z`, `percentile`, and `status`.
-- `POST /fenton-preterm/profile` *(public, rate-limited)* — classify weight + length + HC together at one timepoint. Body: `{sex, reference_year?, gest_age_weeks, day?, weight?, length?, hc?}` — at least one of `weight`/`length`/`hc` required, any combination is fine. Returns one `{value, z, percentile, status}` per metric provided.
-- `POST /fenton-preterm/growth` *(public, rate-limited)* — classify a series of same-metric measurements over time and return the trajectory, chart-ready. Body: `{sex, metric, reference_year?, measurements: [{gest_age_weeks, day?, value}, ...]}` (up to 50 points, any order — sorted by age server-side). Returns each point's `{gest_age_weeks, day, value, z, percentile, status}` plus a `trend` block (`first_z`/`last_z`/`min_z`/`max_z`/`z_change_overall`, and `notable_drops`: consecutive-point gaps where z fell ≥0.67 — roughly one major percentile band. Descriptive only, not a clinical threshold.).
-- `POST /fenton-preterm/velocity` *(public, rate-limited)* — same body shape as `/growth`, 2+ points. Returns velocity for each consecutive pair: weight in **g/kg/day** (average-weight method: Δweight / average-weight-kg / days — the long-standing NICU convention), length/HC in **cm/week**.
-- `GET /fenton-preterm/chart` *(public, rate-limited, cached 1h)* — `sex`, `metric`, optional `reference_year`, and optional `points` (e.g. `points=28w0d:900,30w0d:1200,32w0d:1500` — day suffix optional, defaults `0`) to overlay an infant's own trajectory. Returns a self-contained **SVG image** (`Content-Type: image/svg+xml`) with the P3/P10/P50/P90/P97 reference curves and, if given, the overlay points/line. **This is the only endpoint that touches the full reference curve, and it never returns curve data as JSON — only rendered vector graphics** (mirrors Dr. Fenton's own public tool, which outputs jpg/pdf images rather than data points). See [`src/fentonChart.js`](src/fentonChart.js).
-- `GET /fenton-preterm/references` *(public, rate-limited, cached 1h)* — static metadata: both years' citations/DOIs, sexes, metrics, the **exact** valid age range per (year, metric) — verified against the seeded data, not approximated — and the license summary. No L/M/S values.
-- `POST /fenton-preterm/bulk` *(admin)* — see [Bulk insert](#bulk-insert); 5 seed files (500 rows each except the last, 284): [`scripts/fenton_preterm_seed_1.json`](scripts/fenton_preterm_seed_1.json) through `_5.json`. Run all 5 — the unique `(reference_year, sex, metric, time_days)` constraint rejects a repeat seed instead of duplicating rows.
+- `GET /fenton-preterm/classify` *(API key, rate-limited, cached 1h)* — `sex` (`boys`/`girls`, or `boy`/`girl`/`male`/`female`/`m`/`f`), `metric` (`weight`/`length`/`hc`), `gest_age_weeks` (22-50), `day` (0-6, day of the gestational week, default 0), `value` (grams for weight, cm for length/hc), and optional `reference_year` (`2013` or `2025`, default `2025`). Returns `z`, `percentile`, and `status`.
+- `POST /fenton-preterm/profile` *(API key, rate-limited)* — classify weight + length + HC together at one timepoint. Body: `{sex, reference_year?, gest_age_weeks, day?, weight?, length?, hc?}` — at least one of `weight`/`length`/`hc` required, any combination is fine. Returns one `{value, z, percentile, status}` per metric provided.
+- `POST /fenton-preterm/growth` *(API key, rate-limited)* — classify a series of same-metric measurements over time and return the trajectory, chart-ready. Body: `{sex, metric, reference_year?, measurements: [{gest_age_weeks, day?, value}, ...]}` (up to 50 points, any order — sorted by age server-side). Returns each point's `{gest_age_weeks, day, value, z, percentile, status}` plus a `trend` block (`first_z`/`last_z`/`min_z`/`max_z`/`z_change_overall`, and `notable_drops`: consecutive-point gaps where z fell ≥0.67 — roughly one major percentile band. Descriptive only, not a clinical threshold.).
+- `POST /fenton-preterm/velocity` *(API key, rate-limited)* — same body shape as `/growth`, 2+ points. Returns velocity for each consecutive pair: weight in **g/kg/day** (average-weight method: Δweight / average-weight-kg / days — the long-standing NICU convention), length/HC in **cm/week**.
+- `GET /fenton-preterm/chart` *(API key, rate-limited, cached 1h)* — `sex`, `metric`, optional `reference_year`, and optional `points` (e.g. `points=28w0d:900,30w0d:1200,32w0d:1500` — day suffix optional, defaults `0`) to overlay an infant's own trajectory. Returns a self-contained **SVG image** (`Content-Type: image/svg+xml`) with the P3/P10/P50/P90/P97 reference curves and, if given, the overlay points/line. **This is the only endpoint that touches the full reference curve, and it never returns curve data as JSON — only rendered vector graphics** (mirrors Dr. Fenton's own public tool, which outputs jpg/pdf images rather than data points). See [`src/fentonChart.js`](../src/fentonChart.js).
+- `GET /fenton-preterm/references` *(API key, rate-limited, cached 1h)* — static metadata: both years' citations/DOIs, sexes, metrics, the **exact** valid age range per (year, metric) — verified against the seeded data, not approximated — and the license summary. No L/M/S values.
+- `POST /fenton-preterm/bulk` *(admin)* — see [Bulk insert](#bulk-insert); 5 seed files (500 rows each except the last, 284): [`scripts/fenton_preterm_seed_1.json`](../scripts/fenton_preterm_seed_1.json) through `_5.json`. Run all 5 — the unique `(reference_year, sex, metric, time_days)` constraint rejects a repeat seed instead of duplicating rows.
 
 ```
 GET /fenton-preterm/classify?sex=girls&metric=weight&gest_age_weeks=32&day=0&value=1500
@@ -1148,10 +1361,10 @@ Length and head-circumference reference data start partway through the 22-50 wee
 
 ### FHIR facade (`/fhir`) — growth + full Nutrition Care Process
 
-Phase 1 (below) is a stateless FHIR R4 translation layer over the classify endpoints above. **Phase 2 adds the whole Nutrition Care Process** — see [NCP operations](#ncp-operations-fhir-phase-2). Groundwork for future EHR/HIE integration. **Not a FHIR server with storage** (Chakudya has never persisted patient records, and this doesn't change that — a real EHR is expected to store the returned `Observation` itself), and **not yet registered with any OpenHIM/HIE instance** — that's a separate, later step once there's a real instance to register with. See [`src/fhir.js`](src/fhir.js) for the full scope note.
+Phase 1 (below) is a stateless FHIR R4 translation layer over the classify endpoints above. **Phase 2 adds the whole Nutrition Care Process** — see [NCP operations](#ncp-operations-fhir-phase-2). Groundwork for future EHR/HIE integration. **Not a FHIR server with storage** (Chakudya has never persisted patient records, and this doesn't change that — a real EHR is expected to store the returned `Observation` itself), and **not yet registered with any OpenHIM/HIE instance** — that's a separate, later step once there's a real instance to register with. See [`src/fhir.js`](../src/fhir.js) for the full scope note.
 
-- `GET /fhir/metadata` *(public, rate-limited)* — FHIR `CapabilityStatement`.
-- `POST /fhir/Observation/$evaluate-growth` *(public, rate-limited)* — body is a FHIR `Parameters` resource:
+- `GET /fhir/metadata` *(no key needed, rate-limited)* — FHIR `CapabilityStatement`.
+- `POST /fhir/Observation/$evaluate-growth` *(API key, rate-limited)* — body is a FHIR `Parameters` resource:
   ```json
   {
     "resourceType": "Parameters",
@@ -1186,7 +1399,7 @@ Phase 1 (below) is a stateless FHIR R4 translation layer over the classify endpo
 
 #### Assessment foundation (FHIR Phase 4, NCP step 1)
 
-Stateless like the rest of `/fhir`: nothing is stored. Source: [`src/fhirAssessment.js`](src/fhirAssessment.js), tests in `test/fhirAssessment.test.js`.
+Stateless like the rest of `/fhir`: nothing is stored. Source: [`src/fhirAssessment.js`](../src/fhirAssessment.js), tests in `test/fhirAssessment.test.js`.
 
 | Operation | What it does |
 |---|---|
@@ -1206,7 +1419,7 @@ Stateless like the rest of `/fhir`: nothing is stored. Source: [`src/fhirAssessm
 
 #### NCP operations (FHIR Phase 2)
 
-The Academy of Nutrition and Dietetics Nutrition Care Process, end to end, as stateless FHIR R4 operations. Same contract as Phase 1: **nothing is stored or logged beyond method/path/status** — the caller's EHR persists what comes back. All are `POST`, public, rate-limited (100/min/IP), body is a FHIR `Parameters` resource, success is a `Bundle`, failure is an `OperationOutcome` (400 malformed, 422 valid-but-unsupported). Source: [`src/fhirNcp.js`](src/fhirNcp.js) (pure functions, tests in `test/fhirNcp.test.js`).
+The Academy of Nutrition and Dietetics Nutrition Care Process, end to end, as stateless FHIR R4 operations. Same contract as Phase 1: **nothing is stored or logged beyond method/path/status** — the caller's EHR persists what comes back. All are `POST`, public, rate-limited (100/min/IP), body is a FHIR `Parameters` resource, success is a `Bundle`, failure is an `OperationOutcome` (400 malformed, 422 valid-but-unsupported). Source: [`src/fhirNcp.js`](../src/fhirNcp.js) (pure functions, tests in `test/fhirNcp.test.js`).
 
 | NCP step | Operation | FHIR output |
 |---|---|---|
@@ -1216,11 +1429,11 @@ The Academy of Nutrition and Dietetics Nutrition Care Process, end to end, as st
 | 3. Intervention | `POST /fhir/CarePlan/$intervene` | `CarePlan` + `Goal`s + `NutritionOrder`s (oral diet / supplement / enteral formula) + `ServiceRequest`s (education / counseling / coordination of care) |
 | 4. Monitoring & evaluation | `POST /fhir/Goal/$evaluate` | `Goal` with `achievementStatus` (achieved / improving / no-change / worsening / sustaining / not-achieved / in-progress) + outcome `Observation` |
 | 4. Monitoring & evaluation (follow-up visit) | `POST /fhir/CarePlan/$monitor` | follow-up `Observation`s / `QuestionnaireResponse`s linked to patient, encounter and plan, change from baseline, updated `Goal`s, plan-review `Task`s and a draft successor `CarePlan` |
-| Terminology | `GET /fhir/CodeSystem/ncp-diagnosis` | the NI/NC/NB diagnostic terms as a FHIR `CodeSystem` (public, from Supabase) |
+| Terminology | `GET /fhir/CodeSystem/ncp-diagnosis` | the NI/NC/NB diagnostic terms as a FHIR `CodeSystem` (no key needed, from Supabase) |
 | Conformance | `GET /fhir/CodeSystem/{name}`, `/fhir/OperationDefinition/{id}`, `/fhir/StructureDefinition/{name}` | static definitions behind every URL the facade emits |
 | 5. Documentation | `POST /fhir/Bundle/$ncp-document` | one complete ADIME `Composition` **document Bundle** assembled from the Bundles above, identified and validated (structure, references, links) |
 | 6. Professional and institutional context | `POST /fhir/Bundle/$care-context` | linked `Organization`, `Practitioner`, `PractitionerRole` and `CareTeam` resources (author, role, facility, multidisciplinary team) |
-| 7. Interoperability and governance | `POST /fhir/$validate`, `POST /fhir/ConceptMap/$translate`, `GET /fhir/AuditEvent`, `GET /fhir/ConceptMap/{id}` | R4 structural check, terminology mappings, audit trail; scopes + `FHIR_AUTH_MODE`; profiles and Provenance on the document |
+| 7. Interoperability and governance | `POST /fhir/$validate`, `POST /fhir/ConceptMap/$translate`, `GET /fhir/AuditEvent`, `GET /fhir/ConceptMap/{id}` | R4 structural check, terminology mappings, audit trail; scopes; profiles and Provenance on the document |
 | Documentation (check) | `POST /fhir/Bundle/$validate-document` | `OperationOutcome` with errors and warnings for any document Bundle |
 
 **What Chakudya computes vs. what the clinician supplies.** Chakudya computes the deterministic parts (BMI, % weight change, MUST score, Mifflin-St Jeor BEE, GLIM criteria logic, goal progress). It does **not** choose the nutrition diagnosis, goals or orders — the PES statement, targets, diet prescription etc. are inputs it validates and shapes into FHIR. Energy/protein requirements are only produced when you pass `energyFactor` / `proteinGPerKg`; the factor is your clinical call, not a default. Everything carries the screening-aid disclaimer.
@@ -1231,7 +1444,7 @@ The Academy of Nutrition and Dietetics Nutrition Care Process, end to end, as st
 - Intervention defaults are conservative: `status: draft`, `intent: proposal` (Goals → `proposed`). Pass `status` (`draft|active`) and `intent` (`proposal|plan|order`) to change.
 - Resources inside a returned Bundle cross-reference each other by `urn:uuid` `fullUrl`. Pass whole Bundles into `$ncp-document` (as `resource` parameters) to keep those links valid.
 - Each Observation is tagged with an NCP step (`category` → `…/CodeSystem/ncp-step`). In `$ncp-document`, untagged Observations are filed under Assessment; a `Goal` with an `achievementStatus` goes under Monitoring & evaluation, otherwise under Intervention. Empty ADIME sections get `emptyReason: notstarted`; Screening is only included if present.
-- Diagnosis terminology: the NCP nutrition diagnostic terms (2006 edition — Intake `NI`, Clinical `NC`, Behavioral-Environmental `NB`, 62 terms) live in Supabase table `ncp_diagnosis_terms` ([`sql/017_add_ncp_diagnosis_terms.sql`](sql/017_add_ncp_diagnosis_terms.sql), run once in the SQL editor; re-running upserts). Pass `problemCode: "NI-5.2"` and `$diagnose` fills in the term text, domain and a coding on `…/fhir/CodeSystem/ncp-diagnosis`; terms marked "(specify)" need `problemSpecify` (e.g. `NI-55.1` + `Iron`), "(use with caution)" terms add a note. Unknown codes are a 400; if the table hasn't been created, `$diagnose` returns 503 naming the migration. You can still pass your own coding (`problemSystem` + `problemCode`), a public shortcut (`malnutrition`, `underweight`, `obesity`, …), or free text with `domain` + `problem`. A PES statement needs problem + ≥1 etiology + ≥1 signs/symptoms. The terminology belongs to the Academy of Nutrition and Dietetics — it's reference data here, not Chakudya's own content.
+- Diagnosis terminology: the NCP nutrition diagnostic terms (2006 edition — Intake `NI`, Clinical `NC`, Behavioral-Environmental `NB`, 62 terms) live in Supabase table `ncp_diagnosis_terms` ([`sql/017_add_ncp_diagnosis_terms.sql`](../sql/017_add_ncp_diagnosis_terms.sql), run once in the SQL editor; re-running upserts). Pass `problemCode: "NI-5.2"` and `$diagnose` fills in the term text, domain and a coding on `…/fhir/CodeSystem/ncp-diagnosis`; terms marked "(specify)" need `problemSpecify` (e.g. `NI-55.1` + `Iron`), "(use with caution)" terms add a note. Unknown codes are a 400; if the table hasn't been created, `$diagnose` returns 503 naming the migration. You can still pass your own coding (`problemSystem` + `problemCode`), a public shortcut (`malnutrition`, `underweight`, `obesity`, …), or free text with `domain` + `problem`. A PES statement needs problem + ≥1 etiology + ≥1 signs/symptoms. The terminology belongs to the Academy of Nutrition and Dietetics — it's reference data here, not Chakudya's own content.
 
 **Parameters by operation** (`valueX` types as in FHIR; `part` = nested parts)
 
@@ -1274,7 +1487,7 @@ The Academy of Nutrition and Dietetics Nutrition Care Process, end to end, as st
   - GLIM follows Cederholm 2019 (≥1 phenotypic + ≥1 etiologic criterion after a positive screen; severity from the worst phenotypic criterion). Missing inputs are listed as "not assessed" rather than assumed. Weight loss uses strict `>5%` (≤6 mo) / `>10%` (>6 mo).
 - `$diagnose`: `subject`; repeatable `diagnosis` part: `problemCode` (e.g. `NI-5.2`, resolves `problem` + `domain` for you) and `problemSpecify` for "(specify)" terms — or `domain` + `problem` for free text — repeatable `etiology`, repeatable `signsSymptoms`, optional `problemSystem`/`problemDisplay` (your own coding), `severity` (`mild|moderate|severe`), `verificationStatus` (`provisional` default | `confirmed`), `evidence` (repeatable reference string, e.g. an Observation `urn:uuid`), `recordedDate`.
 
-  **Structured diagnosis (Phase 4).** The PES statement is stored as components, not only as text, and the operation now also builds the evidence and provenance around it (source: [`src/fhirDiagnosis.js`](src/fhirDiagnosis.js), tests in `test/fhirDiagnosis.test.js`). Everything above still works unchanged.
+  **Structured diagnosis (Phase 4).** The PES statement is stored as components, not only as text, and the operation now also builds the evidence and provenance around it (source: [`src/fhirDiagnosis.js`](../src/fhirDiagnosis.js), tests in `test/fhirDiagnosis.test.js`). Everything above still works unchanged.
   - **Components.** Alongside the plain `etiology` / `signsSymptoms` strings, each diagnosis can carry `etiologyItem` parts (`text`, optional `system` + `code` + `display`) and `signItem` parts (`text`, optional coding, optional `evidence` Observation references, optional inline `observation`). The Condition gets a `pes-statement` extension holding `statement` (the readable sentence, also still in `Condition.note[0]`), `problem` (the coded diagnosis), one `etiology` CodeableConcept per cause, and one `signSymptom` per sign with `evidence` references. The legacy `pes-etiology` / `pes-signs-symptoms` extensions are kept.
   - **Evidence as Observations.** An inline `observation` inside a `signItem` takes the same parts as `$nutrition-assessment` (`code`, `value`, `effectiveDateTime`, ...; e.g. `weight-change-percent` (positive = loss), `intake-percent-of-requirement`, `energy-intake-kcal`, `weight`, `hemoglobin`), is validated the same way (units never guessed, plausibility, timestamps), is returned in the Bundle, and is linked from `Condition.evidence` (the sign's text defaults to a description of the measurement). To cite an Observation you already have (for example one from `$nutrition-assessment`), use `evidence` with its `Observation/123` or `urn:uuid`.
   - **Coding.** The NCP term (NI/NC/NB) stays the primary coding; add `additionalCoding` (`system`, `code`, `display`) for ICD-10 or SNOMED CT. Added codes are carried as given and are not checked against their code system.
@@ -1282,7 +1495,7 @@ The Academy of Nutrition and Dietetics Nutrition Care Process, end to end, as st
   - Validation reports every problem at once (400). `recordedDate` must be a valid FHIR date/dateTime and not in the future. A whole diagnosis Bundle can go straight into `$ncp-document` (Condition in the diagnosis section, evidence in assessment, Provenance as a supporting entry).
 - `$intervene`: `subject`, `addresses` (Condition refs), `title`, `status`, `intent`; repeatable parts `goal` (`description`, `measure`, `measureCode`, `direction`, `baseline`, `target`, `dueDate`, `priority`), `nutritionOrder` (`kind` = `oral-diet` → `type`, repeatable `nutrient` part {`name`,`amount`}, `texture`, `fluidConsistency`, `instruction`; `supplement` → `type`, `productName`, `quantity`, `instruction`; `enteral-formula` → `baseFormulaType`, `productName`, `route`, `rate`, `maxVolume`, `instruction`), `education` (`topic`, `audience`, `method`), `counseling` (`topic`, `approach`), `coordination` (`reason`, `with`).
 
-  **Structured intervention (Phase 4).** The plan is now trackable and linked to the diagnosis (source: [`src/fhirIntervention.js`](src/fhirIntervention.js), tests in `test/fhirIntervention.test.js`). Everything above still works unchanged.
+  **Structured intervention (Phase 4).** The plan is now trackable and linked to the diagnosis (source: [`src/fhirIntervention.js`](../src/fhirIntervention.js), tests in `test/fhirIntervention.test.js`). Everything above still works unchanged.
   - **Linked to the diagnosis.** Pass the `$diagnose` Bundle as `resource`: `subject` defaults to its patient, and the CarePlan, every Goal, NutritionOrder (extension), ServiceRequest and Task address its Condition(s) (`addresses`, `reasonReference`). Explicit `addresses` must be Condition references that resolve in that Bundle and belong to the same patient; a refuted or entered-in-error Condition is refused and a resolved one is flagged. A plan with no diagnosis is allowed but says so.
   - **Measurable goals with target dates.** `dueDate` and `startDate` must be valid and in order (due not before start, not in the past); a `target` needs a unit; `baseline` and `target` must share a unit and agree with `direction` (increase: target above baseline; decrease: below). A goal with no `dueDate`, a target with no `measure` or `direction`, or a `measure` with no target is flagged in the trailing OperationOutcome entry. These goals run directly through `Goal/$evaluate`.
   - **Orders.** Same three kinds. Nutrient amounts need a recognised unit, a supplement `quantity` needs a unit, enteral `rate` is mL/h and `maxVolume` mL or L (stored in mL), with plausibility limits. New optional parts: `timesPerDay`, `startDate`, `endDate` (a Timing schedule), `foodPreference`, `excludeFood`, `allergyIntolerance` references; `orderer` is set when `author` is a Practitioner reference.
@@ -1295,12 +1508,12 @@ The Academy of Nutrition and Dietetics Nutrition Care Process, end to end, as st
   - **Goals.** Each Goal in the plan is matched to the follow-up value of its measure (`measureCode` as a registered code or LOINC code, else the `measure` text) or to an explicit `current`, then judged by the same rules as `$evaluate`. It comes back with the same identity plus `achievementStatus`, `statusDate`, an `outcomeReference`, a note with the progress, and `goal-progress-fraction`; `achieved` also sets `lifecycleStatus` to `completed`. A `goal` part with `reference` (a Goal in the plan) adds `current`, `response` (the patient's response, recorded as a Goal note), `lowerBound`/`upperBound` (for `maintain`), `baseline` or `noChangeTolerance`. A `goal` part without `reference` evaluates a goal that is not in a plan. A goal with no matching value is reported, never guessed.
   - **Updating the plan.** A goal that is `worsening`, `no-change`, `not-achieved`, or past its due date and not achieved gets a `plan-review` `Task` (due `reviewDueDate`), and the plan is carried forward as a **draft** successor `CarePlan` (`replaces` the current one, follow-up evidence in `supportingInfo`, a note listing the goals to review). The original plan and goals' targets are never edited, and Chakudya does not choose the revised interventions: edit the draft, then record it with `$intervene`. When every goal is achieved or sustained the response says so and changes nothing.
   - **Provenance.** With `author` one `Provenance` covers everything recorded (entity `derivation`: the plan; `source`: the baseline Observations used and any `source` strings). The Bundle goes straight into `$ncp-document` (follow-up Observations and evaluated Goals land in the monitoring section). Stateless: nothing is stored, so your system keeps the Bundles and passes them back as `resource`, `baseline` and `previous` at the next visit.
-- `$ncp-document` (NCP step 5, the complete ADIME note): `subject`, `author` (`Practitioner/…` reference or a name), repeatable `resource` (single resources or whole Bundles from the operations above, including a `$care-context` Bundle), optional `title`, `date`, `encounter`, `custodian`, `status` (`preliminary`, `final` default, `amended`). Source: [`src/fhirDocument.js`](src/fhirDocument.js), tests in `test/fhirDocument.test.js`.
+- `$ncp-document` (NCP step 5, the complete ADIME note): `subject`, `author` (`Practitioner/…` reference or a name), repeatable `resource` (single resources or whole Bundles from the operations above, including a `$care-context` Bundle), optional `title`, `date`, `encounter`, `custodian`, `status` (`preliminary`, `final` default, `amended`). Source: [`src/fhirDocument.js`](../src/fhirDocument.js), tests in `test/fhirDocument.test.js`.
   - **One document.** A `Composition` plus the resources it cites, as a `document` Bundle with a Bundle and Composition `identifier` (new `urn:uuid`) and a narrative. Sections: Nutrition assessment, Nutrition diagnosis (PES), Nutrition intervention, Nutrition monitoring and evaluation (and Nutrition screening when present). A section with nothing in it gets `emptyReason: notstarted`.
   - **Pass the steps in order.** If the same resource arrives twice (`$monitor` returns each evaluated Goal under the plan's own `fullUrl`), the later one replaces the earlier one, so send the `$intervene` Bundle before the `$monitor` Bundle.
   - **Validated before it is returned.** Structure (Composition first and complete, the four ADIME sections each with entries or an `emptyReason`, narrative on sections with entries, unique `fullUrl`s), references (every `urn:uuid` that should point inside the Bundle must resolve), one patient throughout, and each resource in the section its step says. These are errors: **422** with every problem listed. Warnings (a care plan with no diagnosis, a diagnosis no plan addresses, a Goal not listed in the plan, results with no goals, an entry nothing links to, a baseline Observation that is not in the Bundle) do not stop the document; check them with `$validate-document`.
   - **Not signed.** Chakudya assembles and checks; it does not write clinical content, sign or attest the note, and stores nothing.
-- `$care-context` (NCP step 6, professional and institutional context): who did the work, in what role, at which facility, and with which team. Source: [`src/fhirContext.js`](src/fhirContext.js), tests in `test/fhirContext.test.js`. Body is a `Parameters` resource with repeatable `organization`, `practitioner`, `role` and `careTeam` parts; success is a `collection` Bundle of linked `Organization`, `Practitioner`, `PractitionerRole` and `CareTeam` resources (`urn:uuid` links).
+- `$care-context` (NCP step 6, professional and institutional context): who did the work, in what role, at which facility, and with which team. Source: [`src/fhirContext.js`](../src/fhirContext.js), tests in `test/fhirContext.test.js`. Body is a `Parameters` resource with repeatable `organization`, `practitioner`, `role` and `careTeam` parts; success is a `collection` Bundle of linked `Organization`, `Practitioner`, `PractitionerRole` and `CareTeam` resources (`urn:uuid` links).
   - **Local ids.** Parts point at each other with a short `id` you choose (`"hosp"`, `"rd"`, `"rd1"`); anywhere a link is expected you can instead give a reference to a resource your own system already holds (`Practitioner/123`).
   - **Organization:** `name` and/or `identifier` (+ `identifierSystem`), `type` (`prov`, `dept`, `team`, … from the HL7 organization-type list, else kept as text), `partOf` (a department inside a hospital), `address`/`city`/`district`/`country`, `phone`, `email`.
   - **Practitioner:** `name` (last word = family name) or `family` + `given`, `identifier` (registration or licence number, **not verified**), repeatable `qualification` (`code`, `identifier`, `issuer`, period), `phone`, `email`.
@@ -1331,26 +1544,19 @@ curl -s -X POST "$BASE/fhir/Observation/\$assess-nutrition" -H 'content-type: ap
 # 5. Document  → POST /fhir/Bundle/$ncp-document  (each Bundle above as a "resource" parameter)
 ```
 
-**Honest limits.** Screening covers MUST, NRS-2002, MNA, SGA, PG-SGA and the NACS classification (no paediatric screening tools such as STRONGkids or PYMS yet, and no WHZ cutoffs — the MCP server has more). `$assess-nutrition` is adult-only; WHO 0–59-month growth is still unsupported (as in Phase 1). No `Patient`/`Encounter` resources are created — you pass references. Every canonical URL the facade emits now resolves: `GET /fhir/CodeSystem/{name}` (the code lists — `ncp-step`, `ncp-assessment-domain`, `glim`, `growth-status`, … — plus `ncp-diagnosis` from Supabase), `GET /fhir/OperationDefinition/{id}` (one per operation in `/fhir/metadata`, id = `<Resource>-<operation>`, e.g. `Observation-screen`) and `GET /fhir/StructureDefinition/{name}` (the Extensions, e.g. `pes-specify`). They are static definitions in [`src/fhirTerminology.js`](src/fhirTerminology.js); a test walks real operation output and fails if any emitted code system, code, extension or operation link lacks a definition, so add the definition when you add a field. These are conformance descriptions, not validated profiles. Not registered with any OpenHIM/HIE instance.
+**Honest limits.** Screening covers MUST, NRS-2002, MNA, SGA, PG-SGA and the NACS classification (no paediatric screening tools such as STRONGkids or PYMS yet, and no WHZ cutoffs — the MCP server has more). `$assess-nutrition` is adult-only; WHO 0–59-month growth is still unsupported (as in Phase 1). No `Patient`/`Encounter` resources are created — you pass references. Every canonical URL the facade emits now resolves: `GET /fhir/CodeSystem/{name}` (the code lists — `ncp-step`, `ncp-assessment-domain`, `glim`, `growth-status`, … — plus `ncp-diagnosis` from Supabase), `GET /fhir/OperationDefinition/{id}` (one per operation in `/fhir/metadata`, id = `<Resource>-<operation>`, e.g. `Observation-screen`) and `GET /fhir/StructureDefinition/{name}` (the Extensions, e.g. `pes-specify`). They are static definitions in [`src/fhirTerminology.js`](../src/fhirTerminology.js); a test walks real operation output and fails if any emitted code system, code, extension or operation link lacks a definition, so add the definition when you add a field. These are conformance descriptions, not validated profiles. Not registered with any OpenHIM/HIE instance.
 
 #### Interoperability and governance (FHIR Phase 4, NCP step 7)
 
-Source: [`src/fhirGovernance.js`](src/fhirGovernance.js) (pure functions), wiring in `src/index.js`, tests in `test/fhirGovernance.test.js`, migration `sql/028_add_fhir_governance.sql`.
+Source: [`src/fhirGovernance.js`](../src/fhirGovernance.js) (pure functions), wiring in `src/index.js`, tests in `test/fhirGovernance.test.js`, migration `sql/028_add_fhir_governance.sql`.
 
-**Authentication and access control.** Credentials are the ones that already exist: the root key, a per-consumer API key, or an OAuth 2.0 access token (`POST /oauth/token`, client_credentials), sent as `Authorization: Bearer`.
+**Authentication and access control.** Credentials are API keys (the root key, an admin or reviewer key, or a consumer key from the developer console), sent as `Authorization: Bearer`. Access control is always on; there is no open mode and no environment switch. Every operation needs a credential **with the scope**. Open without a key: `GET /fhir/metadata`, `CodeSystem`, `OperationDefinition`, `StructureDefinition`, `ConceptMap` and `Questionnaire` reads only. `POST /fhir/ConceptMap/$translate` is an operation, so it needs a key (a `read` scope).
 
-| `FHIR_AUTH_MODE` | Behaviour |
-|---|---|
-| unset / `open` (default, unchanged) | Clinical operations stay public, as before. A valid token is still recognised, so the audit trail can name the caller. |
-| `enforce` | Every operation needs a credential **with the scope**. Always open: `GET /fhir/metadata`, `CodeSystem`, `OperationDefinition`, `StructureDefinition`, `ConceptMap`, `Questionnaire` and `POST /fhir/ConceptMap/$translate`. |
-
-*Use `enforce` in production.* `open` exists so existing integrations keep working until they hold credentials; it is not a safe setting for real patient data.
-
-Scopes are `system/<ResourceType|*>.<read|write|*>`. An operation that produces clinical content needs `write` on its resource type (`Condition/$diagnose` needs `system/Condition.write`, `Bundle/$ncp-document` needs `system/Bundle.write`); checking and translating (`$validate`, `Bundle/$validate-document`, `QuestionnaireResponse/$validate`) need `read`. With no explicit scopes, the role decides: `admin` and the root key carry `system/*.*`, `reviewer` carries `system/*.read` (so a reviewer key can validate but not generate). To narrow a credential, give it `fhir_scopes` when you create it: `POST /admin/keys` or `POST /admin/oauth-clients` with `{"label": "...", "role": "reviewer", "fhir_scopes": "system/Condition.write system/CarePlan.write"}` (run `sql/028` first). Failures: **401** (`issue.code: login`, with `WWW-Authenticate: Bearer`) with no or a bad credential; **403** (`forbidden`) when the scope is missing. `AuditEvent` is never covered by a wildcard type scope.
+Scopes are `system/<ResourceType|*>.<read|write|*>`. An operation that produces clinical content needs `write` on its resource type (`Condition/$diagnose` needs `system/Condition.write`, `Bundle/$ncp-document` needs `system/Bundle.write`); checking and translating (`$validate`, `Bundle/$validate-document`, `QuestionnaireResponse/$validate`) need `read`. With no explicit scopes, the role decides: `admin` and the root key carry `system/*.*`, `reviewer` carries `system/*.read` (so a reviewer key can validate but not generate). To narrow a credential, give it `fhir_scopes` when you create it: `POST /admin/keys` with `{"label": "...", "role": "reviewer", "fhir_scopes": "system/Condition.write system/CarePlan.write"}` (run `sql/028` first). Failures: **401** (`issue.code: login`, with `WWW-Authenticate: Bearer`) with no or a bad credential; **403** (`forbidden`) when the scope is missing. `AuditEvent` is never covered by a wildcard type scope.
 
 **OperationOutcome everywhere.** Every error under `/fhir` (including auth failures, rate limits, 404 and 405) is an `OperationOutcome` with a proper `issue.code`, served as `application/fhir+json`. POST responses and AuditEvent reads carry `Cache-Control: no-store`; all carry `X-Content-Type-Options: nosniff` and `X-Request-Id`.
 
-**Audit.** Every non-conformance request under `/fhir`, and every failure, produces one `AuditEvent` (profile `ncp-audit-event`): `type` rest, subtype operation/read/search-type, action `E`/`R`, `recorded`, `outcome` (`0` success, `4` 4xx, `8` 5xx), the agent (API-key or OAuth-client label, or `anonymous`), the route (`POST /fhir/Condition/$diagnose`), the source and the request id as `AuditEvent.id` (= `X-Request-Id`). **Never recorded:** the request or response body, the query string, the token, the full IP (IPv4 is truncated to `a.b.c.0`, IPv6 to its first three groups) and, unless the operator opts in, the patient.
+**Audit.** Every non-conformance request under `/fhir`, and every failure, produces one `AuditEvent` (profile `ncp-audit-event`): `type` rest, subtype operation/read/search-type, action `E`/`R`, `recorded`, `outcome` (`0` success, `4` 4xx, `8` 5xx), the agent (API-key label, or `anonymous` for a refused request), the route (`POST /fhir/Condition/$diagnose`), the source and the request id as `AuditEvent.id` (= `X-Request-Id`). **Never recorded:** the request or response body, the query string, the token, the full IP (IPv4 is truncated to `a.b.c.0`, IPv6 to its first three groups) and, unless the operator opts in, the patient.
 
 | Variable | Effect |
 |---|---|
@@ -1366,13 +1572,165 @@ Scopes are `system/<ResourceType|*>.<read|write|*>`. An operation that produces 
 
 **Terminology mappings.** `GET /fhir/ConceptMap/{id}`: `assessment-item-to-loinc`, `growth-metric-to-loinc`, `ncp-care-role-to-practitioner-role`, `growth-status-to-interpretation`. `POST /fhir/ConceptMap/$translate` (`system`, `code`, optional `url`, `targetSystem`) returns `result` and one `match` per mapping. A code with no true mapping is an explicit negative (`result=false`, or `unmatched` in the map), never a guess. For instance `dietitian` has no HL7 `practitioner-role` equivalent, and only `physician`, `nurse` and `pharmacist` are mapped. The growth-status map is `relatedto`, not `equivalent`.
 
-**R4 validation.** `POST /fhir/$validate` (one `resource` parameter; any resource or Bundle) returns an `OperationOutcome`; `$validate-document` and `$ncp-document` run the same check on every resource in the Bundle (an R4 error stops `$ncp-document` with a 422). It checks element names (unknown ones are warnings), required elements, array/single cardinality, required code bindings, primitive formats (instant, dateTime, date, code, uri, id), references, extensions, narrative XHTML, empty arrays/objects/nulls, and the main invariants (cmp-1, cmp-2, bdl-7/9/10/11, obs-6, gol-1, cpl-3, org-1) for 19 resource types, plus the minimum cardinality of any Chakudya profile named in `meta.profile`. **It is not the HL7 FHIR Validator.** It loads no StructureDefinitions and does not check terminology beyond required bindings. It does not validate against any implementation guide: this facade claims R4 base conformance and its own five profiles only, not IPS, SMART App Launch (OAuth here is client_credentials only), US Core or any national IG. Run the HL7 validator in your pipeline for those. While building this step the checker found and fixed three real defects in earlier steps: empty `entity`/`activity` arrays and Step 5 sections marked empty with no text.
+**R4 validation.** `POST /fhir/$validate` (one `resource` parameter; any resource or Bundle) returns an `OperationOutcome`; `$validate-document` and `$ncp-document` run the same check on every resource in the Bundle (an R4 error stops `$ncp-document` with a 422). It checks element names (unknown ones are warnings), required elements, array/single cardinality, required code bindings, primitive formats (instant, dateTime, date, code, uri, id), references, extensions, narrative XHTML, empty arrays/objects/nulls, and the main invariants (cmp-1, cmp-2, bdl-7/9/10/11, obs-6, gol-1, cpl-3, org-1) for 19 resource types, plus the minimum cardinality of any Chakudya profile named in `meta.profile`. **It is not the HL7 FHIR Validator.** It loads no StructureDefinitions and does not check terminology beyond required bindings. It does not validate against any implementation guide: this facade claims R4 base conformance and its own five profiles only, not IPS, SMART App Launch (there is no OAuth here), US Core or any national IG. Run the HL7 validator in your pipeline for those. While building this step the checker found and fixed three real defects in earlier steps: empty `entity`/`activity` arrays and Step 5 sections marked empty with no text.
 
-**CapabilityStatement.** `rest.security` (OAuth service, token URL, scope model, the current mode), system-level `validate`, `supportedProfile`s, and the `AuditEvent`, `ConceptMap`, `Composition`, `Provenance`, `CareTeam`, `StructureDefinition`, `CodeSystem`, `OperationDefinition` and `Questionnaire` resources.
+**CapabilityStatement.** `rest.security` (API key as a Bearer token, the scope model, the requirement that every operation except conformance reads needs a key), system-level `validate`, `supportedProfile`s, and the `AuditEvent`, `ConceptMap`, `Composition`, `Provenance`, `CareTeam`, `StructureDefinition`, `CodeSystem`, `OperationDefinition` and `Questionnaire` resources.
+
+### Sports nutrition (`/sports`) — `v1.46.0+`
+
+Calculators from Krause and Mahan's *Food and the Nutrition Care Process*, 16th ed., chapter 23 (Nutrition in Exercise and Sports Performance). Any API key, 100 requests/minute, nothing stored, no SQL. Every result returns its steps, warnings and sources. Where the chapter gives a range, you get the range; where the chapter contradicts itself or has an arithmetic slip, `GET /sports/reference` lists it under `known_issues` and the result says which figure it used.
+
+| Route | What it calculates |
+|---|---|
+| `GET /sports/reference` | Activity factors, kcal/kg tiers, macro targets, fuel timing, hydration, body-fat standards, sweat electrolytes, known chapter issues |
+| `POST /sports/energy` | Cunningham REE (500 + 22 x lean body mass), Box 23.2 activity factor or custom multiplier, exercise by METs (0.0175 kcal/kg/min per MET) and/or `activity_log` (Appendix 10 table), TEF as a separate 10% step, kcal/kg cross-check, optional Mifflin-St Jeor cross-check |
+| `POST /sports/macros` | Carbohydrate, protein and fat in g/kg and grams by `profile` (`general_fitness`, `general_training`, `endurance`, `elite_endurance`, `resistance_hypertrophy`), protein per meal, optional energy split with AMDR check, optional `intake` comparison |
+| `POST /sports/fuel-timing` | Carbohydrate 1-4 hours before, during (25-30 g per 30 min over 60 min) and after (1.2 g/kg/h), Box 23.4 meal tiers, drink concentration check |
+| `POST /sports/hydration` | Body-mass loss %, rehydration volume, 80% rule before a second session, in-exercise fluid and sodium, urine specific gravity band, child and master-athlete rules, heat warning |
+| `POST /sports/body-composition` | Fat and lean mass, lowest safe and highest optimal weight, weekly loss/gain rates, weeks to a target |
+| `POST /sports/supplement-dose` | Caffeine, creatine, beta-alanine, HMB, beetroot doses. `age_years` required. Withheld under 18, in pregnancy and when breastfeeding |
+| `POST /sports/plan` | All of the above for one athlete; each section as its own endpoint returns it, a bad value only errors its section |
+
+```bash
+curl -X POST https://chakudya-api.edisontaimu9.workers.dev/sports/energy \
+  -H "Authorization: Bearer YOUR_KEY" -H "Content-Type: application/json" \
+  -d '{"weight_kg":79.5,"lean_body_mass_kg":71.6,"activity_level":"extra_active"}'
+# REE 2075, x 1.9 = 3943, TEF 394, total 4337 kcal (Box 23.2 prints 4336: the chapter rounds as it goes)
+```
+
+**Not the same as `/energy/requirements`.** Box 23.2 adds the thermic effect of food as its own step; the chapter 2 engine treats TEF as already inside its activity multipliers. The two methods are not interchangeable. Use `/energy/requirements` for healthy people, children and clinical stress; use `/sports/energy` for athletes with a body-composition measurement.
+
+**Related routes reused, not repeated:** `POST /activity-energy/calculate` (named exercise), `POST /energy/food-energy` (grams to kcal), `GET /dri` (AMDR, water and electrolytes), `POST /meals/analyze` (what was eaten). Not implemented because the chapter gives no formula: the De Lorenzo equation, energy availability and RED-S thresholds.
+
+### Weight management (`/weight-management`) — `v1.47.0+`
+
+Calculators from Krause and Mahan's *Food and the Nutrition Care Process*, 16th ed., chapter 21 (Nutrition in Weight Management), for weight loss and weight gain. Any API key, 100 requests/minute, nothing stored, no SQL. Maintenance energy comes from `POST /energy/requirements` (not a second copy); BMI class and weight-loss significance reuse the `$assess-nutrition` code; AMDR comes from `GET /dri`. Every result returns its steps, warnings and sources. Where the chapter contradicts itself or looks misprinted, `GET /weight-management/reference?section=known_issues` lists it and the result says which figure it used.
+
+| Route | What it does |
+|---|---|
+| `GET /weight-management/reference` | Chapter tables; `?section=` one of `bmi_classes`, `disease_risk`, `body_fat`, `metabolic_syndrome`, `rates`, `energy_floors`, `macronutrients`, `diets`, `activity`, `treatment`, `unintentional_loss`, `energy_boosters`, `bariatric`, `known_issues` |
+| `GET /weight-management/bariatric` | `?procedure=lagb\|lsg\|rygb\|bpd_ds` (+ `sex`, `childbearing_age`, `pregnant`): diet stages (Table 21.9) and supplementation (Table 21.10). Misprinted values come back as printed with `suspect: true` |
+| `POST /weight-management/assess` | Adults: BMI class, Table 21.3 risk with waist, waist-hip ratio, body-fat obesity, metabolic syndrome (3 of 5), older-adult flags, unintentional-loss significance, treatment-option eligibility flags. Children 2 to under 19: BMI-for-age percentile band (WHO lookup for ages 3-18) and the age-based goal |
+| `POST /weight-management/loss-plan` | Maintenance minus a 500-1000 kcal deficit (or a chosen intake), rate band by BMI beside the static `deficit x 7 / 3500` expectation, 5% and 10% goal weights with timelines, protein 1.2 g/kg, macro split, supplement flag, maintenance at goal weight |
+| `POST /weight-management/gain-plan` | Maintenance plus 500-1000 kcal, protein 12-15% and fat about 30%, expected rate, target weight range, Table 21.12 foods |
+| `POST /weight-management/progress` | Stateless weigh-in tracking: rate vs guideline, 5%/10% milestones, plateau flag, target progress, National Weight Control Registry check |
+| `POST /weight-management/diet-pattern` | Daily grams to energy, AMDR comparison, pattern tags (very low fat, ketogenic, high-protein low-carbohydrate), nutrients at risk, protein g/kg |
+
+```bash
+curl -X POST https://chakudya-api.edisontaimu9.workers.dev/weight-management/loss-plan \
+  -H "Authorization: Bearer YOUR_KEY" -H "Content-Type: application/json" \
+  -d '{"sex":"female","age_years":35,"weight_kg":81.8,"height_cm":165.1,"pal_category":"sedentary"}'
+# maintenance 2124 kcal (IOM overweight equation), intake 1624 kcal, guideline 0.5-1 lb/week
+```
+
+**What it refuses.** An intake below 800 kcal (the very-low-calorie diet range is medically supervised only), a loss plan for BMI under 25, under 19 years, or in pregnancy or breastfeeding, and a gain plan at BMI 25 or more. From age 65 a loss request returns the maintenance estimate and the chapter's advice, with no deficit.
+
+**Chapter examples.** The gain example reproduces exactly (2400 kcal maintains, 2900-3400 gains). The loss example (about 1400 kcal at BMI 30) does not: the IOM equation gives 2124 kcal maintenance, so about 1624 after the deficit. See `known_issues`.
+
+**Related routes reused:** `POST /energy/requirements`, `POST /energy/food-energy`, `GET /dri`, `GET /bmi-for-age`, `GET /growth/assess`. Athlete weight work (body-fat based) stays in `POST /sports/body-composition`.
+
+### Pregnancy and lactation (`/pregnancy`) — `v1.48.0+`
+
+Calculators from Krause and Mahan's *Food and the Nutrition Care Process*, 16th ed., chapter 14 (Nutrition in Pregnancy and Lactation) and Appendix 3. Any API key, 100 requests/minute, nothing stored, no SQL. Energy comes from `POST /energy/requirements` (its pregnancy and lactation add-ons are the chapter's figures, so there is no second copy), and nutrient targets from the DRI tables behind `GET /dri`. Every result returns its steps, warnings and sources. Where the chapter contradicts itself or leaves a gap, `GET /pregnancy/reference?section=known_issues` lists it and the result says which figure it used.
+
+| Route | What it does |
+|---|---|
+| `GET /pregnancy/reference` | Chapter tables; `?section=` one of `weight_gain`, `energy`, `protein`, `twins`, `lab_ranges`, `anemia`, `gdm`, `preeclampsia`, `nutrients`, `adolescent`, `lactation`, `known_issues` |
+| `POST /pregnancy/gestational-age` | From `lmp`, `edd` or `ga_weeks` (+`ga_days`) at `reference_date` (default today, UTC): weeks and days, trimester, due date, milestones |
+| `POST /pregnancy/weight-gain` | Pre-pregnancy BMI category (18.5 / 25 / 30), IOM totals and weekly rates, first-trimester allowance, twins, status at a gestational age, weigh-in series and recent rate |
+| `POST /pregnancy/plan` | `status: pregnant`: energy (trimester worked out from gestational age), protein 0.8 / 1.1 g/kg, DRI targets, twin table, weight-gain goal. `status: lactating`: +330 / +400 kcal, 1800 kcal floor, protein, weight-loss rule |
+| `POST /pregnancy/assess` | Independent sections: anemia by trimester with altitude and smoking, Table 14.4 labs, GDM glucose tests, preeclampsia criteria |
+
+```bash
+curl -X POST https://chakudya-api.edisontaimu9.workers.dev/pregnancy/plan \
+  -H "Authorization: Bearer YOUR_KEY" -H "Content-Type: application/json" \
+  -d '{"status":"pregnant","age_years":28,"pre_pregnancy_weight_kg":60,"height_cm":162,"pal_category":"low_active","lmp":"2026-04-01","current_weight_kg":66}'
+# trimester 3: energy 2559 kcal (2107 + 452), protein 73 g (1.1 g/kg), iron 27 mg, folate 600 µg DFE
+```
+
+**Not from the chapter (stated in every result that uses them).** The chapter gives no dating rules: pregnancy is counted as 280 days from the last menstrual period, trimester 1 is under 14 weeks, trimester 2 is 14 to under 28 weeks, trimester 3 is 28 weeks and over, and the "second half" for protein starts at 20 weeks. The expected gain at a given week is an approximate straight line from the first-trimester allowance at 13 weeks to the printed total at 40 weeks, because the chapter prints no weekly curve.
+
+**What it will not do.** It gives no weight-loss or deficit advice in pregnancy, no twin gain range for underweight women (the chapter has none), and no diagnosis: the assessment sections are screening aids.
+
+**Related routes reused:** `POST /energy/requirements`, `GET /dri`, `GET /dri/compare`, `POST /fhir/Observation/$assess-nutrition` (pre-pregnancy BMI and MUAC), `POST /meals/analyze`.
+
+### Renal nutrition (`/renal-nutrition`) — `v1.49.0+` (`/food-plan` from `v1.50.0`)
+
+Calculators built on the *KDOQI Clinical Practice Guideline for Nutrition in CKD: 2020 Update* and Krause and Mahan's *Food and the Nutrition Care Process*, chapter 35 (Tables 35.9 and 35.10, Box 35.3). Any API key, 100 requests/minute, nothing stored, no SQL. Every target comes from KDOQI 2020. Krause Table 35.9 is older (KDOQI 2000), so its figures are returned separately as `legacy_krause` and never mixed into the targets. The renal food list stays at `GET /renal`.
+
+| Route | What it does |
+|---|---|
+| `GET /renal-nutrition/reference` | `?section=` one of `kdoqi_2020`, `legacy_krause`, `labs`, `adequacy`, `weight_adjustment`, `monitoring`, `ckd_stages`, `emergency_diet`, `known_issues` |
+| `GET /renal-nutrition/emergency-diet` | Box 35.3: 5 days or less when dialysis is not possible. Choices per day, emergency kit, storage |
+| `POST /renal-nutrition/stage` | `sex`, `age_years`, `creatinine_mg_dl` or `creatinine_umol_l`, optional `acr_mg_g`: CKD-EPI 2021 eGFR, G and A category, and the `status` to use next |
+| `POST /renal-nutrition/requirements` | `status` (`ckd_1_2`, `ckd_3_5`, `hd`, `pd`, `transplant`), `weight_kg`, optional `height_cm`, `sex`, `diabetes`, `ckd_stage`: protein, energy, sodium, calcium, bicarbonate, potassium and phosphorus rules, with amounts per day |
+| `POST /renal-nutrition/labs` | Table 35.10 values (mg/dL, mEq/L or SI) against the dialysis or normal-kidney column, with the diet action and the calcium x phosphorus product |
+| `POST /renal-nutrition/adequacy` | URR, Kt/V, eKt/V, weekly Kt/V (peritoneal), nPNA, interdialytic weight gain |
+| `POST /renal-nutrition/plan` | All of the above for the parts sent, plus the KDOQI monitoring schedule |
+| `POST /renal-nutrition/food-plan` | Same body as `/requirements`, plus optional `exchange_type`, `q`, `limit` (1-300), `share_flag_pct` (5-100, default 25), `potassium_mg_per_day_max`, `phosphorus_mg_per_day_max`, `legacy_krause_limits`. Reads `exchange_lists` and `renal_foods` (read only) and returns each exchange item as a percentage of the daily protein, sodium, potassium and phosphorus limits, per-group averages with the exchanges that fit before the tightest limit, and the matching `renal_foods` row |
+
+```bash
+curl -X POST https://chakudya-api.edisontaimu9.workers.dev/renal-nutrition/plan \
+  -H "Authorization: Bearer YOUR_KEY" -H "Content-Type: application/json" \
+  -d '{"sex":"male","age_years":67,"creatinine_mg_dl":3.3,"weight_kg":48,"height_cm":170,"diabetes":true,"labs":{"potassium_meq_l":5.8,"phosphorus_mg_dl":6.7}}'
+# eGFR 19.7 (G4) -> ckd_3_5; protein 0.6-0.8 g/kg (diabetes) on the adjusted weight; potassium and phosphorus flagged high with diet actions
+```
+
+**Linking the targets to the food exchange list (`v1.50.0+`).** `POST /renal-nutrition/food-plan` runs `/requirements` unchanged and divides its daily targets by what one exchange of each food supplies. Protein (KDOQI 2020, g/day maximum) and sodium (under 2.3 g/day) come from the targets. KDOQI 2020 gives no potassium or phosphorus intake number, so those budgets exist only when you send `potassium_mg_per_day_max` or `phosphorus_mg_per_day_max` (labelled `clinician-set`) or `legacy_krause_limits: true` (Krause Table 35.9, labelled older than KDOQI 2020). The column names of `exchange_lists` and `renal_foods` are detected rather than assumed: the result lists them in `field_map` and any nutrient it could not find in `missing_fields`. A value missing from an exchange row (`exchange_lists` has no sodium, potassium or phosphorus) is filled from the matching `renal_foods` row (`po4`, `na`, `k`) only on a strong name match, and marked `filled_from_renal_foods`. A one-word name match is returned as `renal_foods_possible_match` and nothing is copied. `renal_foods` values are for that row's own portion (`grams`, `measure`), not per 100 g. The share-of-day figures, group averages, `share_flag_pct` flag and the name matching are arithmetic added by this API, not from KDOQI 2020 or Krause.
+
+```bash
+curl -X POST https://chakudya-api.edisontaimu9.workers.dev/renal-nutrition/food-plan \
+  -H "Authorization: Bearer YOUR_KEY" -H "Content-Type: application/json" \
+  -d '{"status":"hd","weight_kg":60,"potassium_mg_per_day_max":2000,"exchange_type":"protein"}'
+```
+
+**Where the two sources differ** (the full list is `GET /renal-nutrition/reference?section=known_issues`):
+
+| | Krause Table 35.9 (2000) | KDOQI 2020 (used) |
+|---|---|---|
+| Protein, CKD 3-5 | 0.6-1.0 g/kg | 0.55-0.60 g/kg; 0.6-0.8 with diabetes |
+| Protein, dialysis | 1.2 (HD), 1.2-1.5 (PD) g/kg | 1.0-1.2 g/kg |
+| Energy | 30-35 kcal/kg (35 on HD) | 25-35 kcal/kg |
+| Sodium | 1.5-2 g/day | under 2.3 g/day |
+| Potassium, phosphorus | numeric ranges | adjust to keep serum normal; no intake number |
+
+**Not from either document (stated in the result).** CKD-EPI 2021 and the KDIGO categories in `/stage`, the Daugirdas spKt/V and rate-adjusted eKt/V in `/adequacy` (optional, needs session length, ultrafiltration and weight), and the SI conversion factors. The 2020 guideline has no protein statement for CKD 1-2 or transplant recipients, no fluid statement, and no numeric potassium or phosphorus target: those come back as `null` with the reason. The targets are for metabolically stable adults.
+
+**Related routes reused:** `GET /renal` (renal food list), `POST /meals/analyze` (single-meal kidney-disease screen), `GET /dri`.
+
+### Diabetes nutrition (`/diabetes`) — `v1.51.0+`
+
+Calculators and reference tables from Krause 16th ed. chapter 30, the ADA Standards of Care in Diabetes 2026 and the UCT exchange lists. Any valid API key. Where Krause (written around ADA 2021) and ADA 2026 differ, ADA 2026 is used and the difference is listed in `GET /diabetes/reference?section=known_issues`. Arithmetic added by this API and not printed in the sources is labelled in each result.
+
+| Route | What it does |
+|---|---|
+| `GET /diabetes/reference?section=` | `diagnosis`, `a1c_eag`, `glycemic_targets`, `pregnancy_targets`, `hypoglycemia`, `insulin_rules`, `insulin_action_times`, `exercise`, `sick_day`, `nutrition_recommendations`, `food_list_values`, `medication_nutrition`, `known_issues`. No section lists them |
+| `POST /diabetes/status` | `a1c_percent` or `a1c_mmol_mol`, `fpg_*`, `ogtt_2h_*`, `random_*` (mg/dL or mmol/L), `classic_symptoms`, `a1c_unreliable` → normal, prediabetes or diabetes (Krause Table 30.1), and eAG |
+| `POST /diabetes/glucose-targets` | `population`: `nonpregnant_adult` (ADA 2026: A1C <7%, 80-130 before meals, <180 after, CGM time in range) or `pregnancy` (fasting <95, 1 h <140, 2 h <120) |
+| `POST /diabetes/carb-plan` | `carb_g_per_day`, or `energy_kcal` with `carb_pct`, or `sex` for the Krause starting point (women 3-4, men 4-5 carbohydrate servings per meal, 1-2 per snack); `meals`, `snacks`, `meal_weights`, `population: gdm` → grams and 15 g exchanges per meal and snack |
+| `POST /diabetes/carb-count` | `total_carb_g`, `fibre_g`, `sugar_alcohol_g`, `servings` → counted carbohydrate (half the fibre and sugar alcohol is subtracted only above 5 g) |
+| `POST /diabetes/exchange-plan` | Reads `exchange_lists` (read only). `exchanges: {type: n}` totals a daily prescription by the Krause 4-4-9 worksheet method; `meals: {meal: {type: n}}` gives carbohydrate choices per meal; `carb_plan: {...}` attaches example choices to each slot; with none of these it returns the exchange types and items |
+| `POST /diabetes/glycemic-load` | Reads `glycaemic_index_data` (read only). `foods: [{food, carbs_g, gi?}]` → GI from the table, GL = GI × carbohydrate / 100 per food and for the meal. Foods with no GI are listed, not guessed |
+| `POST /diabetes/insulin` | `tdd_units` (or clinician-set `icr_g_per_unit` and `cf_mg_dl_per_unit`), `carbs_g`, `current_glucose_*`, `target_glucose_*`, `dose_step` → 500 rule, 1700 rule, mealtime and correction dose. No dose is calculated below 70 mg/dL. Active insulin is not modelled. A starting estimate for the prescriber |
+| `POST /diabetes/hypoglycemia` | `glucose_*`, `assistance_needed`, `able_to_swallow`, `on_alpha_glucosidase_inhibitor` → ADA level 1-3 and treatment steps |
+| `POST /diabetes/exercise` | `duration_min`, `on_insulin_or_secretagogue`, `pre_exercise_glucose_*`, `intensity`, `ketones_present` → extra carbohydrate (15 g per 30-60 min on insulin or a secretagogue) |
+| `POST /diabetes/plan` | `labs`, `population`, `carb` → status, glucose targets and carbohydrate plan in one call |
+
+```bash
+curl -X POST https://chakudya-api.edisontaimu9.workers.dev/diabetes/carb-plan \
+  -H "Authorization: Bearer YOUR_KEY" -H "Content-Type: application/json" \
+  -d '{"energy_kcal":1900,"carb_pct":50,"meals":3,"snacks":3}'
+
+curl -X POST https://chakudya-api.edisontaimu9.workers.dev/diabetes/exchange-plan \
+  -H "Authorization: Bearer YOUR_KEY" -H "Content-Type: application/json" \
+  -d '{"carb_plan":{"carb_g_per_day":180,"meals":3,"snacks":2}}'
+```
+
+Gaps: `exchange_lists` is the South African UCT list, so Malawian foods appear only as maize meal portions, and `glycaemic_index_data` holds only a few Malawian studies. Malawi diabetes guidelines are not loaded yet.
 
 ### Recipes
 
-**`POST /recipes/calculate`** *(public, rate-limited)* — give it a list of ingredients, get back the recipe's total and per-serving nutrition. Builds directly on Serving-Size Intelligence above.
+**`POST /recipes/calculate`** *(API key, rate-limited)* — give it a list of ingredients, get back the recipe's total and per-serving nutrition. Builds directly on Serving-Size Intelligence above.
 
 ```json
 {
@@ -1390,7 +1748,7 @@ Scopes are `system/<ResourceType|*>.<read|write|*>`. An operation that produces 
 - `servings` (top-level, optional, default `1`) — the recipe yield, used to compute `nutrients_per_serving`.
 - Response includes `total_nutrients`, `nutrients_per_serving`, `total_grams`, `grams_per_serving`, a per-ingredient `ingredients[]` breakdown (with `grams_basis` explaining how each quantity was converted), and `unresolved_ingredients[]` for anything that couldn't be matched or converted — one bad ingredient never fails the whole request.
 
-**`POST /meals/analyze`** *(public, rate-limited)* — same ingredient resolution as `/recipes/calculate` (built on the same shared `resolveIngredientsList()`), but framed around a single eaten meal rather than a recipe yield — no `servings`, since a meal is eaten once.
+**`POST /meals/analyze`** *(API key, rate-limited)* — same ingredient resolution as `/recipes/calculate` (built on the same shared `resolveIngredientsList()`), but framed around a single eaten meal rather than a recipe yield — no `servings`, since a meal is eaten once.
 
 ```json
 {
@@ -1421,7 +1779,7 @@ Adds, on top of the recipe response shape:
 { "ingredients": [{ "food_name": "groundnut flour porridge", "quantity": 1, "unit": "cup" }], "conditions": ["pregnancy", "food_allergy"], "age": 26, "allergens": ["peanut"] }
 ```
 
-**`POST /ingredients/parse`** *(public, rate-limited)* — turns free text into the `ingredients[]` shape `/recipes/calculate` and `/meals/analyze` accept above, so a caller can paste a plain sentence instead of hand-building JSON.
+**`POST /ingredients/parse`** *(API key, rate-limited)* — turns free text into the `ingredients[]` shape `/recipes/calculate` and `/meals/analyze` accept above, so a caller can paste a plain sentence instead of hand-building JSON.
 
 ```json
 { "text": "2 eggs, 1 cup rice, 100g chicken and ½ avocado" }
@@ -1515,7 +1873,7 @@ a per-patient interaction checker.
 
 - `GET /drug-interactions`
 - `GET /drug-interactions/:id`
-- `GET /drug-interactions/search?q=warfarin` *(public, rate-limited)* — keyword scan across `drug`/`aliases`/`category`/`subcategory`/`tags`/`effects`/`implications` (same whole-row-scan approach `/rag/ask` already uses for `exchange_lists`/`renal_foods`/`enteral_formulas`, since none of these have a single documented column to `ilike` on). `q` can be a drug name, brand name, drug class, or a nutrient/food keyword (e.g. `"grapefruit"`, `"vitamin B12"`); `drug` is also accepted as the param name. Returns rows with a `match_score` (count of matched keywords), sorted descending.
+- `GET /drug-interactions/search?q=warfarin` *(API key, rate-limited)* — keyword scan across `drug`/`aliases`/`category`/`subcategory`/`tags`/`effects`/`implications` (same whole-row-scan approach `/rag/ask` already uses for `exchange_lists`/`renal_foods`/`enteral_formulas`, since none of these have a single documented column to `ilike` on). `q` can be a drug name, brand name, drug class, or a nutrient/food keyword (e.g. `"grapefruit"`, `"vitamin B12"`); `drug` is also accepted as the param name. Returns rows with a `match_score` (count of matched keywords), sorted descending.
 - `POST /drug-interactions` *(admin)*
 - `POST /drug-interactions/bulk` *(admin)*
 - `PUT /drug-interactions/:id` *(admin)*
@@ -1530,8 +1888,8 @@ Row shape: `{ external_id, drug, aliases[], category, subcategory, effects[], im
 
 - `GET /packaged`
 - `GET /packaged/pending` *(admin)* — review queue
-- `POST /packaged/submit` *(public, rate-limited)*
-- `POST /packaged/scan` *(public, rate-limited)*
+- `POST /packaged/submit` *(API key, rate-limited)*
+- `POST /packaged/scan` *(API key, rate-limited)*
 - `POST /packaged/:id/approve` *(admin)*
 - `POST /packaged/:id/reject` *(admin)*
 - `PUT /packaged/:id` *(admin)*
@@ -1676,7 +2034,7 @@ alter table packaged_foods add column if not exists ocr_raw jsonb;
 No user-account system exists in this API — same model as the memory
 system's `session_id`: the client generates and keeps its own identifier
 (a device id, an app-level user id, whatever) and passes it as `user_id`
-on every call. These endpoints are public and rate-limited, not
+on every call. These endpoints need an API key and are rate-limited, not
 admin-gated, since there's no server-side account to authenticate against.
 
 Rows are **not** hydrated with the underlying food data — just the
@@ -1734,7 +2092,7 @@ create index if not exists view_history_user_id_idx on view_history(user_id, vie
 
 ### Food Log (nutrition diary)
 
-Same public, self-declared-identity model as Favorites & History above —
+Same self-declared-identity model (API key required, but no per-user accounts) as Favorites & History above —
 no server-side account system, `user_id` is whatever the client supplies.
 
 **`GET /log?user_id=...&date=YYYY-MM-DD`** *(date optional)* — diary
@@ -1793,7 +2151,7 @@ create index if not exists food_log_entries_user_date_idx on food_log_entries(us
 
 ### RAG
 
-- `POST /rag/retrieve` *(public, rate-limited)*
+- `POST /rag/retrieve` *(API key, rate-limited)*
 - `POST /rag/ingest` *(admin)*
 
 `POST /rag/retrieve` body:
@@ -1817,7 +2175,7 @@ create index if not exists food_log_entries_user_date_idx on food_log_entries(us
 }
 ```
 
-`POST /rag/ask` *(public, rate-limited — 15 req/min per IP)* — RAG Search Orchestrator
+`POST /rag/ask` *(API key, rate-limited — 15 req/min per IP)* — RAG Search Orchestrator
 
 Runs the full pipeline: **Intent Detection** (Groq `llama-3.1-8b-instant`, with a
 keyword-based heuristic fallback) → **Search Orchestrator** (fans out, in
@@ -1876,8 +2234,8 @@ Per-session clinical scratchpad for Oasis AI. Scoped by `session_id` (the
 app's own `SESSION_ID`, regenerated per page load) — this is intentionally
 session-scoped working memory, not a long-term cross-visit profile.
 
-- `POST /memory/write` *(public, rate-limited)*
-- `POST /memory/recall` *(public, rate-limited — preferred)* / `GET /memory/recall` *(deprecated, same params as query string)*
+- `POST /memory/write` *(API key, rate-limited)*
+- `POST /memory/recall` *(API key, rate-limited — preferred)* / `GET /memory/recall` *(deprecated, same params as query string)*
 - `POST /memory/consolidate` *(admin — also run automatically, hourly, by a cron trigger)*
 
 **Setup required** (not automatic — run once):
@@ -2024,7 +2382,7 @@ curl -X POST "https://chakudya-api.<your-subdomain>.workers.dev/foods" \
   -d '{"food_name":"Matemba","category":"fish"}'
 ```
 
-### Community packaged submission (public)
+### Community packaged submission (API key)
 
 ```bash
 curl -X POST "https://chakudya-api.<your-subdomain>.workers.dev/packaged/submit" \
@@ -2032,7 +2390,7 @@ curl -X POST "https://chakudya-api.<your-subdomain>.workers.dev/packaged/submit"
   -d '{"barcode":"6001234567890","product_name":"ONGA Mchuzi Mix"}'
 ```
 
-### RAG retrieval (public)
+### RAG retrieval (API key)
 
 ```bash
 curl -X POST "https://chakudya-api.<your-subdomain>.workers.dev/rag/retrieve" \
@@ -2044,6 +2402,5 @@ curl -X POST "https://chakudya-api.<your-subdomain>.workers.dev/rag/retrieve" \
 
 ## Maintainer
 
-**Edison Taimu**
-Blantyre, Malawi  
+**Edison Taimu**, Blantyre, Malawi  
 BSc Nutrition & Dietetics (KUHeS) · Self-taught Web Developer

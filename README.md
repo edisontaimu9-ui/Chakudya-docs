@@ -204,7 +204,7 @@ chakudya-docs/
 │   ├── copy.js                   # copy-to-clipboard + toasts
 │   └── main.js                   # bootstraps everything, hash router
 ├── assets/favicon.svg
-└── API_SOURCE_README.md          # the original Chakudya API repo's README, for reference
+└── API_SOURCE_README.md          # copy of docs/API-REFERENCE.md from the Chakudya API repo (v1.53.0), for reference
 ```
 
 The UI never hardcodes an endpoint list - every route, parameter, schema,
@@ -257,13 +257,13 @@ only)" summary in the spec.
 - `GET /foods` - List foods
 - `POST /foods` - Create a food (admin)
 - `POST /foods/bulk` - Bulk-create foods (admin)
-- `GET /foods/lookup` - External food lookup cascade (public, rate-limited)
-- `GET /foods/autocomplete` - Search-as-you-type suggestions (public, rate-limited)
-- `GET /foods/categories` - Food category list (public, rate-limited, cached 24h)
-- `GET /foods/search` - Typo-tolerant fuzzy search over foods (public, rate-limited)
-- `GET /foods/substitutes` - Nutritionally close substitutes for a food (public, rate-limited)
-- `GET /foods/compare` - Side-by-side nutrient comparison of 2-6 foods (public, rate-limited)
-- `GET /foods/by-category` - Browse foods by category (public, rate-limited)
+- `GET /foods/lookup` - External food lookup cascade (API key, rate-limited)
+- `GET /foods/autocomplete` - Search-as-you-type suggestions (API key, rate-limited)
+- `GET /foods/categories` - Food category list (API key, rate-limited, cached 24h)
+- `GET /foods/search` - Typo-tolerant fuzzy search over foods (API key, rate-limited)
+- `GET /foods/substitutes` - Nutritionally close substitutes for a food (API key, rate-limited)
+- `GET /foods/compare` - Side-by-side nutrient comparison of 2-6 foods (API key, rate-limited)
+- `GET /foods/by-category` - Browse foods by category (API key, rate-limited)
 - `GET /foods/local-categories` - Categories used by the local food table (API key, rate-limited)
 - `GET /foods/baby-foods` - Baby and infant foods (API key, rate-limited)
 - `GET /foods/convert` - Household and standard measures for one food, either way round (API key, rate-limited)
@@ -472,8 +472,8 @@ only)" summary in the spec.
 **Packaged**
 - `GET /packaged` - List packaged/branded foods
 - `GET /packaged/pending` - Admin review queue (admin)
-- `POST /packaged/submit` - Submit a packaged food (public, rate-limited)
-- `POST /packaged/scan` - Submit a packaged food via photo (public, rate-limited)
+- `POST /packaged/submit` - Submit a packaged food (API key, rate-limited)
+- `POST /packaged/scan` - Submit a packaged food via photo (API key, rate-limited)
 - `POST /packaged/{id}/approve` - Approve a pending packaged food (admin)
 - `POST /packaged/{id}/reject` - Reject a pending packaged food (admin)
 - `PUT /packaged/{id}` - Replace a packaged food (admin)
@@ -481,29 +481,29 @@ only)" summary in the spec.
 - `DELETE /packaged/{id}` - Delete a packaged food (admin)
 
 **Favorites**
-- `GET /favorites` - List a user's favorites (public, rate-limited)
-- `POST /favorites` - Save a favorite (public, rate-limited, idempotent)
-- `DELETE /favorites` - Remove a favorite (public, rate-limited)
+- `GET /favorites` - List a user's favorites (API key, rate-limited)
+- `POST /favorites` - Save a favorite (API key, rate-limited, idempotent)
+- `DELETE /favorites` - Remove a favorite (API key, rate-limited)
 
 **History**
-- `GET /history` - Recently viewed, most recent first (public, rate-limited)
-- `POST /history` - Log a view (public, rate-limited, opt-in)
+- `GET /history` - Recently viewed, most recent first (API key, rate-limited)
+- `POST /history` - Log a view (API key, rate-limited, opt-in)
 
 **Food Log**
-- `GET /log` - List nutrition diary entries (public, opt-in identity)
+- `GET /log` - List nutrition diary entries (API key, opt-in identity)
 - `POST /log` - Log a food diary entry
 - `GET /log/{id}` - Get a food log entry by id
 - `DELETE /log/{id}` - Delete a food log entry
 - `GET /log/summary` - Daily or weekly calorie totals for a user
 
 **Recipes**
-- `POST /recipes/calculate` - Compute total and per-serving nutrition for a recipe (public, rate-limited)
+- `POST /recipes/calculate` - Compute total and per-serving nutrition for a recipe (API key, rate-limited)
 
 **Meals**
-- `POST /meals/analyze` - Analyze a meal's macro split, food groups, and (optionally) targets (public, rate-limited)
+- `POST /meals/analyze` - Analyze a meal's macro split, food groups, and (optionally) targets (API key, rate-limited)
 
 **Ingredients**
-- `POST /ingredients/parse` - Parse free-text ingredients into structured items (public, rate-limited)
+- `POST /ingredients/parse` - Parse free-text ingredients into structured items (API key, rate-limited)
 
 **DRI**
 - `GET /dri/life-stages` - List every DRI life-stage group
@@ -511,10 +511,10 @@ only)" summary in the spec.
 - `POST /dri/compare` - Compare an actual day's intake against a life stage's RDA/AI targets
 
 **RAG**
-- `POST /rag/retrieve` - Raw semantic retrieval (public, rate-limited)
+- `POST /rag/retrieve` - Raw semantic retrieval (API key, rate-limited)
 - `DELETE /rag/source` - Bulk-remove RAG chunks by citation (admin)
 - `POST /rag/ingest` - Ingest a document into the RAG knowledge base (admin)
-- `POST /rag/ask` - RAG Search Orchestrator (public, rate-limited)
+- `POST /rag/ask` - RAG Search Orchestrator (API key, rate-limited)
 - `POST /rag/upload` - Upload a document for automatic ingestion (admin)
 - `POST /rag/enqueue` - Queue an already-uploaded file, or retry a failed job (admin)
 - `GET /rag/jobs` - List recent ingestion jobs (admin)
@@ -522,8 +522,8 @@ only)" summary in the spec.
 - `POST /rag/webhook` - Storage trigger webhook (shared secret)
 
 **Memory**
-- `POST /memory/write` - Write a raw memory fact (public, rate-limited)
-- `POST /memory/recall` - Recall top-K relevant memory rows for a session (public, rate-limited, preferred)
+- `POST /memory/write` - Write a raw memory fact (API key, rate-limited)
+- `POST /memory/recall` - Recall top-K relevant memory rows for a session (API key, rate-limited, preferred)
 - `GET /memory/recall` - Recall (deprecated - use POST, same params as query string)
 - `POST /memory/consolidate` - Manually trigger consolidation for one session (admin)
 
