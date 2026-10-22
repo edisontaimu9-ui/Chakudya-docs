@@ -23,6 +23,7 @@
     ["usage.html", "Usage", "usage"],
     ["monitoring.html", "Errors & latency", "monitoring"],
     ["health.html", "Uptime", "health"],
+    ["surveillance.html", "Surveillance", "surveillance"],
     ["activity.html", "Admin actions", "activity"],
     ["ingest.html", "RAG ingest", "ingest"],
     ["audit.html", "FHIR audit", "audit"],

@@ -141,3 +141,9 @@
   @media (prefers-reduced-motion: reduce) {
     .pulse::after, .ibtn.busy svg { animation:none; }
   }
+
+  /* Surveillance page */
+  .notice { margin:12px 0 0; padding:10px 12px; border:1px solid #5a4a22; border-radius:10px; background:#1d180d; color:var(--warn); font-size:13px; }
+  ul.tips { margin:6px 0 0; padding-left:18px; font-size:13.5px; color:var(--text); }
+  ul.tips li { margin:3px 0; }
+  .filters select { flex:1 1 200px; min-width:160px; }

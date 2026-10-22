@@ -1,0 +1,256 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<meta name="robots" content="noindex, nofollow, noarchive" />
+<meta name="theme-color" content="#0e1210" />
+<title>Chakudya admin · Surveillance</title>
+<link rel="stylesheet" href="admin.css" />
+</head>
+<body>
+<main id="root"></main>
+
+<template id="tpl">
+  <h2>Nutrition surveillance</h2>
+  <div class="bar" style="gap:6px;margin:0 0 8px" id="wFilter">
+    <button data-w="3" class="chip">3 months</button><button data-w="6" class="chip">6 months</button><button data-w="12" class="chip on">12 months</button><button data-w="24" class="chip">24 months</button>
+  </div>
+  <div class="bar" style="gap:6px;margin:0 0 8px;justify-content:flex-start" id="gFilter"></div>
+  <p id="sMsg" class="muted" role="status"></p>
+  <div id="sStats" class="grid"></div>
+  <div id="sCaveat" class="notice hide"></div>
+
+  <h2>What needs attention</h2>
+  <div id="sInsights"></div>
+
+  <h2>District explorer</h2>
+  <div class="filters">
+    <select id="xGroup" aria-label="Population group"></select>
+    <select id="xInd" aria-label="Indicator"></select>
+  </div>
+  <p id="xMsg" class="muted" role="status"></p>
+  <div id="xNational" class="grid"></div>
+  <h3 class="muted" style="margin:14px 0 6px;font-size:14px">By month (all districts)</h3>
+  <div id="xTrend"></div>
+  <p id="xTrendNote" class="muted"></p>
+  <h3 class="muted" style="margin:14px 0 6px;font-size:14px">By district</h3>
+  <div class="wrap" id="xTable"></div>
+
+  <h2>National figures</h2>
+  <div id="sNational"></div>
+
+  <h2>Data quality</h2>
+  <div id="sQuality"></div>
+</template>
+
+<script src="../js/config.js"></script>
+<script src="admin.js"></script>
+<script>
+(() => {
+  "use strict";
+  const { $, esc, fmt, stat, call } = Admin;
+
+  const STALE_MS = 10 * 60 * 1000; // surveillance data changes slowly, so auto refresh only reloads every 10 minutes
+  let months = 12;
+  let group = ""; // "" = all groups (insights filter)
+  let xGroup = "under5";
+  let xInd = "stunting";
+  let ref = null;
+  let lastLoad = 0;
+
+  const PRI_CLASS = { critical: "bad", high: "warn", medium: "run", info: "" };
+  const TYPE_LABEL = { hotspot: "Hotspot", rising: "Rising", trend: "Trend", data_gap: "Data gap" };
+  const CLS_LABEL = { hotspot: "hotspot", watch: "watch", typical: "typical", below_national: "below national", insufficient_data: "too few to compare", suppressed: "hidden" };
+  const CLS_PILL = { hotspot: "bad", watch: "warn", typical: "", below_national: "ok", insufficient_data: "", suppressed: "" };
+
+  const pct = (n) => (typeof n === "number" ? n + "%" : "n/a");
+  const num = (n) => (typeof n === "number" ? fmt(n) : esc(n ?? "n/a")); // counts can read "<10"
+  const monthShort = (m) => { const d = new Date(m + "-01T00:00:00Z"); return d.toLocaleDateString(undefined, { month: "short", timeZone: "UTC" }) + "<br>" + String(d.getUTCFullYear()).slice(2); };
+
+  // One shared explanation for the three common failures, used by every call on this page.
+  function problem(r, what) {
+    if (r.status === 403) return `The gateway has not enabled ${what} yet (add the /surveillance paths to ADMIN_GET_PATHS).`;
+    if (r.status === 404) return "The API does not have the surveillance engine yet. Deploy API v1.54.0.";
+    if (r.status === 0) return "Couldn't reach the gateway. Check your connection.";
+    return `Couldn't load ${what} (${r.status || "network"}).`;
+  }
+
+  let refResponse = null;
+  async function loadRef() {
+    if (ref) return ref;
+    refResponse = await call("/surveillance/reference");
+    if (refResponse.status === 200 && refResponse.body?.data?.indicators) ref = refResponse.body.data;
+    return ref;
+  }
+
+  /* ───── insights, headline numbers, national table, quality ───── */
+
+  function insightCard(i) {
+    const place = i.district ? `${i.district}${i.region ? " · " + i.region : ""}` : "National";
+    const acts = (i.suggested_actions || []).map((a) => `<li>${esc(a)}</li>`).join("");
+    const qs = (i.research_questions || []).map((a) => `<li>${esc(a)}</li>`).join("");
+    const more = acts || qs
+      ? `<details><summary>What to do and what to ask</summary>${acts ? `<div class="muted" style="margin-top:8px">Consider</div><ul class="tips">${acts}</ul>` : ""}${qs ? `<div class="muted" style="margin-top:8px">Before acting, check</div><ul class="tips">${qs}</ul>` : ""}</details>`
+      : "";
+    return `<div class="ev">
+      <div class="head"><div><span class="pill ${PRI_CLASS[i.priority] ?? ""}">${esc(i.priority)}</span> <span class="pill">${esc(TYPE_LABEL[i.type] || i.type)}</span>${i.confidence ? ` <span class="pill">${esc(i.confidence)} confidence</span>` : ""}</div>
+      <span class="muted">${esc(place)}</span></div>
+      <div style="font-size:15px;margin:6px 0 2px">${esc(i.title)}</div>
+      <div class="muted">${esc(i.detail)}</div>${more}</div>`;
+  }
+
+  function nationalTable(rows) {
+    if (!rows?.length) return '<p class="muted">No group has enough records yet to show national figures.</p>';
+    const byGroup = {};
+    for (const r of rows) (byGroup[r.population_group] ||= []).push(r);
+    return Object.entries(byGroup).map(([g, list]) => {
+      const name = ref?.population_groups?.[g]?.label || g;
+      const body = list.map((r) => `<tr><td>${esc(shortLabel(r.label))}</td><td class="num">${fmt(r.n)}</td><td class="num">${pct(r.prevalence_pct)}</td><td class="num">${r.ci95_pct ? esc(r.ci95_pct[0] + " to " + r.ci95_pct[1]) + "%" : "n/a"}</td><td>${r.who_band ? `<span class="pill">${esc(r.who_band)}</span>` : ""}</td></tr>`).join("");
+      return `<details style="margin-bottom:8px"><summary class="muted" style="cursor:pointer;padding:6px 0">${esc(name)} · ${list.length} indicator${list.length === 1 ? "" : "s"}</summary>
+        <div class="wrap"><table><thead><tr><th>Indicator</th><th class="num">Screened</th><th class="num">Rate</th><th class="num">95% range</th><th>WHO band</th></tr></thead><tbody>${body}</tbody></table></div></details>`;
+    }).join("");
+  }
+  const shortLabel = (l) => String(l || "").replace(/\s*\(.*$/, "");
+
+  function qualityBlock(q) {
+    if (!q) return "";
+    const gaps = q.districts_without_enough_data || [];
+    const thin = q.districts_reporting_in_under_half_of_months || [];
+    const setting = Object.entries(q.by_setting || {}).map(([k, v]) => `${esc(k)} ${num(v)}`).join(" · ");
+    return `<div class="ev">
+      <div class="muted">${num(q.records)} records over ${fmt(q.months_in_window)} months · ${fmt(q.districts_reporting)} of ${fmt(q.districts_total)} districts reporting</div>
+      ${setting ? `<div class="muted">Where records come from: ${setting}</div>` : ""}
+      ${gaps.length ? `<div style="margin-top:6px">Too little data: <span class="muted">${esc(gaps.join(", "))}</span></div>` : '<div class="muted" style="margin-top:6px">Every district has enough data.</div>'}
+      ${thin.length ? `<div style="margin-top:6px">Reporting in under half of the months: <span class="muted">${esc(thin.join(", "))}</span></div>` : ""}
+      ${(q.notes || []).map((n) => `<div class="muted" style="margin-top:6px">${esc(n)}</div>`).join("")}</div>`;
+  }
+
+  function clearMain() { ["sStats", "sInsights", "sNational", "sQuality"].forEach((id) => ($(id).innerHTML = "")); $("sCaveat").classList.add("hide"); }
+
+  async function loadMain() {
+    const gq = group ? `&population_group=${encodeURIComponent(group)}` : "";
+    const [ins, sum] = await Promise.all([call(`/surveillance/insights?months=${months}${gq}`), call(`/surveillance/summary?months=${months}`)]);
+    if (Admin.authFail(ins) || Admin.authFail(sum)) { $("sMsg").textContent = ""; clearMain(); return; }
+    const bad = ins.status !== 200 || !ins.body?.data ? ins : sum.status !== 200 || !sum.body?.data ? sum : null;
+    if (bad) { $("sMsg").textContent = problem(bad, "surveillance data"); clearMain(); return; }
+    const i = ins.body.data, s = sum.body.data;
+    if (i.available === false || s.available === false) { $("sMsg").textContent = (i.note || s.note) + " Then reload."; clearMain(); return; }
+
+    $("sMsg").textContent = `Window ${s.window.from} to ${s.window.to}.`;
+    const c = i.summary || {};
+    const q = s.data_quality || {};
+    $("sStats").innerHTML = stat("Records", typeof q.records === "number" ? q.records : null)
+      + `<div class="stat"><b>${fmt(q.districts_reporting)}/${fmt(q.districts_total)}</b><span>Districts reporting</span></div>`
+      + stat("Critical", c.critical) + stat("High priority", c.high) + stat("Medium", c.medium);
+    if (typeof q.records !== "number") $("sStats").firstElementChild.innerHTML = `<b>${esc(q.records)}</b><span>Records</span>`;
+    $("sCaveat").textContent = s.data_caveat || "";
+    $("sCaveat").classList.toggle("hide", !s.data_caveat);
+
+    const list = i.insights || [];
+    $("sInsights").innerHTML = list.length ? list.map(insightCard).join("")
+      : '<p class="muted">Nothing stands out. With few records, hotspots and trends cannot be told apart from chance: districts need about 30 records each to be compared.</p>';
+    $("sNational").innerHTML = nationalTable(s.national);
+    $("sQuality").innerHTML = qualityBlock(s.data_quality);
+  }
+
+  /* ───── district explorer ───── */
+
+  function fillSelects() {
+    if (!ref) return;
+    const groups = Object.entries(ref.population_groups || {});
+    $("xGroup").innerHTML = groups.map(([k, v]) => `<option value="${esc(k)}"${k === xGroup ? " selected" : ""}>${esc(v.label)}</option>`).join("");
+    fillIndicators();
+  }
+  function fillIndicators() {
+    const list = Object.entries(ref.indicators || {}).filter(([, v]) => v.population_groups.includes(xGroup));
+    if (!list.some(([k]) => k === xInd)) xInd = list[0]?.[0] || "";
+    $("xInd").innerHTML = list.map(([k, v]) => `<option value="${esc(k)}"${k === xInd ? " selected" : ""}>${esc(shortLabel(v.label))}</option>`).join("");
+  }
+
+  function pctBars(series) {
+    const vals = series.map((s) => (typeof s.prevalence_pct === "number" ? s.prevalence_pct : null));
+    const max = Math.max(1, ...vals.filter((v) => v !== null));
+    return `<div class="trend">${series.map((s, idx) => {
+      const v = vals[idx];
+      const label = v !== null ? v + "%" : s.suppressed ? "hidden" : "none";
+      const h = v !== null ? Math.max(2, Math.round((v / max) * 110)) : 2;
+      return `<div class="col${idx === series.length - 1 ? " today" : ""}"><span class="val">${esc(label)}</span><div class="bar1" style="height:${h}px"></div><span class="day">${monthShort(s.month)}</span></div>`;
+    }).join("")}</div>`;
+  }
+
+  function districtTable(districts) {
+    if (!districts?.length) return '<p class="muted">No district has records for this indicator in the window.</p>';
+    const rows = districts.map((d) => {
+      const pill = `<span class="pill ${CLS_PILL[d.classification] ?? ""}">${esc(CLS_LABEL[d.classification] || d.classification)}${d.priority ? " · " + esc(d.priority) : ""}</span>`;
+      if (d.classification === "suppressed") return `<tr><td>${esc(d.district)}</td><td class="num muted" colspan="3">fewer than the minimum, hidden</td><td>${pill}</td></tr>`;
+      return `<tr><td>${esc(d.district)}</td><td class="num">${fmt(d.n)}</td><td class="num">${pct(d.prevalence_pct)}</td><td class="num">${d.ratio_to_national ? esc(d.ratio_to_national) + "x" : ""}</td><td>${pill}</td></tr>`;
+    }).join("");
+    return `<table><thead><tr><th>District</th><th class="num">Screened</th><th class="num">Rate</th><th class="num">vs national</th><th>Status</th></tr></thead><tbody>${rows}</tbody></table>`;
+  }
+
+  async function loadExplorer() {
+    if (!xInd) return;
+    const base = `indicator=${encodeURIComponent(xInd)}&population_group=${encodeURIComponent(xGroup)}&months=${months}`;
+    const [hot, tr] = await Promise.all([call(`/surveillance/hotspots?${base}`), call(`/surveillance/trends?${base}`)]);
+    if (Admin.authFail(hot) || Admin.authFail(tr)) return;
+    const bad = hot.status !== 200 || !hot.body?.data ? hot : tr.status !== 200 || !tr.body?.data ? tr : null;
+    if (bad) { $("xMsg").textContent = problem(bad, "the district explorer"); ["xNational", "xTrend", "xTable"].forEach((id) => ($(id).innerHTML = "")); $("xTrendNote").textContent = ""; return; }
+    const h = hot.body.data, t = tr.body.data;
+    if (h.available === false) { $("xMsg").textContent = h.note || "Surveillance data is not available."; return; }
+    const r = h.results?.[0];
+    if (!r) {
+      $("xMsg").textContent = "No records for this group and indicator in the window.";
+      ["xNational", "xTrend", "xTable"].forEach((id) => ($(id).innerHTML = "")); $("xTrendNote").textContent = "";
+      return;
+    }
+    $("xMsg").textContent = `${r.label}. ${fmt(r.hotspots.length)} hotspot${r.hotspots.length === 1 ? "" : "s"} among ${fmt(r.districts_compared)} districts with enough records to compare.`;
+    const nat = r.national;
+    $("xNational").innerHTML = stat("Screened", nat.n) + `<div class="stat"><b>${pct(nat.prevalence_pct)}</b><span>National rate${nat.ci95_pct ? " (" + esc(nat.ci95_pct[0] + " to " + nat.ci95_pct[1]) + "%)" : ""}</span></div>`
+      + (nat.who_band ? `<div class="stat"><b>${esc(nat.who_band)}</b><span>WHO band (indicative)</span></div>` : "");
+    $("xTable").innerHTML = districtTable(r.districts);
+
+    const tt = t.results?.[0];
+    if (tt) {
+      $("xTrend").innerHTML = pctBars(tt.series);
+      const tr2 = tt.trend || {};
+      const yoy = tt.vs_same_month_last_year;
+      $("xTrendNote").textContent = tr2.direction === "insufficient_data" ? (tr2.note || "")
+        : `Trend: ${tr2.direction}${typeof tr2.slope_pp_per_month === "number" ? ` (${tr2.slope_pp_per_month > 0 ? "+" : ""}${tr2.slope_pp_per_month} points a month)` : ""}.`
+          + (yoy ? ` Latest month ${yoy.prevalence_pct}% against ${yoy.same_month_last_year_pct}% a year earlier.` : "");
+    }
+  }
+
+  function groupChips() {
+    if (!ref) return;
+    const items = [["", "All groups"], ...Object.entries(ref.population_groups || {}).map(([k, v]) => [k, v.label])];
+    $("gFilter").innerHTML = items.map(([k, label]) => `<button data-g="${esc(k)}" class="chip${k === group ? " on" : ""}">${esc(label)}</button>`).join("");
+  }
+
+  async function refresh(keep) {
+    if (keep && Date.now() - lastLoad < STALE_MS) return; // slow-moving data: don't re-run the heavy analysis every minute
+    $("sMsg").textContent = "";
+    if (!(await loadRef())) {
+      if (!Admin.authFail(refResponse)) $("sMsg").textContent = problem(refResponse, "surveillance");
+      return;
+    }
+    if (!$("xGroup").options.length) { fillSelects(); groupChips(); }
+    await Promise.all([loadMain(), loadExplorer()]);
+    lastLoad = Date.now();
+  }
+
+  Admin.mount({
+    id: "surveillance",
+    title: "Surveillance",
+    init() {
+      Admin.chips("wFilter", "w", (v) => { months = Number(v); lastLoad = 0; refresh(); });
+      Admin.chips("gFilter", "g", (v) => { group = v; loadMain(); });
+      $("xGroup").addEventListener("change", (e) => { xGroup = e.target.value; fillIndicators(); loadExplorer(); });
+      $("xInd").addEventListener("change", (e) => { xInd = e.target.value; loadExplorer(); });
+    },
+    refresh,
+  });
+})();
+</script>
+</body>
+</html>

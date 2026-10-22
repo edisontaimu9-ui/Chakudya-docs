@@ -10,6 +10,7 @@ Internal admin panel, one page per job. Not indexed (`noindex`), not part of the
 | `usage.html` | Calls per endpoint (today, 7 or 30 days) | `/admin/usage` |
 | `monitoring.html` | Failing and slow endpoints, latest failed and slow calls | `/admin/monitoring` |
 | `health.html` | Uptime, per-service latency, outages and daily uptime from the scheduled health probe | `/admin/health-history` |
+| `surveillance.html` | Nutrition surveillance: priority insights (hotspots, rising districts, trends, data gaps), a district explorer with a monthly chart, national figures and data quality. Filter by window and population group | `/surveillance/reference`, `/surveillance/insights`, `/surveillance/summary`, `/surveillance/hotspots`, `/surveillance/trends` |
 | `activity.html` | Recent admin actions (keys created and revoked, foods reviewed) | `/admin/activity` |
 | `ingest.html` | RAG ingest jobs (read-only) | `/admin/overview`, `/rag/jobs` |
 | `audit.html` | FHIR audit log search | `/fhir/AuditEvent` |
