@@ -333,3 +333,45 @@ body.is-landing .content { max-width: 1180px; padding: 24px 28px 0; }
 .btn.btn-cut.btn--sm { height: 34px; padding: 0 16px; }
 .btn.btn-cut.btn--sm:hover { padding: 0 20px; }
 @media (prefers-reduced-motion: reduce) { .btn.btn-cut, .btn.btn-cut:hover { transition: none; } }
+
+/* ── Hard-shadow form fields on the Submit page ──
+   Thick border, offset shadow, mono type, lift on hover, inverted on focus.
+   Uses theme colours so it works in dark and light. Change --brut-offset to resize the shadow. */
+.submit-page .lp-contrib__form {
+  --brut-ink: var(--text-primary);
+  --brut-paper: var(--bg-raised);
+  --brut-offset: 5px;
+}
+.submit-page .field input[type=text],
+.submit-page .field textarea,
+.submit-page .field select {
+  width: 100%; min-height: 50px; padding: 10px 12px;
+  font-family: var(--font-mono); font-size: 16px;
+  color: var(--brut-ink); background-color: var(--brut-paper);
+  border: 3px solid var(--brut-ink); border-radius: 0; outline: none;
+  box-shadow: var(--brut-offset) var(--brut-offset) 0 var(--brut-ink);
+  transition: transform .2s ease, box-shadow .2s ease, background-color .2s ease, color .2s ease;
+}
+.submit-page .field textarea { min-height: 96px; }
+.submit-page .field input::placeholder, .submit-page .field textarea::placeholder { color: var(--text-tertiary); }
+.submit-page .field input[type=text]:hover,
+.submit-page .field textarea:hover,
+.submit-page .field select:hover {
+  transform: translate(-2px, -2px);
+  box-shadow: calc(var(--brut-offset) + 2px) calc(var(--brut-offset) + 2px) 0 var(--brut-ink);
+}
+.submit-page .field input[type=text]:focus,
+.submit-page .field textarea:focus,
+.submit-page .field select:focus {
+  background-color: var(--brut-ink); color: var(--brut-paper); border-color: var(--brut-ink);
+  transform: translate(-2px, -2px);
+  box-shadow: calc(var(--brut-offset) + 2px) calc(var(--brut-offset) + 2px) 0 var(--accent);
+}
+.submit-page .field input:focus::placeholder, .submit-page .field textarea:focus::placeholder { color: var(--brut-paper); opacity: .6; }
+.submit-page .field select:focus option { background: var(--brut-paper); color: var(--brut-ink); }
+.submit-page .field-grid { gap: 18px 16px; }
+@media (prefers-reduced-motion: reduce) {
+  .submit-page .field input, .submit-page .field textarea, .submit-page .field select { transition: none; }
+  .submit-page .field input:hover, .submit-page .field textarea:hover, .submit-page .field select:hover,
+  .submit-page .field input:focus, .submit-page .field textarea:focus, .submit-page .field select:focus { transform: none; }
+}
