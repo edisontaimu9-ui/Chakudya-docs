@@ -56,7 +56,7 @@ const RenderSubmit = (() => {
             <h3>Thank you, your food was submitted</h3>
             <p id="submit-done-text"></p>
             <div class="lp-contrib__actions">
-              <button type="button" class="btn btn--primary" id="submit-again">Submit another food</button>
+              <button type="button" class="btn btn--primary btn-cut" id="submit-again">Submit another food</button>
               <a class="btn" href="#/">Back to home</a>
             </div>
           </div>
@@ -85,7 +85,7 @@ const RenderSubmit = (() => {
                 <span class="field__hint" id="lp-photo-barcode-note">We try to read the barcode from your photos. If that fails, type the digits under the bars.</span></label>
               <div class="lp-contrib__trap" aria-hidden="true"><label>Website <input type="text" name="website" tabindex="-1" autocomplete="off" /></label></div>
               <div class="lp-contrib__actions">
-                <button class="btn btn--primary btn--lg" type="submit" id="lp-photo-btn">Submit photos for review</button>
+                <button class="btn btn--primary btn--lg btn-cut" type="submit" id="lp-photo-btn">Submit photos for review</button>
                 <p class="lp-contrib__msg" id="lp-photo-msg" role="status" aria-live="polite"></p>
               </div>
             </form>
@@ -113,7 +113,7 @@ const RenderSubmit = (() => {
                 <span class="field__hint">Optional. Copy them as printed on the pack.</span></label>
               <div class="lp-contrib__trap" aria-hidden="true"><label>Website <input type="text" name="website" tabindex="-1" autocomplete="off" /></label></div>
               <div class="lp-contrib__actions">
-                <button class="btn btn--primary btn--lg" type="submit" id="lp-submit-btn">Submit for review</button>
+                <button class="btn btn--primary btn--lg btn-cut" type="submit" id="lp-submit-btn">Submit for review</button>
                 <p class="lp-contrib__msg" id="lp-submit-msg" role="status" aria-live="polite"></p>
               </div>
             </form>

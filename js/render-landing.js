@@ -249,7 +249,7 @@ const RenderLanding = (() => {
             </li>`).join("")}
         </ol>
         <div class="lp-contrib__cta">
-          <a class="btn btn--primary btn--lg" href="#/submit">Submit a food <span aria-hidden="true">\u2192</span></a>
+          <a class="btn btn--primary btn--lg btn-cut" href="#/submit">Submit a food <span aria-hidden="true">\u2192</span></a>
         </div>
       </section>
     `);

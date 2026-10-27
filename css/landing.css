@@ -305,3 +305,31 @@ body.is-landing .content { max-width: 1180px; padding: 24px 28px 0; }
 .lp-footer__connect { margin-top: 24px; }
 .lp-footer nav .lp-social { width: 40px; height: 40px; }
 .lp-footer__note a { color: var(--accent-strong); font-weight: 600; }
+
+/* ── Cut-corner button (add class "btn-cut" next to "btn btn--primary") ──
+   Colours come from the site theme so text stays readable in dark and light.
+   To use a different look, change only the three variables below, e.g.
+   --cut-from: #1c1c1c; --cut-to: #6220fb; --cut-ink: #fff; */
+.btn.btn-cut {
+  --cut-from: var(--accent);
+  --cut-to: var(--accent-strong);
+  --cut-ink: var(--accent-ink);
+  display: inline-flex; align-items: center; justify-content: center;
+  height: 40px; padding: 0 25px;
+  border: 0; border-radius: .25rem;
+  text-transform: uppercase; font-style: normal; font-weight: 600;
+  font-size: .7rem; line-height: 14px; letter-spacing: 1.2px;
+  color: var(--cut-ink);
+  background-image: linear-gradient(90deg, var(--cut-from), var(--cut-to));
+  box-shadow: none; overflow: hidden; text-decoration: none; white-space: nowrap;
+  -webkit-clip-path: polygon(0 0, 0 0, 100% 0, 100% 0, 100% calc(100% - 15px), calc(100% - 15px) 100%, 15px 100%, 0 100%);
+  clip-path: polygon(0 0, 0 0, 100% 0, 100% 0, 100% calc(100% - 15px), calc(100% - 15px) 100%, 15px 100%, 0 100%);
+  transition: .2s .1s;
+}
+.btn.btn-cut:hover { cursor: pointer; padding: 0 30px; transition: all .3s ease-in; background-image: linear-gradient(90deg, var(--cut-from), var(--cut-to)); border: 0; box-shadow: none; }
+.btn.btn-cut:focus-visible { outline: 2px solid var(--cut-ink); outline-offset: -4px; } /* clip-path hides outer outlines */
+.btn.btn-cut:disabled { opacity: .55; cursor: progress; }
+.btn.btn-cut.btn--lg { height: 46px; }
+.btn.btn-cut.btn--sm { height: 34px; padding: 0 16px; }
+.btn.btn-cut.btn--sm:hover { padding: 0 20px; }
+@media (prefers-reduced-motion: reduce) { .btn.btn-cut, .btn.btn-cut:hover { transition: none; } }
