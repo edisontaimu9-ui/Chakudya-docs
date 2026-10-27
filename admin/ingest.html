@@ -21,7 +21,7 @@
   <p id="jMsg" class="muted" role="status"></p>
   <div id="jobList"></div>
   <button id="jMore" class="hide">Load more</button>
-  <p class="muted">Read-only. Upload and retry are done through the API.</p>
+  <p class="muted">Upload and retry are done through the API. Dismiss removes only the job record from this list; ingested chunks are not changed.</p>
 </template>
 
 <script src="../js/config.js"></script>
@@ -58,6 +58,28 @@
       + `<div class="muted">${esc(legend)}</div>`;
   }
 
+  // A queued/processing job updated in the last 10 minutes may still be running, so it cannot be dismissed (the API enforces the same rule).
+  const STALE_MS = 10 * 60 * 1000;
+  function canDismiss(j) {
+    if (!j.id) return false;
+    if (j.status !== "queued" && j.status !== "processing") return true;
+    const t = new Date(j.updated_at || j.created_at).getTime();
+    return !isFinite(t) || Date.now() - t >= STALE_MS;
+  }
+
+  async function dismissJob(id, btn) {
+    const j = jLoaded.find((x) => x.id === id);
+    if (!confirm(`Dismiss "${j?.file_name || "this job"}"? This removes the job record only; ingested chunks stay.`)) return;
+    btn.disabled = true;
+    const r = await call("/rag/jobs/" + encodeURIComponent(id), { method: "DELETE" });
+    if (Admin.authFail(r)) return;
+    if (r.status === 200) { Admin.reload(); return; }
+    btn.disabled = false;
+    $("jMsg").textContent = r.status === 403 ? "The gateway has not enabled dismiss yet. Deploy the gateway update."
+      : r.status === 405 || r.status === 404 && !r.body?.message ? "The API does not support dismiss yet. Deploy the API update."
+      : (r.body?.message || r.body?.error || "Couldn't dismiss the job (" + (r.status || "network") + ").");
+  }
+
   function jobCard(j) {
     const cls = JOB_CLS[j.status] || "";
     const chunks = typeof j.chunk_count === "number" ? ` · ${fmt(j.chunk_count)} chunks` : "";
@@ -68,7 +90,8 @@
       <div class="muted" style="word-break:break-word">${esc(j.source || "")}</div>
       <div class="muted">Updated ${esc(ago(j.updated_at))}${chunks}${tries} · <span style="font-family:var(--mono)">${esc(String(j.id || "").slice(0, 8))}</span></div>
       ${jobBar(j)}
-      ${j.error ? `<p class="err-text">${esc(j.error)}</p>` : ""}</div>`;
+      ${j.error ? `<p class="err-text">${esc(j.error)}</p>` : ""}
+      ${canDismiss(j) ? `<div style="margin-top:8px"><button class="chip" data-dismiss="${esc(j.id)}" aria-label="Dismiss ${esc(j.file_name || "job")}">Dismiss</button></div>` : ""}</div>`;
   }
 
   function renderJobs() {
@@ -104,6 +127,10 @@
     init() {
       Admin.chips("jFilter", "st", (v) => { jStatus = v; jLoaded = []; jTotal = null; loadJobs(true); });
       $("jMore").addEventListener("click", () => loadJobs(false));
+      $("jobList").addEventListener("click", (e) => {
+        const b = e.target.closest("[data-dismiss]");
+        if (b) dismissJob(b.dataset.dismiss, b);
+      });
     },
     async refresh() {
       const d = await Admin.overview();
