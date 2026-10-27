@@ -65,6 +65,21 @@
     return { status: res.status, body };
   }
 
+  // Multipart upload with progress (fetch cannot report upload progress). `form` is a FormData; onProgress gets 0..1.
+  async function upload(path, form, onProgress) {
+    const t = await token();
+    if (!t) return { status: 401 };
+    return new Promise((resolve) => {
+      const x = new XMLHttpRequest();
+      x.open("POST", GW + "/a" + path);
+      x.setRequestHeader("Authorization", "Bearer " + t);
+      x.upload.onprogress = (e) => { if (e.lengthComputable && onProgress) onProgress(e.loaded / e.total); };
+      x.onload = () => { let body = null; try { body = JSON.parse(x.responseText); } catch (_) {} resolve({ status: x.status, body }); };
+      x.onerror = () => resolve({ status: 0 });
+      x.send(form);
+    });
+  }
+
   /* ───── helpers ───── */
   const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
   const fmt = (n) => (typeof n === "number" ? n.toLocaleString() : "n/a");
@@ -283,5 +298,5 @@
     else start();
   }
 
-  window.Admin = { $, esc, fmt, stat, bar, ago, msFmt, when, clock, dayLabel, trendBars, chips, call, loadSession, overview, authFail, fatal, reload: load, mount };
+  window.Admin = { $, esc, fmt, stat, bar, ago, msFmt, when, clock, dayLabel, trendBars, chips, call, upload, loadSession, overview, authFail, fatal, reload: load, mount };
 })();

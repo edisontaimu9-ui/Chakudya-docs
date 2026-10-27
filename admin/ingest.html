@@ -12,6 +12,24 @@
 <main id="root"></main>
 
 <template id="tpl">
+  <h2>Upload a document</h2>
+  <div class="card" id="upCard">
+    <div class="filters">
+      <input id="upFile" type="file" accept=".pdf,.docx,.txt,.md,.csv,.html" aria-label="Document to ingest" />
+    </div>
+    <div class="filters" style="margin-top:8px">
+      <input id="upSource" type="text" maxlength="200" placeholder="Source name for citations (optional, defaults to the file name)" aria-label="Source name" />
+      <select id="upContext" aria-label="Context">
+        <option value="clinical">Clinical</option><option value="general">General</option><option value="both">Both</option>
+      </select>
+    </div>
+    <p style="margin:8px 0"><label class="chk"><input id="upReplace" type="checkbox" /> Replace existing chunks with the same source name</label></p>
+    <button id="upGo" class="primary">Upload and ingest</button>
+    <div id="upBar" style="margin-top:8px"></div>
+    <p id="upMsg" class="muted" role="status"></p>
+    <p class="muted" style="margin:0">PDF, DOCX, TXT, MD, CSV or HTML, up to 25 MB. Scanned or image-only PDFs can't be read; use manual ingest for those.</p>
+  </div>
+
   <h2>RAG ingest jobs</h2>
   <div id="jobs" class="grid"></div>
   <div id="jProgress" class="card" style="margin-top:10px"></div>
@@ -29,7 +47,7 @@
 <script>
 (() => {
   "use strict";
-  const { $, esc, fmt, stat, bar, ago, call } = Admin;
+  const { $, esc, fmt, stat, bar, ago, call, upload } = Admin;
   const J_PAGE = 20;
   let jStatus = "";
   let jLoaded = [];
@@ -65,6 +83,44 @@
     if (j.status !== "queued" && j.status !== "processing") return true;
     const t = new Date(j.updated_at || j.created_at).getTime();
     return !isFinite(t) || Date.now() - t >= STALE_MS;
+  }
+
+  const UP_MAX = 25 * 1024 * 1024;
+  const UP_EXT = ["pdf", "docx", "txt", "md", "csv", "html"];
+  let uploading = false;
+
+  async function doUpload() {
+    if (uploading) return;
+    const f = $("upFile").files[0];
+    const msg = (t) => { $("upMsg").textContent = t; };
+    if (!f) { msg("Choose a file first."); return; }
+    const ext = f.name.split(".").pop().toLowerCase();
+    if (!UP_EXT.includes(ext)) { msg("Unsupported file type. Use PDF, DOCX, TXT, MD, CSV or HTML."); return; }
+    if (f.size > UP_MAX) { msg("That file is over 25 MB."); return; }
+    if (!f.size) { msg("That file is empty."); return; }
+    const form = new FormData();
+    form.set("file", f, f.name);
+    form.set("context", $("upContext").value);
+    const src = $("upSource").value.trim();
+    if (src) form.set("source", src);
+    if ($("upReplace").checked) form.set("replace", "true");
+    uploading = true; $("upGo").disabled = true; msg("");
+    $("upBar").innerHTML = bar({ text: "Uploading " + f.name, pct: 0 });
+    const r = await upload("/rag/upload", form, (p) => { $("upBar").innerHTML = bar({ text: "Uploading " + f.name, pct: p * 100 }); });
+    uploading = false; $("upGo").disabled = false;
+    if (Admin.authFail(r)) { $("upBar").innerHTML = ""; return; }
+    if (r.status === 200 || r.status === 201) {
+      $("upBar").innerHTML = bar({ text: "Uploaded. Queued for ingestion", pct: 100, cls: "ok" });
+      msg("Queued. It shows in the list below and moves from queued to processing to done.");
+      $("upFile").value = ""; $("upSource").value = ""; $("upReplace").checked = false;
+      Admin.reload();
+      return;
+    }
+    $("upBar").innerHTML = "";
+    msg(r.status === 403 ? "The gateway has not enabled uploads yet. Deploy the gateway update."
+      : r.status === 405 ? "The gateway does not allow uploads yet. Deploy the gateway update."
+      : r.status === 0 ? "Network error. Check your connection and try again."
+      : (r.body?.message || r.body?.error || "Upload failed (" + r.status + ")."));
   }
 
   async function dismissJob(id, btn) {
@@ -126,6 +182,7 @@
     title: "RAG ingest",
     init() {
       Admin.chips("jFilter", "st", (v) => { jStatus = v; jLoaded = []; jTotal = null; loadJobs(true); });
+      $("upGo").addEventListener("click", doUpload);
       $("jMore").addEventListener("click", () => loadJobs(false));
       $("jobList").addEventListener("click", (e) => {
         const b = e.target.closest("[data-dismiss]");
