@@ -17,7 +17,7 @@ const RenderLanding = (() => {
   // Live record counts. One request per resource per page load, cached in memory.
   const COUNT_SOURCES = [
     { key: "foods", path: "/foods", label: "Foods in the registry", note: "Local food composition records" },
-    { key: "packaged", path: "/packaged", label: "Packaged & branded foods", note: "Barcode-scannable products" },
+    { key: "packaged", path: "/packaged", label: "Community-submitted foods", note: "Packaged products added by contributors" },
     { key: "gi", path: "/glycaemic-index", label: "Glycaemic index entries", note: "GI / GL reference values" },
     { key: "exchange", path: "/exchange", label: "Exchange list items", note: "Standard & therapeutic lists" },
     { key: "renal", path: "/renal", label: "Renal nutrition foods", note: "For renal dietary planning" },
@@ -225,6 +225,34 @@ const RenderLanding = (() => {
       }), { threshold: 0.4 });
       grid.querySelectorAll("[data-count]").forEach((n) => io.observe(n));
     }
+  }
+
+  function contributeSection() {
+    const steps = [
+      ["Submit", "Send a packaged food's name, barcode and nutrition label details, or photos of the label."],
+      ["Review", "Every entry is checked, including a calories-versus-macros check, before it is approved."],
+      ["Share", "Approved foods join the registry and become available to everyone through the API."],
+    ];
+    return el(`
+      <section class="lp-section lp-contrib reveal" id="lp-contribute" aria-labelledby="lp-contrib-h">
+        <div class="lp-head">
+          <p class="lp-kicker">Community</p>
+          <h2 id="lp-contrib-h">Help grow the registry</h2>
+          <p class="lp-sub">Know a food that is missing? Submit it and help others find accurate nutrition information.</p>
+        </div>
+        <ol class="lp-contrib__steps">
+          ${steps.map(([t, d], i) => `
+            <li class="lp-card lp-contrib__step">
+              <span class="lp-contrib__n" aria-hidden="true">${String(i + 1).padStart(2, "0")}</span>
+              <h3>${t}</h3>
+              <p>${d}</p>
+            </li>`).join("")}
+        </ol>
+        <div class="lp-cta lp-cta--center">
+          <a class="btn btn--primary btn--lg" href="${epLink("POST", "/packaged/submit")}">Submit a food</a>
+        </div>
+      </section>
+    `);
   }
 
   function aboutSection() {
@@ -561,6 +589,7 @@ const RenderLanding = (() => {
     root.append(
       heroSection({ showKey }),
       statsSection(),
+      contributeSection(),
       aboutSection(),
       trySection(),
       nutriMindSection(),
