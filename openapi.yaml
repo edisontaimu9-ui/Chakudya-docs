@@ -229,8 +229,7 @@ paths:
       summary: Usage by endpoint (root key only)
       description: Which endpoints get called most. Calls are counted per UTC day, method and route (ids replaced, for example
         `/foods/:id`) in `route_usage`. Counts only - no keys, IPs, query strings or bodies. Skipped - OPTIONS, `/`, `/health`
-        and `/admin/*`. Storage is off unless `ROUTE_USAGE_STORE=true` (run `sql/032_add_route_usage.sql` first). When the table
-        cannot be read the response has `available` false and a note. Needs the root key.
+        and `/admin/*`. When storage is not ready the response has `available` false and a note. Needs the root key.
       security:
       - bearerAuth: []
       parameters:
@@ -278,7 +277,7 @@ paths:
                           description: Up to 25 busiest endpoints.
                           items:
                             type: object
-                            description: method, route, calls, errors, error_rate (percent), avg_ms, p95_ms (estimated from latency buckets, null until sql/036 is run and traffic arrives), share (percent of all calls) and last_day.
+                            description: method, route, calls, errors, error_rate (percent), avg_ms, p95_ms (estimated from latency buckets, null until traffic arrives), share (percent of all calls) and last_day.
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
@@ -293,12 +292,12 @@ paths:
       - API Keys
       summary: Uptime, upstream status and outage timeline (root key only)
       description: Reads the health probe history. A cron runs the same checks as `GET /health` every 5 minutes and stores one
-        row per run when `HEALTH_CHECK_STORE=true` (run `sql/034_add_health_checks.sql` first). Returns uptime percent, coverage
+        row per run. Returns uptime percent, coverage
         (how many of the expected probes actually ran), per-upstream uptime and probe latency (average, p95, max), an outage
         timeline (runs of consecutive degraded probes, newest first) and daily uptime. `current.stale` is true when the latest
         probe is older than 15 minutes, which usually means the cron is not running. A probe that could not reach the database
         is held in KV and written with the next one, so a database outage still shows up. Only Supabase, Cohere and Groq
-        count towards an outage. Needs the root key. When the table cannot be read the response has `available` false and a note.
+        count towards an outage. Needs the root key. When storage is not ready the response has `available` false and a note.
       security:
       - bearerAuth: []
       parameters:
@@ -379,8 +378,7 @@ paths:
       description: Summary of failed and slow requests for the admin monitor. Only failures (5xx, 429 and 4xx other than 401
         and 404) and slow calls (at or above `REQUEST_LOG_SLOW_MS`, default 1500 ms) are stored, so this shows what is breaking
         and what is slow, not an overall error rate. Rows hold the method, a route with ids replaced, status, duration and
-        request id - never query strings, bodies, tokens or IPs. Storage is off unless `REQUEST_LOG_STORE=true` (run
-        `sql/031_add_request_log.sql` first). When the table cannot be read the response has `available` false and a note.
+        request id - never query strings, bodies, tokens or IPs. When storage is not ready the response has `available` false and a note.
         Needs the root key.
       security:
       - bearerAuth: []
@@ -5313,7 +5311,7 @@ paths:
       summary: NCP Step 2 — nutrition diagnosis (PES statement)
       description: 'Validates and shapes clinician-supplied PES statements (problem, etiology, signs/symptoms) into Condition
         resources. Does not choose the diagnosis. problemCode values like NI-5.2 are resolved against the NCP diagnostic terminology
-        in Supabase (503 if sql/017 has not been run). The PES statement is stored as components (`pes-statement` extension:
+        in Supabase (503 if the terminology is not loaded). The PES statement is stored as components (`pes-statement` extension:
         statement, coded problem, etiologies, signs with evidence references) as well as text. Optional `etiologyItem` / `signItem`
         parts add coded components and evidence: a `signItem` can hold an inline `observation` (validated like $nutrition-assessment,
         returned in the Bundle and linked from Condition.evidence) or `evidence` references to existing Observations; `additionalCoding`
@@ -5810,7 +5808,7 @@ paths:
       - FHIR
       summary: Search stored audit events (admin)
       description: 'Requires the root key, the admin role, or a credential with an explicit system/AuditEvent.read scope,
-       . Read-only and immutable through the API. Answers 501 unless FHIR_AUDIT_STORE=true (run sql/028).
+       . Read-only and immutable through the API. Answers 501 when audit storage is off.
         Events never contain request bodies, query strings, tokens, full IPs or (by default) patient references. Always needs
         a credential: the admin role (or root key) or an explicit `system/AuditEvent.read` scope. A
         wildcard `system/*` scope never covers AuditEvent.'
@@ -8037,7 +8035,7 @@ paths:
         '429':
           $ref: '#/components/responses/RateLimited'
         '503':
-          description: The stored reference values are missing or unreadable (run sql/039_add_clinical_reference_values.sql).
+          description: The stored reference values are missing or unreadable.
   /burns/energy:
     post:
       tags:
@@ -8073,7 +8071,7 @@ paths:
         '429':
           $ref: '#/components/responses/RateLimited'
         '503':
-          description: The stored reference values are missing or unreadable (run sql/039_add_clinical_reference_values.sql).
+          description: The stored reference values are missing or unreadable.
   /burns/protein:
     post:
       tags:
@@ -8101,7 +8099,7 @@ paths:
         '429':
           $ref: '#/components/responses/RateLimited'
         '503':
-          description: The stored reference values are missing or unreadable (run sql/039_add_clinical_reference_values.sql).
+          description: The stored reference values are missing or unreadable.
   /burns/nitrogen-balance:
     post:
       tags:
@@ -8131,7 +8129,7 @@ paths:
         '429':
           $ref: '#/components/responses/RateLimited'
         '503':
-          description: The stored reference values are missing or unreadable (run sql/039_add_clinical_reference_values.sql).
+          description: The stored reference values are missing or unreadable.
   /burns/micronutrients:
     post:
       tags:
@@ -8161,7 +8159,7 @@ paths:
         '429':
           $ref: '#/components/responses/RateLimited'
         '503':
-          description: The stored reference values are missing or unreadable (run sql/039_add_clinical_reference_values.sql).
+          description: The stored reference values are missing or unreadable.
   /burns/glycemic-targets:
     post:
       tags:
@@ -8186,7 +8184,7 @@ paths:
         '429':
           $ref: '#/components/responses/RateLimited'
         '503':
-          description: The stored reference values are missing or unreadable (run sql/039_add_clinical_reference_values.sql).
+          description: The stored reference values are missing or unreadable.
   /burns/maintenance-fluid:
     post:
       tags:
@@ -8212,7 +8210,7 @@ paths:
         '429':
           $ref: '#/components/responses/RateLimited'
         '503':
-          description: The stored reference values are missing or unreadable (run sql/039_add_clinical_reference_values.sql).
+          description: The stored reference values are missing or unreadable.
   /burns/indirect-calorimetry:
     post:
       tags:
@@ -8243,7 +8241,7 @@ paths:
         '429':
           $ref: '#/components/responses/RateLimited'
         '503':
-          description: The stored reference values are missing or unreadable (run sql/039_add_clinical_reference_values.sql).
+          description: The stored reference values are missing or unreadable.
   /burns/pediatric-equations:
     post:
       tags:
@@ -8274,7 +8272,7 @@ paths:
         '429':
           $ref: '#/components/responses/RateLimited'
         '503':
-          description: The stored reference values are missing or unreadable (run sql/039_add_clinical_reference_values.sql).
+          description: The stored reference values are missing or unreadable.
   /burns/pharmacology:
     post:
       tags:
@@ -8298,7 +8296,7 @@ paths:
         '429':
           $ref: '#/components/responses/RateLimited'
         '503':
-          description: The stored reference values are missing or unreadable (run sql/039_add_clinical_reference_values.sql).
+          description: The stored reference values are missing or unreadable.
   /burns/reference:
     get:
       tags:
@@ -8317,7 +8315,7 @@ paths:
         '400':
           $ref: '#/components/responses/BadRequest'
         '503':
-          description: The stored reference values are missing or unreadable (run sql/039_add_clinical_reference_values.sql).
+          description: The stored reference values are missing or unreadable.
   /refeeding/risk-adult:
     post:
       tags:
@@ -8348,7 +8346,7 @@ paths:
         '429':
           $ref: '#/components/responses/RateLimited'
         '503':
-          description: The stored reference values are missing or unreadable (run sql/040_add_refeeding_reference_values.sql).
+          description: The stored reference values are missing or unreadable.
   /refeeding/risk-pediatric:
     post:
       tags:
@@ -8379,7 +8377,7 @@ paths:
         '429':
           $ref: '#/components/responses/RateLimited'
         '503':
-          description: The stored reference values are missing or unreadable (run sql/040_add_refeeding_reference_values.sql).
+          description: The stored reference values are missing or unreadable.
   /refeeding/severity:
     post:
       tags:
@@ -8414,7 +8412,7 @@ paths:
         '429':
           $ref: '#/components/responses/RateLimited'
         '503':
-          description: The stored reference values are missing or unreadable (run sql/040_add_refeeding_reference_values.sql).
+          description: The stored reference values are missing or unreadable.
   /refeeding/initiation:
     post:
       tags:
@@ -8444,7 +8442,7 @@ paths:
         '429':
           $ref: '#/components/responses/RateLimited'
         '503':
-          description: The stored reference values are missing or unreadable (run sql/040_add_refeeding_reference_values.sql).
+          description: The stored reference values are missing or unreadable.
   /refeeding/reference:
     get:
       tags:
@@ -8463,7 +8461,7 @@ paths:
         '400':
           $ref: '#/components/responses/BadRequest'
         '503':
-          description: The stored reference values are missing or unreadable (run sql/040_add_refeeding_reference_values.sql).
+          description: The stored reference values are missing or unreadable.
   /stress-factors/harris-benedict:
     post:
       tags:
@@ -8494,7 +8492,7 @@ paths:
         '429':
           $ref: '#/components/responses/RateLimited'
         '503':
-          description: The stored reference values are missing or unreadable (run sql/041_add_stress_factor_reference_values.sql).
+          description: The stored reference values are missing or unreadable.
   /stress-factors/fever:
     post:
       tags:
@@ -8521,7 +8519,7 @@ paths:
         '429':
           $ref: '#/components/responses/RateLimited'
         '503':
-          description: The stored reference values are missing or unreadable (run sql/041_add_stress_factor_reference_values.sql).
+          description: The stored reference values are missing or unreadable.
   /stress-factors/conditions:
     get:
       tags:
@@ -8540,7 +8538,7 @@ paths:
         '400':
           $ref: '#/components/responses/BadRequest'
         '503':
-          description: The stored reference values are missing or unreadable (run sql/041_add_stress_factor_reference_values.sql).
+          description: The stored reference values are missing or unreadable.
   /stress-factors/adjustments:
     get:
       tags:
@@ -8551,7 +8549,7 @@ paths:
         '200':
           $ref: '#/components/responses/MutationSuccess'
         '503':
-          description: The stored reference values are missing or unreadable (run sql/041_add_stress_factor_reference_values.sql).
+          description: The stored reference values are missing or unreadable.
   /stress-factors/reference:
     get:
       tags:
@@ -8570,7 +8568,7 @@ paths:
         '400':
           $ref: '#/components/responses/BadRequest'
         '503':
-          description: The stored reference values are missing or unreadable (run sql/041_add_stress_factor_reference_values.sql).
+          description: The stored reference values are missing or unreadable.
   /carb-counting/carbohydrate-content:
     post:
       tags:
@@ -8597,7 +8595,7 @@ paths:
         '429':
           $ref: '#/components/responses/RateLimited'
         '503':
-          description: The stored reference values are missing or unreadable (run sql/042_add_carb_counting_reference_values.sql).
+          description: The stored reference values are missing or unreadable.
   /carb-counting/insulin-dose:
     post:
       tags:
@@ -8627,7 +8625,7 @@ paths:
         '429':
           $ref: '#/components/responses/RateLimited'
         '503':
-          description: The stored reference values are missing or unreadable (run sql/042_add_carb_counting_reference_values.sql).
+          description: The stored reference values are missing or unreadable.
   /carb-counting/foods:
     get:
       tags:
@@ -8649,7 +8647,7 @@ paths:
         '429':
           $ref: '#/components/responses/RateLimited'
         '503':
-          description: The stored reference values are missing or unreadable (run sql/042_add_carb_counting_reference_values.sql).
+          description: The stored reference values are missing or unreadable.
   /carb-counting/handy-measures:
     get:
       tags:
@@ -8662,7 +8660,7 @@ paths:
         '429':
           $ref: '#/components/responses/RateLimited'
         '503':
-          description: The stored reference values are missing or unreadable (run sql/042_add_carb_counting_reference_values.sql).
+          description: The stored reference values are missing or unreadable.
   /carb-counting/insulin-types:
     get:
       tags:
@@ -8684,7 +8682,7 @@ paths:
         '429':
           $ref: '#/components/responses/RateLimited'
         '503':
-          description: The stored reference values are missing or unreadable (run sql/042_add_carb_counting_reference_values.sql).
+          description: The stored reference values are missing or unreadable.
   /carb-counting/dose-adjustment:
     get:
       tags:
@@ -8706,7 +8704,7 @@ paths:
         '429':
           $ref: '#/components/responses/RateLimited'
         '503':
-          description: The stored reference values are missing or unreadable (run sql/042_add_carb_counting_reference_values.sql).
+          description: The stored reference values are missing or unreadable.
   /carb-counting/reference:
     get:
       tags:
@@ -8727,7 +8725,7 @@ paths:
         '429':
           $ref: '#/components/responses/RateLimited'
         '503':
-          description: The stored reference values are missing or unreadable (run sql/042_add_carb_counting_reference_values.sql).
+          description: The stored reference values are missing or unreadable.
   /dietary-assessment:
     post:
       tags:
