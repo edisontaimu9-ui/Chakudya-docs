@@ -14,7 +14,7 @@
 <template id="tpl">
   <h2>API keys and usage</h2>
   <div id="keystats" class="grid"></div>
-  <h2>Usage trend <span class="muted">· last 7 days, UTC</span></h2>
+  <h2>Usage trend <span class="muted">· last 7 days, Malawi time (CAT)</span></h2>
   <div class="card"><div id="trend" class="muted">Loading…</div></div>
   <div class="card wrap" style="margin-top:10px;padding:6px 10px"><table id="perKey" class="pk"></table></div>
   <p id="trendNote" class="muted"></p>
@@ -59,7 +59,7 @@
     renderTrend(k);
   }
 
-  // Usage trend: total calls per UTC day (bars) and calls per key per day (heat table).
+  // Usage trend: total calls per Malawi (CAT) day (bars) and calls per key per day (heat table).
   // Needs api_keys.usage_daily and top[].daily from the API; older API versions only send totals.
   function renderTrend(k) {
     const days = Array.isArray(k.usage_daily) ? k.usage_daily : null;
@@ -84,7 +84,7 @@
     const total = `<tr class="sum"><td class="k">All keys</td>${days.map((d) => `<td class="c">${fmt(d.count)}</td>`).join("")}<td class="num">${fmt(sum)}</td></tr>`;
     tbl.innerHTML = rows.length ? head + body + total : "";
     const shown = rows.length, active = typeof k.active === "number" ? k.active : shown;
-    note.textContent = "Counts are approximate, by UTC day, for active keys only (revoked keys and anonymous calls are not included)."
+    note.textContent = "Counts are approximate, by Malawi (CAT) day, for active keys only (revoked keys and anonymous calls are not included)."
       + (active > shown ? ` Showing the ${shown} busiest of ${active} active keys.` : "");
   }
 

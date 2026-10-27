@@ -35,7 +35,7 @@
 <script>
 (() => {
   "use strict";
-  const { $, esc, fmt, ago, call } = Admin;
+  const { $, esc, fmt, ago, when: fmtWhen, call } = Admin;
   const A_PAGE = 25;
   let aLoaded = [];
   let aTotal = null;
@@ -47,7 +47,7 @@
     const [label, cls] = A_OUT[e.outcome] || ["Outcome " + e.outcome, ""];
     const ag = e.agent?.[0] || {};
     const ip = ag.network?.address ? ` · ${esc(ag.network.address)}` : "";
-    const when = e.recorded ? new Date(e.recorded).toLocaleString() : "unknown time";
+    const when = fmtWhen(e.recorded);
     return `<div class="ev"><div class="head"><div><span class="pill ${cls}">${esc(label)}</span> <span class="pill">${esc(A_ACT[e.action] || e.action || "")}</span></div>
       <span class="muted">${esc(when)} · ${esc(ago(e.recorded))}</span></div>
       <div class="op">${esc(e.entity?.[0]?.name || "")}</div>

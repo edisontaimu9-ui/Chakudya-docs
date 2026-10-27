@@ -27,7 +27,7 @@
 <script>
 (() => {
   "use strict";
-  const { $, esc, ago, call } = Admin;
+  const { $, esc, ago, when: fmtWhen, call } = Admin;
   const ACT_PAGE = 15;
   let actRows = [];
   let actGroup = "";
@@ -39,7 +39,7 @@
 
   function actCard(e) {
     const [label, cls] = ACT_LABEL[e.type] || [e.type, ""];
-    const when = e.at ? new Date(e.at).toLocaleString() : "unknown time";
+    const when = fmtWhen(e.at);
     const by = e.actor ? ` · by ${esc(e.actor)}` : "";
     return `<div class="ev"><div class="head"><div><span class="pill ${cls}">${esc(label)}</span></div>
       <span class="muted">${esc(when)} · ${esc(ago(e.at))}</span></div>

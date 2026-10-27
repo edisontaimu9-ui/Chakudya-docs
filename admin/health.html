@@ -32,7 +32,7 @@
 <script>
 (() => {
   "use strict";
-  const { $, esc, fmt, ago, msFmt, bar, call } = Admin;
+  const { $, esc, fmt, ago, when, msFmt, bar, call } = Admin;
   let hHours = 24;
   const IDS = ["hStats", "hServices", "hIncidents", "hDaily"];
   const pct = (n) => (typeof n === "number" ? n + "%" : "n/a");
@@ -52,7 +52,7 @@
     const state = i.ongoing ? '<span class="pill bad">ongoing</span>' : '<span class="pill ok">resolved</span>';
     const svc = (i.failing_services || []).join(", ") || "unknown";
     return `<div class="ev"><div class="head"><div>${state}</div>
-      <span class="muted">${esc(new Date(i.started_at).toLocaleString())} · ${esc(ago(i.started_at))}</span></div>
+      <span class="muted">${esc(when(i.started_at))} · ${esc(ago(i.started_at))}</span></div>
       <div class="op">${esc(svc)}</div>
       <div class="muted">${esc(dur(i.duration_minutes))}${i.detail ? " · " + esc(i.detail) : ""}</div></div>`;
   }

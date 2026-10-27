@@ -81,7 +81,7 @@ const RenderAccount = (() => {
   }
 
   // ── Signed in: developer console ─────────────────────────
-  const fmtDay = (v) => new Date(v).toLocaleDateString("en-GB", { year: "numeric", month: "short", day: "numeric" });
+  const fmtDay = (v) => new Date(v).toLocaleDateString("en-GB", { year: "numeric", month: "short", day: "numeric", timeZone: "Africa/Blantyre" });
   const plural = (n, word) => `${Number(n).toLocaleString()} ${word}${Number(n) === 1 ? "" : "s"}`;
   let closeMenus = null;
 
@@ -166,7 +166,7 @@ const RenderAccount = (() => {
         <div class="code-block"><pre><code id="acc-curl"></code></pre></div></div>` : ""}
 
       <div class="console-metrics">
-        <div class="metric"><span class="metric__label">Requests today</span><span class="metric__value">${sumToday.toLocaleString()}</span><span class="metric__note">Across all your keys</span></div>
+        <div class="metric"><span class="metric__label">Requests today</span><span class="metric__value">${sumToday.toLocaleString()}</span><span class="metric__note">Across all your keys · Malawi day (CAT)</span></div>
         <div class="metric"><span class="metric__label">Last 7 days</span><span class="metric__value">${sumWeek.toLocaleString()}</span><span class="metric__note">Across all your keys</span></div>
         <div class="metric"><span class="metric__label">Keys in use</span><span class="metric__value">${keys.length} <small>of ${max}</small></span><span class="metric__note">${plural(left, "slot")} remaining</span></div>
       </div>

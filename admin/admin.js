@@ -87,11 +87,21 @@
     if (s < 129600) return Math.round(s / 3600) + " h ago";
     return Math.round(s / 86400) + " d ago";
   }
+  // Everything on the dashboard is shown in Malawi time (CAT, Africa/Blantyre, UTC+2), whatever the viewer's device says.
+  // The API still stores and sends UTC timestamps; only the display and the day buckets are Malawi's.
+  const TZ = "Africa/Blantyre";
+  const when = (iso) => {
+    const d = iso ? new Date(iso) : null;
+    if (!d || isNaN(d)) return "unknown time";
+    return d.toLocaleString("en-GB", { timeZone: TZ, day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit", hour12: false }) + " CAT";
+  };
+  const clock = (d = new Date()) => d.toLocaleTimeString("en-GB", { timeZone: TZ, hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false }) + " CAT";
+  // `iso` here is a plain Malawi calendar date (YYYY-MM-DD) from the API, so it is labelled as-is (timeZone UTC just avoids shifting it).
   function dayLabel(iso) {
     const d = new Date(iso + "T00:00:00Z");
     return d.toLocaleDateString(undefined, { weekday: "short", timeZone: "UTC" }) + "<br>" + d.getUTCDate();
   }
-  // Bar chart of calls per UTC day (days = [{ day, count }]), the last bar highlighted as today.
+  // Bar chart of calls per Malawi (CAT) day (days = [{ day, count }]), the last bar highlighted as today.
   function trendBars(days) {
     const max = Math.max(1, ...days.map((d) => d.count));
     return `<div class="trend">${days.map((d, i) => `<div class="col${i === days.length - 1 ? " today" : ""}"><span class="val">${fmt(d.count)}</span><div class="bar1" style="height:${Math.max(2, Math.round((d.count / max) * 110))}px"></div><span class="day">${dayLabel(d.day)}</span></div>`).join("")}</div>`;
@@ -202,7 +212,7 @@
       $("refresh").classList.remove("busy");
       $("live").classList.remove("busy");
     }
-    $("status").textContent = $("fatal").classList.contains("hide") ? "Live · updated " + new Date().toLocaleTimeString() : "";
+    $("status").textContent = $("fatal").classList.contains("hide") ? "Live · updated " + clock() : "";
   }
 
   // Always on: refresh every minute while the tab is visible, and catch up when you come back to a stale tab.
@@ -273,5 +283,5 @@
     else start();
   }
 
-  window.Admin = { $, esc, fmt, stat, bar, ago, msFmt, dayLabel, trendBars, chips, call, loadSession, overview, authFail, fatal, reload: load, mount };
+  window.Admin = { $, esc, fmt, stat, bar, ago, msFmt, when, clock, dayLabel, trendBars, chips, call, loadSession, overview, authFail, fatal, reload: load, mount };
 })();

@@ -33,7 +33,7 @@
 <script>
 (() => {
   "use strict";
-  const { $, esc, fmt, stat, ago, msFmt, call } = Admin;
+  const { $, esc, fmt, stat, ago, when, msFmt, call } = Admin;
   let monHours = 24;
   let monRecent = [];
   let monShown = 10;
@@ -43,7 +43,7 @@
   function monRow(e) {
     const st = e.status != null ? `<span class="pill ${stCls(e.status)}">${esc(e.status)}</span> ` : "";
     return `<div class="ev"><div class="head"><div>${st}<span class="pill">${esc(e.kind === "both" ? "failed + slow" : e.kind)}</span></div>
-      <span class="muted">${esc(new Date(e.at).toLocaleString())} · ${esc(ago(e.at))}</span></div>
+      <span class="muted">${esc(when(e.at))} · ${esc(ago(e.at))}</span></div>
       <div class="op">${esc(e.method)} ${esc(e.route)}</div>
       <div class="muted">${esc(msFmt(e.duration_ms))}${e.request_id ? " · " + esc(e.request_id) : ""}</div></div>`;
   }
