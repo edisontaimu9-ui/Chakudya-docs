@@ -400,7 +400,7 @@ const RenderLanding = (() => {
       ["food-staples.webp", "Nsima served with a tomato stew and greens", "Nutrition & dietetics apps"],
       ["food-legumes-protein.webp", "Bowls of beans, lentils and whole grains", "Meal planning systems"],
       ["food-fruit-veg.webp", "Fresh fruit and vegetables", "Health & fitness apps"],
-      ["food-barcode.webp", "A packaged food with its barcode being scanned", "Food & barcode scanners"],
+      ["food-barcode.webp", "A phone scanning the barcode on a pack of tomatoes in a shop", "Food & barcode scanners"],
     ];
     const uses = ["Clinical decision support tools", "Nutrition research tools", "AI-powered nutrition assistants", "Educational applications"];
     return el(`
