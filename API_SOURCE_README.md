@@ -1698,6 +1698,451 @@ curl -X POST https://chakudya-api.edisontaimu9.workers.dev/renal-nutrition/food-
 
 **Related routes reused:** `GET /renal` (renal food list), `POST /meals/analyze` (single-meal kidney-disease screen), `GET /dri`.
 
+### Enteral nutrition (`/enteral-nutrition`) — `v1.58.0+`
+
+Tube feeding prescription calculator that follows the Edge Nutrition *Tube Feeding Calculation Guide* (12 steps). Any valid API key. Pure arithmetic, except that `formula_id` or `formula_name` reads one row of `enteral_formulas` (read only).
+
+| Route | What it does |
+|---|---|
+| `POST /enteral-nutrition/calculate` | Formula volume, rate, energy, protein, formula water, free water flush, adequacy and a delivery scenario |
+| `GET /enteral-nutrition/reference` | Optional `?section=` one of `steps`, `limits`, `quick_math`, `modes`, `request_fields` |
+
+**Formula.** Send `formula_id` or `formula_name` (looked up in `enteral_formulas`), or send values yourself as `formula: {kcal_per_ml, protein_g_per_l, water_ml_per_l}`. Values in the body override the looked-up ones. If the row's energy density cannot be read, the API returns 422 listing the row's column names; send `formula.kcal_per_ml` instead.
+
+**Needs.** `kcal_needs` (required unless `mode` is `trophic`), `protein_needs_g`, `fluid_needs_ml` (defaults to 30 ml/kg when `weight_kg` is sent), `weight_kg`, `medication_kcal` (taken off the formula target).
+
+**Feeding.** `mode`: `continuous` (default), `cyclic`, `bolus` (`feeds_per_day`, default 6), `trophic` (`trophic_rate_ml_hr`, default 15, adult range 10-20) or `volume_based` (volume rounded to 100 ml, no rate). `hours_per_day` defaults to 24. `flush_every_hours` defaults to 4 (minimum flush 30 ml, rounded to 5 ml).
+
+**Flags.** `refeeding_risk` (adults start at 10-20 kcal/kg via `refeeding_kcal_per_kg`, default 15, needs `weight_kg`; with `patient_type: "paediatric"` the start is 40-50% of goal via `refeeding_start_pct`, default 45), `mechanically_ventilated`, `high_risk_tolerance` (half-rate start, +10 ml every 4 hours).
+
+**Adequacy.** The response always includes a 65% delivery scenario (the typical share of prescribed EN actually received). Add `delivered_pct` or `delivered_volume_ml` for your own, and `protein_modular: {protein_g_per_serving, kcal_per_serving}` to close a protein gap. For continuous feeds `buffer_rates` shows the rate over 20 and 22 hours.
+
+Warnings are raised for adult rates above 150 ml/hr, flushes above 300 ml, adult refeeding fluid of 2 L/day or more, and overfeeding in ventilated patients (prescribed energy more than 5% above goal).
+
+```bash
+curl -X POST https://chakudya-api.edisontaimu9.workers.dev/enteral-nutrition/calculate \
+  -H "Authorization: Bearer $KEY" -H "Content-Type: application/json" \
+  -d '{"kcal_needs":1800,"protein_needs_g":100,"fluid_needs_ml":2100,"weight_kg":70,
+       "formula":{"kcal_per_ml":1.2,"protein_g_per_l":55.5,"water_ml_per_l":807}}'
+# -> 63 ml/hr x 24 hours (1512 ml/day); 145 ml free water flush Q4
+```
+
+### Clinical nutrition research engine (`/research`) — `v1.60.0+`
+
+Standardises the variables that differ between clinical nutrition studies so datasets can be compared and pooled: anthropometry, dietary intake, biochemical indicators, clinical signs, nutrition diagnoses and outcomes. Any valid API key, nothing stored, no SQL to run. Variable names, canonical units, LOINC codes and plausibility limits come from the same registry as `POST /fhir/Bundle/$nutrition-assessment`, and the cut-offs are the ones the other routes use (WHO adult BMI classes, weight-loss intervals, GLIM, fixed MUAC cut-offs), so a value means the same thing everywhere.
+
+| Route | What it does |
+|---|---|
+| `POST /research/harmonise` | Standardise one study (`records`) or several (`studies`): units, derived indices, diagnoses, outcomes, a flat table and a data-quality report |
+| `POST /research/convert` | One value, or up to 100, converted between units with a plausibility check |
+| `GET /research/variables` | Data dictionary: `domain`, `q` (search) or `name` (one variable, by name or alias) |
+| `GET /research/reference` | Matching rules, unit factors, diagnosis concept list and outcome definitions; `section=rules\|units\|diagnoses\|outcomes\|limits` |
+
+**Request.** `records` is an array of up to 500 objects (up to 150 distinct columns). Each key is matched, in order, by your `columns` mapping (`{"alb": {"variable": "albumin", "unit": "g/L"}, "sex_code": {"variable": "sex", "value_map": {"1": "male", "2": "female"}}}`), by a variable name or alias (`wt`, `hb`, `dbp`), then by name plus unit (`weight_lb`, `albumin_g_l`, `energy_kj`). A column that matches nothing is listed under `columns` as `unmapped` and in `warnings`; list it in `keep` to copy it through. `id` (or `record_id`, `subject_id`, `participant_id`) is carried as the identifier.
+
+**Units are never guessed.** Order of precedence: the cell (`"12 g/dL"` or `{"value": 12, "unit": "g/dL"}`), the `columns` unit, the unit in the column name, the study-wide `units` (`{"albumin": "g/L"}`), then the canonical unit, which is reported as `assumed_canonical` with a warning. Output is in each variable's canonical unit, or SI with `unit_system: "si"` (mmol/L, g/L, µmol/L, mmol/mol, kJ), and `target_units` overrides one variable. A converted value keeps its `original`. Decimal commas, numeric codes (`1`/`2`) and `dd/mm` dates are not guessed: use `value_map` and `date_format`.
+
+**Plausibility.** Values outside a variable's limits are flagged, never changed. The flag lists the units in which the number would be plausible (albumin `32` read as g/dL gives `possible_units: ["g/L"]`), which is how mixed-unit columns show up. `implausible: "null"` sets them to null. `"<5"` and `">200"` are kept as the number and marked `censored`. Missing: null, empty, `NA`, `N/A`, plus any `missing_codes` you declare (`[-99, 999]`).
+
+**Derived values** (shown only when every input is present): `bmi`, `bmi-category` (WHO adult classes, age 18+, not in pregnancy; children are pointed to `GET /growth/assess`), `waist-to-height-ratio`, `weight-change-percent` (positive = loss, as elsewhere in the API) and `weight-loss-significance` (standard intervals only), `muac-status` (CMAM cut-offs 6-59 months, WHO 2008 above; `muac_scheme` overrides), protein / fat / carbohydrate % energy and protein and energy per kg, `age-years` from dates, `length-of-stay`, `mortality-28d` and `mortality-90d` (true, false, or null with a reason; `assume_alive_without_death_date: true` only if follow-up is complete), and `glim-status` when the dataset carries GLIM inputs (adults; `glim_bmi_cutoffs: "asian"` for Asian cut-offs). `glim-status` is `insufficient-data` unless the criteria are already met or every criterion could be assessed, so a missing muscle assessment never reads as "not malnourished".
+
+**Diagnoses.** Put free text, ICD-10 codes or NCP codes in a `diagnosis` column (`dx`, `diagnoses`, `icd10`): one value, several separated by `;` or `|`, or an array. A fixed list of concepts (malnutrition by severity, stunting, wasting, weight status, micronutrient deficiencies, dehydration, dysphagia, malabsorption, common comorbidities) is assigned only on a text pattern, an ICD-10 prefix (longest wins: `E44.0` moderate, `E44.1` mild, `E46` unspecified) or an NCP code. Negation or uncertainty (`not obese`, `HIV negative`, `history of TB`, `suspected ...`) and several conditions in one text return `status: "review"` with the `candidates`, not a guess; unmatched text is `unmapped` and kept. `ncp_candidates` are NCP terms a dietitian would consider, with term text read from the NCP diagnostic terminology; an unknown NCP code is `invalid_code`. If that table cannot be read the codes are returned without term text and a warning says so.
+
+**Outcomes.** `died-in-hospital`, `readmission-30d`, `icu-admission`, `hospital-acquired-infection` (yes/no words or 1/0), `length-of-stay` and `icu-length-of-stay` (hours, days, weeks or months become days), and `cmam-outcome` (`cured`, `died`, `defaulted`, `non-responder`, `transferred`, with common spellings such as *recovered*, *lost to follow-up*, *non-recovered*, *referred*).
+
+**Several studies.** Send `studies: [{study_id, records, columns?, units?, date_format?}]` (up to 10, 500 records in all). Each study keeps its own column names and units; `unit_system` and `target_units` are set once at the top level so every study lands in the same units. The response has `pooled.table` (`study_id`, `id`, then one column per variable, with `units`) and `pooled.coverage` (`in_all_studies`, and `gaps` naming the studies a variable is missing from), plus the full per-study report.
+
+**Response.** `summary` (counts, conversions, flags), `warnings`, `columns` (how each column was matched and which unit source it used), `variables` (per variable: n, converted, out of range, mean, SD, median, range), `records` (`standardised`, `derived`, `diagnoses`, `flags`) and `table` (`columns`, `units`, `rows`, ready for R or pandas).
+
+```bash
+curl -X POST https://chakudya-api.edisontaimu9.workers.dev/research/harmonise \
+  -H "Authorization: Bearer $KEY" -H "Content-Type: application/json" \
+  -d '{"unit_system":"si","studies":[
+        {"study_id":"A","units":{"albumin":"g/dL","glucose":"mg/dL","weight":"lb","height":"in"},"records":[{"id":1,"age":40,"weight":160,"height":70,"albumin":3.1,"glucose":100}]},
+        {"study_id":"B","columns":{"alb":{"variable":"albumin","unit":"g/L"}},"records":[{"id":2,"age":35,"weight_kg":60,"height_cm":160,"alb":28,"glucose":"5.0 mmol/L"}]}]}'
+```
+
+Standardisation and screening aids for research data, not a diagnosis. Values are standardised, not corrected. Micronutrient intake is not standardised here: use `POST /micronutrients/assess`. LOINC codes are carried only for items the API already registers.
+
+### Longitudinal nutrition outcomes engine (`/longitudinal`) — `v1.61.0+`
+
+Follows nutrition outcomes over repeated visits so cohort studies and follow-up research can read change, not just status. Any valid API key, nothing stored, no SQL to run. Every number reuses an existing module (the WHO classifiers behind `GET /growth/assess`, the adult BMI classes and weight-loss intervals, the fixed MUAC cut-offs), so a z-score here is the z-score the single endpoints return. The WHO reference rows are read (read only) in a few batched queries per request.
+
+| Route | What it does |
+|---|---|
+| `POST /longitudinal/analyse` | One participant's visits: indicators at each visit, change since the previous visit and since baseline, trends, condition patterns, data-quality flags |
+| `POST /longitudinal/cohort` | Up to 300 participants: paired change with 95% intervals, status transitions, incidence and recovery, retention, two-group comparison, optional flat table |
+| `GET /longitudinal/reference` | Request fields, variables, condition definitions, pattern rules, thresholds, limits; `section=input\|variables\|conditions\|patterns\|thresholds\|limits` |
+
+**Request.** `visits` is an array (up to 60 per participant, one per date) of `{date, weight_kg, length_cm \| height_cm, muac_cm, hc_cm, oedema?, pregnant?, intake?, measures?}`. Weight, length/height, MUAC and head circumference also accept `_g` or `_mm` spellings (send one per visit). `intake` (`{"energy_kcal": 1450}`) and `measures` (`{"hemoglobin_g_dl": 9.8}`) take any numeric names and are tracked like the built-in variables (up to 30 per request). Sex is `boys`/`girls` (or `male`/`female`). Age comes from `birth_date`, else the visit's `age_months`, else `baseline_age_months` moved forward by the elapsed time, which is flagged `age_estimated`; with no age, WHO z-scores and classes are not computed but changes and trends still are (`options.population: "adult"` for adults).
+
+**Per visit.** WHO z-scores from birth to 19 years (weight-, length/height-, weight-for-length/height-, BMI-, head-circumference- and MUAC-for-age), adult BMI class (not in pregnancy), fixed MUAC status (CMAM 115/125 mm for 6-59 months, WHO/FANTA cut-offs otherwise, or `muac_scheme: "who_hiv_2008"`), and change since the previous visit and since baseline (absolute, percent and per 30 days). A variable missing at a visit is compared with the last visit that has it.
+
+**Trends and conditions.** Each variable gets a least-squares slope with a 95% interval and a direction (a z-score is rising or falling when first-to-last change exceeds `z_change_threshold`, default 0.5). Conditions are stunting, underweight, wasting, thinness, overweight/obesity, low MUAC (by fixed cut-off and by z-score), nutritional oedema, and adult under- and overnutrition, each with a state per visit (0 none, 1 present, 2 severe or obesity) and a pattern: `never`, `incident` (new onset), `recovered` (with `sustained_recovery` over `recovery_consecutive_visits`, default 2), `relapsed`, `persistent` or `single_assessment`. Onset and recovery times lie between visits; the response gives days to the first visit that shows the change.
+
+**Data quality.** Out-of-range measurements (wrong unit), WHO-implausible z-scores, height falls, a z-score change of 3 or more between visits, and an adult weight change over 20% in 30 days are flagged, never corrected. WHO-implausible z-scores are left out of trends and conditions unless `implausible: "keep"`.
+
+**Cohort.** Participants carry an optional `group`. The response has paired change with 95% intervals, transition tables from first to last assessed visit, incidence (new cases among those without the condition at the start) and recovery (among those with it), follow-up time, retention against `schedule_days` (days since each participant's first visit, within `schedule_tolerance_days`, default 14), a two-group Welch comparison, and with `include_table: true` a flat participant-visit table (`cond_*` columns hold the 0/1/2 states) ready for R or pandas. A participant that cannot be analysed (bad dates, duplicate id) is listed under `excluded` and the rest are still analysed; `include_visits: true` returns every participant's visit-by-visit detail instead of one summary line. Limits: 300 participants, 60 visits each, 3000 visits in all.
+
+```bash
+curl -X POST https://chakudya-api.edisontaimu9.workers.dev/longitudinal/cohort \
+  -H "Authorization: Bearer $KEY" -H "Content-Type: application/json" \
+  -d '{"participants":[
+        {"id":"a","group":"intervention","sex":"girls","birth_date":"2023-06-01","visits":[{"date":"2024-06-01","muac_cm":11.2},{"date":"2024-09-01","muac_cm":12.8}]},
+        {"id":"b","group":"control","sex":"boys","birth_date":"2023-05-10","visits":[{"date":"2024-06-02","muac_cm":11.9},{"date":"2024-09-03","muac_cm":12.0}]}],
+       "options":{"schedule_days":[0,90],"include_table":true}}'
+```
+
+Screening and research aid, not a diagnosis. Trend, change and status-transition rules are this engine's own descriptive definitions (see `GET /longitudinal/reference`).
+
+### Malnutrition research engine (`/malnutrition`) — `v1.64.0+`
+
+Population-level summaries of child malnutrition from survey or study records, using the WHO growth standards and standard case definitions. Any valid API key, nothing stored, no SQL to run. It reads the WHO reference tables (read only) in a few batched queries. Measurement validation and z-scores come from the data quality engine, which runs the `/research/harmonise` rules, so a z-score here is the z-score `GET /growth/assess` returns.
+
+| Route | What it does |
+|---|---|
+| `POST /malnutrition/analyse` | Up to 2000 `records`: prevalence of each form of malnutrition, acute malnutrition, concurrent failure and CIAF, mean z-scores, by age group, sex and your columns |
+| `GET /malnutrition/reference` | Case definitions, thresholds and limits; `section=indicators\|acute_malnutrition\|thresholds\|anthropometric_failure\|input\|limits` |
+
+**Indicators** (default age range 0 to 59 months, `options.age_range` up to 228). Each has moderate and severe parts, an interval, and mean z-score; z exactly at a cut-off is not a case.
+
+| Indicator | Definition | Ages |
+|---|---|---|
+| `stunting` | height-for-age z < -2 (severe < -3) | all |
+| `underweight` | weight-for-age z < -2 (severe < -3) | to 120 months (WHO reference limit) |
+| `wasting` | weight-for-length/height z < -2 (severe < -3) | 0 to 59 months |
+| `overweight_whz` | weight-for-length/height z > +2 (above +3 shown separately) | 0 to 59 months |
+| `thinness`, `overweight_baz` | BMI-for-age z < -2 (< -3); z > +1 (> +2) | 60 to 228 months |
+
+**Prevalence level.** For stunting, wasting and overweight in children under 5, the response gives the UNICEF/WHO/World Bank level from the point estimate: stunting under 2.5% very low, 2.5 to under 10 low, 10 to under 20 medium, 20 to under 30 high, 30 or more very high; wasting and overweight under 2.5 very low, 2.5 to under 5 low, 5 to under 10 medium, 10 to under 15 high, 15 or more very high. No thresholds are published for underweight, so none is given. The level is withheld when the age range goes beyond 59 months.
+
+**Acute malnutrition** (`acute_malnutrition`): global (GAM) and severe (SAM) by WHZ (z < -2, < -3), by MUAC (< 125 mm, < 115 mm; 6 to 59 months) and combined (either criterion, for children with both measurements), each including bilateral oedema (`oedema`: name of a yes/no, 1/0 or grade column). A child with oedema is a case even with no usable weight. Without an oedema column the response warns that acute malnutrition may be under-estimated. `overlap` shows the children below only the WHZ cut-off, only the MUAC cut-off, both, or neither: the two criteria find overlapping but different children.
+
+**Anthropometric failure** (`anthropometric_failure`): concurrent wasting and stunting, the share of wasted children who are also stunted, and the Composite Index of Anthropometric Failure with its groups (A none, B wasting only, C wasting and underweight, D wasting, stunting and underweight, E stunting and underweight, F stunting only, Y underweight only), for children with all three z-scores valid.
+
+**By group.** `by_stratum` repeats the indicators by age group (0 to 5, 6 to 11, 12 to 23, 24 to 35, 36 to 47, 48 to 59 months, ...), sex, and up to three columns you name in `strata` (a column, or `{variable, name?, cutpoints?}`), each with a chi-square test of equal prevalence across groups.
+
+**Supplied z-scores.** For secondary analysis of survey files, `z_columns: {"haz": "hc70", "waz": "hc71", "whz": "hc72"}` uses z-score columns instead of recomputing. `z_scale: 100` for values in hundredths, `missing_codes: [9996, 9997, 9998, 9999]` for the file's missing codes; supplied values are checked against the same WHO limits as recomputed ones. Age is still needed for the age range and groups (map it in `columns`). When measurements are present too, `sample.supplied_vs_recomputed` compares the two, which exposes a wrong scale or a different reference. `options.z_source` is `auto` (supplied where present), `supplied` or `recomputed`.
+
+**Exclusions are counted.** `sample.excluded` lists children with no age, outside the age range, or with no valid z-score, and `implausible_z_scores_removed` by indicator (WHO flexible limits by default; `options.flag_rule: "survey_mean"` flags values far from the survey mean). `data_quality` summarises records with excluded values and suspected unit errors; send the same records to `POST /data-quality/audit` for digit preference, age heaping and sex and age ratios by team.
+
+**Intervals and surveys.** Wilson by default or exact (`ci_method`), `confidence_level` 0.95; mean z-scores use a t interval. Intervals assume simple random sampling: send `design_effect` from your survey software for a cluster survey. Sampling weights are not applied, so prevalences from a weighted survey will not match published weighted estimates. `population: {"children": 120000}` adds expected prevalent cases (prevalence x population, with the interval scaled): cases at the time of the survey, not new cases over a year. `options.include_table: true` returns a flat table of classified children (0 not present, 1 moderate, 2 severe) for R or pandas.
+
+```bash
+curl -X POST https://chakudya-api.edisontaimu9.workers.dev/malnutrition/analyse \
+  -H "Authorization: Bearer $KEY" -H "Content-Type: application/json" \
+  -d '{"oedema":"oedema","strata":["district"],
+       "columns":{"age_months":{"variable":"age-years","unit":"mo"},"weight_kg":{"variable":"weight","unit":"kg"},
+                  "length_cm":{"variable":"length","unit":"cm"},"height_cm":{"variable":"height","unit":"cm"},"muac_mm":{"variable":"muac","unit":"mm"}},
+       "records":[{"id":"K1","sex":"F","age_months":14,"weight_kg":8.1,"length_cm":71,"muac_mm":128,"oedema":"no","district":"Zomba"},
+                  {"id":"K2","sex":"M","age_months":30,"weight_kg":11.2,"height_cm":86.5,"muac_mm":137,"oedema":"no","district":"Machinga"}]}'
+
+# Secondary analysis of z-scores stored in hundredths (survey file)
+curl -X POST https://chakudya-api.edisontaimu9.workers.dev/malnutrition/analyse \
+  -H "Authorization: Bearer $KEY" -H "Content-Type: application/json" \
+  -d '{"columns":{"b4":{"variable":"sex","value_map":{"1":"male","2":"female"}},"hw1":{"variable":"age-years","unit":"mo"}},
+       "z_columns":{"haz":"hc70","whz":"hc72"},"z_scale":100,"missing_codes":[9996,9997,9998,9999],"design_effect":1.8,
+       "records":[{"b4":1,"hw1":18,"hc70":-250,"hc72":-80},{"b4":2,"hw1":40,"hc70":9998,"hc72":120}]}'
+```
+
+Research aid for population-level summaries, not a diagnosis or a clinical classification of any child.
+
+### Research dataset export engine (`/export`) — `v1.65.0+`
+
+Turns a research dataset into de-identified, analysis-ready files with standard variable names and units, a data dictionary, provenance and loaders for R, Python and Stata. Any valid API key, nothing stored, no SQL to run. Standardisation is the `/research/harmonise` engine, so exports from different studies stack. It reads `ncp_diagnosis_terms` (read only) only when diagnoses are sent.
+
+| Route | What it does |
+|---|---|
+| `POST /export/dataset` | Up to 500 `records` (or `studies`, pooled): returns the files below, the re-identification risk, and why any column was left out |
+| `POST /export/verify` | Checks files against the SHA-256 hashes in a provenance file |
+| `GET /export/reference` | Rules and limits; `section=request\|deidentification\|files\|naming\|provenance\|limits` |
+
+**Files returned** (`files[]`, each with `name`, `role`, `media_type`, `bytes`, `sha256`, `content`; `include` chooses roles, the data file is always there):
+
+| Role | File | Contents |
+|---|---|---|
+| `data` | `<id>_data.csv` | UTF-8, comma-separated, LF line ends, header row. Missing = empty field. Yes/no = `1`/`0`. Coded variables are text codes |
+| `dictionary`, `dictionary_json` | `<id>_dictionary.csv`, `.json` | Per column: name, label, type, role, unit, levels, source variable, LOINC code where the registry has one, plausible range, valid and missing counts, summary |
+| `datapackage` | `datapackage.json` | Frictionless Data tabular Data Package (schema, missing values, file hash). Plausible ranges are not constraints: out-of-range values are kept and flagged |
+| `r`, `python`, `stata` | `<id>_load.R`, `.py`, `.do` | Read the file with the right types; factors / categoricals / value-labelled numerics; labels and units. R is base R; Python needs pandas 1.0+; Stata needs 14+ |
+| `provenance` | `<id>_provenance.json` | What was done, with counts, and name, size and SHA-256 of every other file |
+
+**Names.** One name per variable in every file: lower-case letters, digits and underscores, at most 32 characters (Stata's limit), unique, never a Stata reserved word (`energy-intake-kcal` becomes `energy_intake_kcal`). A value reported as `<7` keeps the number and gets a `<name>_cens` column (`<`, `<=`, `>`, `>=`). Dates become `<name>_day` or `<name>_year`; age becomes `age_months`, `age_years` or `age_band`. Out-of-range values are kept and listed by code in `qc_flags` (`include_qc`).
+
+**De-identification** (`deidentify`):
+
+| Option | Values | What it does |
+|---|---|---|
+| `ids` | `pseudonymise` (default), `drop` | The `id`, `record_id`, `subject_id`, `participant_id`, `patient_id` or `pid` column (or `id_column`) becomes `participant_id` = `P` + 16 hex characters of HMAC-SHA-256(salt, study + id). Repeated visits share it; the same id in two pooled studies is two participants |
+| `salt` | 16 to 200 characters | Your secret. The same salt gives the same pseudonyms in later exports so you can link them. Without one a random salt is used and discarded. Never returned, stored or written to the provenance |
+| `pseudonymise_columns` | up to 5 columns | Cluster or household ids exported as keyed hashes (`H` + 16 hex) so clusters stay intact |
+| `dates` | `relative` (default), `year`, `drop` | Days from each participant's earliest date (day 0), or the year only. Exact dates are never exported; date of birth never |
+| `age` | `months` (default, `years` if `population` is `adult`), `years`, `band`, `exact`, `drop` | Completed months or years (from a date of birth, completed calendar months). 90 years and over is top-coded in every mode |
+| `k`, `on_violation` | 2 to 50, default 5; `report` (default) or `suppress` | k-anonymity on sex, age and `quasi_identifiers` (exported column names, such as a district you copied through). `report` changes nothing and warns. `suppress` blanks the most distinctive quasi-identifier, only in rows whose group is smaller than k |
+
+Columns that are not registered variables are **left out** unless named in `include_columns` (up to 20), and each is checked: names that look like direct identifiers (name, phone, email, address, GPS, national ID), free-text names (`notes`, `comments`), values longer than 40 characters or 4 words, emails, phone patterns, dates, whole numbers of 9+ digits, and values that differ in every record are refused and reported in `columns_dropped`. Free-text diagnoses are exported as concept names only. Text starting with `=`, `+`, `@` or `-` gets a leading `'` so spreadsheets do not run it. Raw identifiers never appear in the response.
+
+**Read `disclosure_risk`.** It gives the smallest group size, the records below k, and category levels with fewer than k records. With few records and fine quasi-identifiers (exact age plus district) nearly every row is unique: use `age: "band"` or `"years"`, coarser geography, or `on_violation: "suppress"`. This is a measure and a reduction of risk on the quasi-identifiers you declare, **not a certificate of anonymity**. Whether a dataset may be released is for the data custodian and the ethics approval that covers it.
+
+**Provenance and verification.** `dataset` (id, title, description, creators, licence, version, contact, keywords, funding, ethics_approval, access_conditions) is carried into the provenance and Data Package; nothing is invented. The provenance records the engine and API version, the time, the input record count, column mapping and a SHA-256 of the input JSON (keys sorted), every transformation with counts, columns dropped and why, and the limits of the method. `POST /export/verify` with `{files:[{name, content}]}` (the provenance file may be among them or sent as `provenance`) returns `verified` and a per-file `match`, `mismatch`, `missing` or `not_listed`. Hashes are of the exact bytes: a rewritten line ending counts as a change.
+
+```bash
+curl -X POST https://chakudya-api.edisontaimu9.workers.dev/export/dataset \
+  -H "Authorization: Bearer $KEY" -H "Content-Type: application/json" \
+  -d '{"dataset":{"id":"zomba-2024","title":"Zomba child nutrition survey","licence":"CC-BY-4.0"},
+       "population":"paediatric","include_columns":["district"],
+       "deidentify":{"salt":"<a long secret you keep>","age":"band","quasi_identifiers":["district"],"k":5},
+       "records":[{"id":"MW-1","Full Name":"(never exported)","sex":"F","age_months":20,"weight_kg":9.4,"hb":"<7 g/dL","visit_date":"2024-06-20","district":"Zomba"},
+                  {"id":"MW-1","sex":"F","age_months":23,"weight_kg":10.1,"hb":"9 g/dL","visit_date":"2024-09-20","district":"Zomba"}]}'
+
+# Check files you received against their provenance
+curl -X POST https://chakudya-api.edisontaimu9.workers.dev/export/verify \
+  -H "Authorization: Bearer $KEY" -H "Content-Type: application/json" \
+  -d '{"files":[{"name":"zomba_2024_data.csv","content":"..."},{"name":"zomba_2024_provenance.json","content":"..."}]}'
+```
+
+Prepares datasets for sharing and measures what is left. It does not decide whether they may be shared.
+
+
+### Nutrition data quality engine (`/data-quality`) — `v1.63.0+`
+
+Audits a survey or study dataset before analysis and returns it standardised, with every problem named and traced to the record, the variable and the field team. Any valid API key, nothing stored, no SQL to run. It reads the WHO growth reference tables (read only) in a few batched queries, the same tables and classifiers behind `GET /growth/assess`, so a z-score here is the z-score that endpoint returns.
+
+| Route | What it does |
+|---|---|
+| `POST /data-quality/audit` | Up to 2000 `records`: unit and range validation, implausible z-scores, consistency checks, survey-level quality, per-team comparison, optional analysis-ready table |
+| `GET /data-quality/reference` | What each check means, the screening bands and the limits; `section=checks\|survey_indicators\|input\|limits` |
+
+**Relation to `/research`.** Unit validation, plausibility ranges, missing codes (`missing_codes`), date formats and variable naming come from `POST /research/harmonise`, and `columns`, `units`, `missing_codes` and `date_format` work exactly as they do there (variable names such as `weight`, `height`, `length`, `muac`, `hc`, `age-years`, `sex`, `date-of-birth`, `assessment-date`). The audit runs harmonise on your records in chunks, then adds what a single-study harmoniser cannot: checks against the WHO growth standards, checks across records, and survey-level statistics.
+
+**Record-level checks.** Each has a severity: `error` (the value is left out of the table), `warning`, or `info` (counted, not listed per record).
+
+| Code | Severity | Meaning |
+|---|---|---|
+| `out_of_range`, `not_numeric`, `unrecognised_unit`, `unrecognised_category` | error | From harmonise. A value out of range lists the units in which it would be plausible (`possible_units`: 9100 kg reads as grams) |
+| `implausible_z` | error | A WHO z-score outside the WHO limits (haz -6/+6, waz -6/+5, whz -5/+5, baz and head-circumference and MUAC -5/+5), or with `options.flag_rule: "survey_mean"` more than `flag_range` (default 3) from the survey's own mean; `"both"` applies both |
+| `weight_exceeds_height` | error | Weight in kg above height in cm: the columns may be swapped. Both are left out |
+| `visit_before_birth`, `future_date` | error | Date problems; age is not used from a bad date |
+| `age_mismatch` | warning | An age column and the dates disagree by more than 1 month; the dates are used |
+| `bmi_mismatch` | warning | A recorded BMI differs from weight and height by more than `bmi_tolerance` (0.5) |
+| `z_mismatch` | warning | A supplied z-score (`supplied_z: {"haz": "haz_col"}`) differs from the recomputed WHO value by more than `z_tolerance` (0.1): another reference, software version, age rounding, or a unit error |
+| `duplicate_record`, `duplicate_visit`, `duplicate_id` | warning | Identical records; the same id twice for one visit date; the same id twice with no visit date |
+
+Z-scores are worked out for children with a usable sex and age up to 228 months; position (lying under 24 months, standing from 24) follows the column used (`length` or `height`) and the WHO adjustment is applied and noted. Adults and records with no sex or age get unit, range and consistency checks only.
+
+**Survey-level indicators** (children aged `options.age_range`, default 6 to 59 months):
+- `completeness` of sex, age, weight, height or length, MUAC and head circumference, among the mapped columns.
+- `flagged`: records with an implausible z-score, overall and by indicator. For MUAC-for-age the band is excellent up to 1.0%, good up to 1.5%, acceptable up to 2.0%, problematic above (the mwana plausibility checks).
+- `z_scores`: mean, SD, skewness and excess kurtosis of each z-score after flagged values are removed. A weight-for-height SD outside `sd_range` (default 0.8 to 1.2) is noted. This is a screening convention, not a standard.
+- `digit_preference` for weight, height or length, MUAC and head circumference: the share of values ending in each digit **as written in the column** (the resolution is the finest decimal place found, so 0.1 kg data count the tenths digit), a chi-square p against evenly spread digits, and a `heaping_index` (0 for even digits, about 100 when every value ends in one digit) corrected for chance so small groups compare with large ones. A top digit holding 20% or more of values is called marked (convention).
+- `age_heaping`: share of ages at whole years against the share expected if ages were spread evenly, for ages given as a months column (ages worked out from dates cannot heap). A ratio of 2 or more is flagged.
+- `sex_ratio` and `age_ratio`: exact binomial tests (boys against girls; the share aged 24 months or more against the share expected for an even spread of ages, 0.667 for 6 to 59 months, overridable with `age_ratio_expected`). A small p can be real (sampling, migration) as well as selective measurement.
+
+**By team or cluster.** `group_by: "team"` repeats the indicators for each value (up to 50 groups) and lists a group under `review` when its flag rate is at least double the survey's, its weight-for-height SD is outside `sd_range`, or its digit heaping is well above the survey's and significant.
+
+**Output.** `summary` (records ok, with warnings, with excluded values), `warnings`, `columns` (how each column was matched, from harmonise), `issues` (count, percent and example records per code), `suspected_unit_errors` (the unit in which each group of out-of-range values would be plausible, and what to declare), `survey_indicators`, `by_group`, `records` (the records with issues, up to `max_issue_records`, default 200), and with `options.include_table: true` an analysis-ready `table` (standardised values, z-scores, `qc_status`, `qc_codes`) in which every value an error flag removed is null.
+
+**Nothing is corrected.** A flagged value stays in the report with its reason and is left out of the table. SMART/ENA plausibility scores are not reproduced: read the statistics against your survey protocol.
+
+```bash
+curl -X POST https://chakudya-api.edisontaimu9.workers.dev/data-quality/audit \
+  -H "Authorization: Bearer $KEY" -H "Content-Type: application/json" \
+  -d '{"group_by":"team",
+       "columns":{"age_months":{"variable":"age-years","unit":"mo"},"weight_kg":{"variable":"weight","unit":"kg"},
+                  "length_cm":{"variable":"length","unit":"cm"},"muac_mm":{"variable":"muac","unit":"mm"}},
+       "options":{"include_table":true},
+       "records":[{"id":"C1","team":"T1","sex":"F","age_months":14,"weight_kg":8.9,"length_cm":71.2,"muac_mm":138},
+                  {"id":"C2","team":"T1","sex":"M","age_months":20,"weight_kg":9400,"length_cm":79,"muac_mm":141}]}'
+# -> C2's weight is flagged out_of_range, suspected_unit_errors says it would be plausible in g, and C2's weight is null in the table
+```
+
+Screening aid for data cleaning, not a verdict on a survey.
+
+### Nutrition epidemiology engine (`/epidemiology`) — `v1.62.0+`
+
+Turns a research dataset, or counts from a paper, into the measures an epidemiologist reports: prevalence, incidence where the design permits, risk and odds ratios, differences, confidence intervals and stratified indicators. Any valid API key, nothing stored, no database read, no SQL to run.
+
+| Route | What it does |
+|---|---|
+| `POST /epidemiology/analyse` | Up to 5000 `records` with a `design`, an `outcome` and optionally an `exposure`, `strata`, `indicators` and `means` |
+| `POST /epidemiology/counts` | The same estimators from tabulated numbers: `proportions`, a 2x2 `table`, `strata` tables, or `rates` |
+| `GET /epidemiology/reference` | Design rules, formulas, methods, input rules and limits; `section=designs\|measures\|methods\|input\|limits` |
+
+**The design decides what is reported.** Wrong-design measures are refused, not computed.
+
+| `design` | Reported | Not estimable |
+|---|---|---|
+| `cross_sectional` | prevalence with interval; prevalence ratio, difference and odds ratio; attributable fractions | incidence |
+| `cohort` | cumulative incidence (risk); risk ratio, difference and odds ratio; with `person_time`, incidence rates (exact Poisson interval) and rate ratios; `baseline_outcome` removes people who already had the outcome | |
+| `case_control` | odds ratio, and the share exposed among cases and among controls | prevalence, risk, incidence, risk ratio and difference (case and control numbers are set by the sampling) |
+
+**Defining the outcome and exposure.** A rule on one column: `{"variable": "haz", "below": -2}` (also `at_or_below`, `above`, `at_or_above`, `between: [low, high)` with the low value included), or `{"variable": "grade", "positive": ["sam", "mam"]}` for categories (case-insensitive; list `negative` too if you want any other value excluded as unrecognised). With no rule the column is read as yes/no, true/false or 1/0. Missing values (empty, `NA`, plus any `missing_codes` such as `[-99, 999]`) and unrecognised values are excluded, counted under `records.excluded_reasons` and an example shown, never guessed. When `positive` is given without `negative`, the values coded negative are listed under `definitions` so a typo is visible. An exposure with several levels, `{"variable": "wealth_quintile", "reference": "Q5"}`, compares every other level with the reference level.
+
+**Strata.** Up to three, each a column name or `{variable, name?, cutpoints?}`; `cutpoints: [6, 24, 60]` gives `<6`, `6 to <24`, `24 to <60`, `60+`. Each stratifier is analysed on its own: prevalence (or risk) by level, and with an exposure the effect measure in every level, a Mantel-Haenszel pooled estimate with a Cochran-Mantel-Haenszel test, a Woolf heterogeneity test, and a crude-versus-adjusted comparison (a gap over 10% flags possible confounding, a rule of thumb). `adjust_for: ["sex", "age"]` adjusts for several strata jointly by cross-classifying them (up to 100 cells). Up to 20 levels per stratum.
+
+**Other indicators.** `indicators: [{"name": "severe stunting", "variable": "haz", "below": -3}]` adds binary indicators with prevalence overall and by stratum; `means: ["haz", "waz"]` gives mean, SD and interval overall and by stratum.
+
+**Intervals.** `confidence_level` (default 0.95). Proportions: Wilson score, or Clopper-Pearson with `ci_method: "exact"`. Risk and prevalence ratios: log (Katz) method. Odds ratios: Woolf. Differences: Wald, in percentage points. Rates: exact Poisson (Garwood). If any cell of a 2x2 table is zero, 0.5 is added to every cell for the ratios and the response says so; differences are never corrected. Chi-square and Fisher's exact p-values are given, with a note when an expected count is under 5.
+
+**Surveys.** Intervals assume simple random sampling. For a cluster survey send `design_effect` (from your survey software): effective sample sizes are divided by it and standard errors inflated by its square root, and Fisher's test is omitted. Sampling weights, clustering and matching are not modelled: matched case-control data need conditional analysis, which this is not.
+
+**Incidence.** A cumulative incidence is a risk over the whole follow-up and is only valid if follow-up was complete and equal for everyone; otherwise send `person_time` and read the rates (per `rate_per`, default 1000 person-time units). The true onset time lies between visits.
+
+```bash
+curl -X POST https://chakudya-api.edisontaimu9.workers.dev/epidemiology/analyse \
+  -H "Authorization: Bearer $KEY" -H "Content-Type: application/json" \
+  -d '{"design":"cross_sectional","outcome":{"variable":"haz","below":-2},
+       "exposure":{"variable":"food_insecure","positive":"yes"},
+       "strata":["sex",{"variable":"age_months","name":"age","cutpoints":[6,24]}],
+       "records":[{"food_insecure":"yes","sex":"F","age_months":14,"haz":-2.4},{"food_insecure":"no","sex":"M","age_months":30,"haz":-0.6}]}'
+
+# Published numbers: 20/100 exposed and 10/100 unexposed had the outcome
+curl -X POST https://chakudya-api.edisontaimu9.workers.dev/epidemiology/counts \
+  -H "Authorization: Bearer $KEY" -H "Content-Type: application/json" \
+  -d '{"design":"cohort","table":{"a":20,"b":80,"c":10,"d":90}}'
+# -> risk ratio 2.00 (0.99 to 4.05), odds ratio 2.25 (0.99 to 5.09), risk difference 10 points (0.2 to 19.8)
+```
+
+Research and teaching aid, not a diagnosis or a causal conclusion. The Mantel-Haenszel estimates reproduce R's `mantelhaen.test` (checked on the Berkeley admissions data).
+
+### Micronutrient assessment (`/micronutrients`) — `v1.59.0+`
+
+A micronutrient-only screen against the NASEM DRI tables, by age, sex, pregnancy and lactation. Any valid API key, nothing stored. It reuses the EAR/RDA/AI/UL tables behind `GET /dri` and the adequacy rules behind `POST /dietary-assessment`. Intake is sent as nutrient totals; to assess foods, macronutrients and energy use `POST /dietary-assessment`.
+
+| Route | What it does |
+|---|---|
+| `POST /micronutrients/assess` | Likely inadequate, borderline, possibly low and above-UL nutrients, with the requirement beside each intake |
+| `GET /micronutrients/requirements` | `age` + `sex` (or `life_stage`), optional `life_stage_type` (`normal`, `pregnancy`, `lactation`) and `group` (`vitamin`, `mineral`): EAR, RDA, AI, UL |
+| `GET /micronutrients/reference` | Nutrients covered, request fields and the adequacy rules |
+
+**Request.** `age` and `sex` (sex needed from age 9), or a `life_stage` code. `intake` is an object such as `{"iron_mg": 9, "calcium_mg": 600, "vitb12_mcg": 1.5}`, or send `days: [{date?, intake}]` for up to 7 days, which are averaged. Add `plant_based_diet: true` for absorption notes on iron, zinc, B12, calcium, vitamin A and iodine. `meals` and `ingredients` are refused (use `/dietary-assessment`).
+
+**Judgement.** Nutrients with an EAR and RDA: below the EAR is *likely inadequate*, between the EAR and RDA is *borderline*, at or above the RDA is adequate. AI-only nutrients: below the AI is *possibly low*. Average intake above the UL is flagged, and sodium is judged against the CDRR as a limit. Nutrients you do not send appear in `not_provided` and are never counted as zero.
+
+**Response.** `summary` (headline, counts, top 5 gaps), `potential_inadequacies` (ranked), `excesses`, `adequate`, `nutrients` (full detail with `ear`, `target`, `percent_of_target`, `percent_of_ear`, `days_below_target`, `ul`), `requirements` (all values for the life stage), `not_provided`, `notes`.
+
+```bash
+curl -X POST https://chakudya-api.edisontaimu9.workers.dev/micronutrients/assess \
+  -H "Authorization: Bearer $KEY" -H "Content-Type: application/json" \
+  -d '{"age":25,"sex":"female","plant_based_diet":true,"intake":{"iron_mg":9,"calcium_mg":600,"vitc_mg":40,"zinc_mg":6,"vitb12_mcg":1.5}}'
+```
+
+Screening only, not a diagnosis. EAR-based adequacy is strictly valid for groups; for one person, read it as the chance that intake is inadequate. Supplements, fortified foods, cooking losses and bioavailability are only as good as the intake you send.
+
+### Critical care nutrition support (`/critical-care`) — `v1.57.0+`
+
+Reference calculators for ICU nutrition support, from a hospital dietetics guideline (sections 2-6), with the fat ceiling from ESPEN 2009. They were moved here from the MCP server, which now calls these routes. Pure arithmetic and static tables, no database. Any valid key. General (non-burn) patients: burns use their own nitrogen formula in the MCP burn tools.
+
+| Route | What it does |
+|---|---|
+| `POST /critical-care/protein-by-stress` | `stress_level` (0-3, optional), `weight_kg` (optional): g/kg/day and g/day. Omit the level for the whole table |
+| `POST /critical-care/npe-nitrogen-ratio` | `npe_kcal`, `protein_g`: NPE:N2 ratio and stress band |
+| `POST /critical-care/nitrogen-balance` | `urine_volume_l`, `urinary_urea_mmol_l`: urinary N, total urinary N, total N output, stress grade |
+| `POST /critical-care/carbohydrate` | optional `weight_kg`: usual, minimum and maximum carbohydrate, g/day when weight is sent |
+| `GET /critical-care/fat` | usual, minimum and maximum fat, acute pancreatitis rule |
+| `POST /critical-care/propofol-fat` | `propofol_percent` (`1` or `2`), `volume_ml`: propofol mg and fat g |
+| `GET /critical-care/cho-fat-ratio` | 70:30, 60:40 and 50:50 by indication |
+| `POST /critical-care/electrolytes` | optional `electrolyte` (`phosphate`, `potassium`, `magnesium`): replacement dosing |
+| `POST /critical-care/potassium-deficit` | `serum_k_mmol_l`: deficit band and expected rise per 20 mmol KCl |
+| `POST /critical-care/fluid` | `weight_kg`: 30-35 mL/kg/day range |
+| `GET /critical-care/reference` | `?section=` one of `protein_by_stress`, `urinary_nitrogen`, `npe_n2_bands`, `cho_fat_ratio`, `electrolytes`, `known_issues` |
+
+**Known issues in the source (returned by `?section=known_issues`).** The "Severe" protein range is 1.6-2.5 g/kg in the stress table but 1.9-2.5 g/kg in the urinary nitrogen table, and both are returned as printed. The usual carbohydrate figure is printed as "3-5 g/kg/min", which cannot be right. **Energy equation selection for the critically ill is not here yet:** nothing in this module estimates energy. Use `POST /energy/requirements` with a measured REE and stress factors until a sourced equation-selection reference is added.
+
+```bash
+curl -X POST https://chakudya-api.edisontaimu9.workers.dev/critical-care/nitrogen-balance \
+  -H "Authorization: Bearer $KEY" -H "Content-Type: application/json" \
+  -d '{"urine_volume_l": 2, "urinary_urea_mmol_l": 250}'
+```
+
+### Burn nutrition (`/burns`) — `v1.66.0+`
+
+Calculators for burn patients, moved here from the MCP server's burn tools (sources: Rousseau et al, Clin Nutr 2013, ESPEN endorsed recommendations; the Abillama burns deck; Mrazek et al, Semin Plast Surg 2024). **The numbers are stored, not coded.** The formulas are in `src/burnNutrition.js`; every coefficient, band, dose and reference text is read from the `clinical_reference_values` table (`condition = 'burns'`, seeded by `sql/039_add_clinical_reference_values.sql`). The Worker keeps the rows for five minutes, so a correction made in Supabase reaches the calculators within that time. If the table is empty or cannot be read the routes answer `503` and name the file to run; there are no built-in fallback numbers. Any valid API key. No writes.
+
+| Route | What it does |
+|---|---|
+| `POST /burns/fluid-resuscitation` | `weight_kg`, `tbsa_burned_percent`, `hours_since_burn` (optional): Parkland 24 h volume, first 8 h and next 16 h volumes and rates, volume left in the current window |
+| `POST /burns/energy` | `weight_kg`, `height_cm`, `age_years`, `sex`; adults also `tbsa_burned_percent`, `kcal_intake_past_24h`, `body_temp_c`, `days_post_burn`: Toronto REE (adult) or weight-only Schofield (under 18) |
+| `POST /burns/protein` | `tbsa_burned_percent`, `weight_kg` and `is_pediatric` (optional): g/kg/day, g/day and NPC:N ratio |
+| `POST /burns/nitrogen-balance` | `protein_intake_g`, `uun_g`, `open_wound_percent` and `weight_kg` (optional): nitrogen balance and burned-tissue loss estimate |
+| `POST /burns/micronutrients` | `tbsa_burned_percent`, optional `bmi`, `age_years`, `chronically_malnourished`: vitamin and trace-element guidance, vitamin A half-dose flag |
+| `POST /burns/glycemic-targets` | optional `weight_kg`, `total_energy_kcal_per_day`: carbohydrate ceiling and glucose targets |
+| `POST /burns/maintenance-fluid` | `weight_kg`: Holliday-Segar daily maintenance fluid (not resuscitation fluid) |
+| `POST /burns/indirect-calorimetry` | `vo2_ml_per_min`, `vco2_ml_per_min`, optional `apply_activity_factor`, `daytime_variability_percent` (10-20), `tbsa_burned_percent`: REE by the modified Weir equation |
+| `POST /burns/pediatric-equations` | `sex`, `age_years`, `weight_kg`, `tbsa_burned_percent` (optional): Curreri Junior, Galveston, Mayes, Schofield and WHO side by side |
+| `POST /burns/pharmacology` | optional `weight_kg`: dosing for growth hormone, IGF-1/IGFBP-3, insulin, propranolol and oxandrolone, with the oxandrolone regulatory warning |
+| `GET /burns/reference` | Sections of the stored values; `?section=<name>` returns that section's rows |
+
+Every answer carries `disclaimer` and `citation`. No predictive equation is accurate for burns: indirect calorimetry is the gold standard and these are fallbacks. To correct a value, edit its row in `clinical_reference_values` in Supabase (`value` holds the numbers or text; `band_min`/`band_max` with the two inclusive flags choose the row for a patient value). Re-running the SQL file never overwrites an edited row; delete the row first to restore its seed value.
+
+```bash
+curl -X POST https://chakudya-api.edisontaimu9.workers.dev/burns/fluid-resuscitation \
+  -H "Authorization: Bearer $KEY" -H "Content-Type: application/json" \
+  -d '{"weight_kg": 70, "tbsa_burned_percent": 40}'
+```
+
+### Refeeding syndrome (`/refeeding`) — `v1.67.0+`
+
+ASPEN consensus refeeding calculators (da Silva et al, Nutr Clin Pract 2020;35(2):178-195), moved here from the MCP server. Same design as burns: the logic is in `src/refeedingNutrition.js`; every cut-off, band, dose and text is read from `clinical_reference_values` (`condition = 'refeeding'`, seeded by `sql/040_add_refeeding_reference_values.sql`, which needs `sql/039` first). Cached five minutes; an empty or unreadable table answers `503` and names the file to run. Any valid API key. No writes.
+
+| Route | What it does |
+|---|---|
+| `POST /refeeding/risk-adult` | Table 3: `bmi`, `weight_loss_percent` with `weight_loss_timeframe` (`1_month`, `3_months`, `6_months`), and clinician-assessed `caloric_intake_level`, `prefeeding_electrolyte_abnormality_level`, `subcutaneous_fat_loss`, `muscle_mass_loss`, `comorbidity_severity` (`none`, `moderate`, `significant`): criteria levels and overall risk |
+| `POST /refeeding/risk-pediatric` | Table 5: `z_score_change_from_baseline`, `weight_gain_percent_of_expected`, `low_intake_days`, `muac_z_score`, plus assessed levels (`none`, `mild`, `moderate`, `significant`): criteria levels and overall risk. Not for neonates 28 days or younger |
+| `POST /refeeding/severity` | Per electrolyte (`phosphorus`, `potassium`, `magnesium`) `_baseline` and `_current`, or `_percent_decrease`; `organ_dysfunction_from_electrolyte_decrease`, `thiamin_deficiency`, `within_5_days_of_refeeding`: mild, moderate or severe |
+| `POST /refeeding/initiation` | Tables 6 and 7: `population` (`adult`, `pediatric`), `weight_kg`, optional `at_risk_for_rs`, `prefeeding_electrolytes_severely_low`: starting calories or GIR, advancement, electrolyte, thiamin and monitoring guidance |
+| `GET /refeeding/reference` | Sections of the stored values; `?section=<name>` returns that section's rows |
+
+Every answer carries `disclaimer` and `citation`. The criteria are expert consensus, not trial evidence. Edit a row in `clinical_reference_values` in Supabase to correct a value; re-running the SQL never overwrites an edited row.
+
+```bash
+curl -X POST https://chakudya-api.edisontaimu9.workers.dev/refeeding/initiation \
+  -H "Authorization: Bearer $KEY" -H "Content-Type: application/json" \
+  -d '{"population": "adult", "weight_kg": 60}'
+```
+
+### Energy and stress factors (`/stress-factors`) — `v1.68.0+`
+
+Harris-Benedict BEE, the Barak et al (2002) clinical stress factors, the 24-hour energy adjustment factors and the fever (Hardy and DuBois) adjustment, moved here from the MCP server. Same design as burns and refeeding: the logic is in `src/stressFactors.js`; every coefficient, factor, percentage and text is read from `clinical_reference_values` (condition `stress_factors`, seeded by `sql/041_add_stress_factor_reference_values.sql`) and cached in the Worker for five minutes. There is no built-in fallback: if the rows cannot be read the answer is a 503 that names the SQL file to run. The older `/energy` engine is unchanged.
+
+| Route | What it does |
+|---|---|
+| `POST /stress-factors/harris-benedict` | `sex`, `weight_kg`, `height_cm`, `age_years`, optional `stress_factor`, `adjustment_factor`, `body_temp_c` (13% per degree C from 37 C, up or down): BEE, each factor applied, adjusted kcal/day |
+| `POST /stress-factors/fever` | `ree_kcal_per_day` with `body_temp_f` (7% per degree F above 98.6) or `body_temp_c` (13% per degree C above 37): percent increase and adjusted REE |
+| `GET /stress-factors/conditions` | The Barak et al stress factor table; `?condition_key=` returns one condition |
+| `GET /stress-factors/adjustments` | Ventilation, body temperature, sedation and activity factors |
+| `GET /stress-factors/reference` | Sections of the stored values; `?section=<name>` returns that section's rows |
+
+When more than one stress factor could apply, use only the single highest one. Every answer carries `disclaimer` and `citation`. Edit a row in `clinical_reference_values` in Supabase to correct a value; re-running the SQL never overwrites an edited row.
+
+```bash
+curl -X POST https://chakudya-api.edisontaimu9.workers.dev/stress-factors/harris-benedict \
+  -H "Authorization: Bearer $KEY" -H "Content-Type: application/json" \
+  -d '{"sex": "male", "weight_kg": 70, "height_cm": 175, "age_years": 40, "stress_factor": 1.2}'
+```
+
+### Carbohydrate counting and insulin dose (`/carb-counting`) — `v1.69.0+`
+
+Carbohydrate counting, the mealtime quick-acting insulin dose and the related reference lists, moved here from the MCP server (six tools). Same design as burns, refeeding and stress factors: the logic is in `src/carbCounting.js`; every list, handy measure, insulin profile, default (ISF 2.5 mmol/L per unit, half-unit rounding) and text is read from `clinical_reference_values` (condition `carb_counting`, seeded by `sql/042_add_carb_counting_reference_values.sql`) and cached in the Worker for five minutes. There is no built-in fallback: if the rows cannot be read the answer is a 503 that names the SQL file to run. Source: a UK diabetes network patient-education guide, in units per 10 g and mmol/L. This is separate from `/diabetes` (Krause ch. 30 and ADA 2026, mg/dL and grams per unit); the two do not share data.
+
+| Route | What it does |
+|---|---|
+| `POST /carb-counting/carbohydrate-content` | `carb_per_100g` with exactly one of `portion_weight_g` (returns carbohydrate in the portion) or `target_carb_g` (returns the portion weight) |
+| `POST /carb-counting/insulin-dose` | `total_carb_g`, `icr_units_per_10g`, optional `current_bg_mmol_l` + `target_bg_low_mmol_l` + `target_bg_high_mmol_l` (+ `isf_mmol_l_per_unit`): carb dose, correction dose, total, rounded to half a unit |
+| `GET /carb-counting/foods` | Food groups that do and do not affect blood glucose, with tips; `?list=affects_blood_glucose\|does_not_affect_blood_glucose` |
+| `GET /carb-counting/handy-measures` | Everyday carbohydrate portions and the weighing rules of thumb |
+| `GET /carb-counting/insulin-types` | Background insulin names and quick-acting onset, peak, duration; `?category=background\|quick_acting` |
+| `GET /carb-counting/dose-adjustment` | The 7-step approach and the checklist; `?section=stepwise_approach\|dose_adjustment_checklist` |
+| `GET /carb-counting/reference` | Sections of the stored values; `?section=<name>` returns that section's rows |
+
+A blood glucose below the target midpoint gives a correction of 0 (the MCP tool used to subtract insulin). Corrections belong at mealtimes or before bed, at least 4 hours after the last quick-acting dose. Every answer carries `disclaimer` and `citation`: ratios, correction factors and targets are set by the person's own diabetes team. Edit a row in `clinical_reference_values` in Supabase to correct a value; re-running the SQL never overwrites an edited row.
+
+```bash
+curl -X POST https://chakudya-api.edisontaimu9.workers.dev/carb-counting/insulin-dose \
+  -H "Authorization: Bearer $KEY" -H "Content-Type: application/json" \
+  -d '{"total_carb_g": 50, "icr_units_per_10g": 1, "current_bg_mmol_l": 12, "target_bg_low_mmol_l": 6, "target_bg_high_mmol_l": 8}'
+```
+
 ### Diabetes nutrition (`/diabetes`) — `v1.51.0+`
 
 Calculators and reference tables from Krause 16th ed. chapter 30, the ADA Standards of Care in Diabetes 2026 and the UCT exchange lists. Any valid API key. Where Krause (written around ADA 2021) and ADA 2026 differ, ADA 2026 is used and the difference is listed in `GET /diabetes/reference?section=known_issues`. Arithmetic added by this API and not printed in the sources is labelled in each result.
@@ -2291,6 +2736,97 @@ automatically for every session that qualifies — no manual step needed in
 normal operation.
 
 ---
+
+## Nutrition Research & Surveillance Engine (v1.54.0)
+
+Individual screening answers "is this child malnourished?". The surveillance engine answers "where, how many, and is it
+getting worse?" by pooling **anonymised** screening records. It finds districts with a higher burden than the national
+figure, tracks monthly trends, raises early warnings, and turns the findings into prioritised insights with suggested
+actions and research questions.
+
+Setup: run `sql/037_add_surveillance.sql` in Supabase and keep `SURVEILLANCE_STORE = "true"` in `wrangler.toml`.
+`SURVEILLANCE_MIN_CELL` (default `10`, lowest `5`) sets the smallest group that is ever shown.
+
+| Route | Key | Purpose |
+|---|---|---|
+| `POST /surveillance/records` | any API key | Send one record, or `{"records":[...]}` up to 100 |
+| `GET /surveillance/reference` | any API key | Districts, population groups, indicators, accepted fields, privacy rules |
+| `GET /surveillance/summary` | admin key | Records by group, setting and region; districts reporting; national prevalence |
+| `GET /surveillance/hotspots` | admin key | Districts significantly above the national figure |
+| `GET /surveillance/trends` | admin key | Monthly series, trend test, change against the same month last year |
+| `GET /surveillance/alerts` | admin key | Early warning: recent months against the baseline, per district |
+| `GET /surveillance/insights` | admin key | All of the above as prioritised, actionable findings |
+
+### Sending records
+
+```json
+{
+  "submission_id": "k3j9x2m8q1w7",
+  "consent_confirmed": true,
+  "observed_on": "2026-10-14",
+  "district": "Zomba",
+  "sex": "female",
+  "age_months": 18,
+  "setting": "community",
+  "source": "oasis",
+  "measurements": { "weight_kg": 8.1, "length_cm": 76.5, "muac_cm": 11.9 },
+  "outcomes": { "recent_diarrhoea": true, "low_dietary_diversity": true }
+}
+```
+
+- `submission_id`: a random token your app makes (8 to 64 letters, digits, `-` or `_`). It only stops a re-sent record from being counted twice. Never use an id from a patient record.
+- `consent_confirmed` must be `true`: your programme confirms it has the consent, or the legal and ethical basis, to share the anonymised record.
+- `district`: one of Malawi's 28 districts. `Mzuzu City`, `Lilongwe City`, `Blantyre City` and `Zomba City` roll up to Mzimba, Lilongwe, Blantyre and Zomba.
+- `age_months` for children, `age_years` for adults and women. `population_group` is worked out from the age (`under5`, `school_age`, `adolescent`, `adult`) and must be sent for `pregnant_lactating`. For `pregnant_lactating` the age may be left out (age band `unknown`).
+- `measurements` are classified with the WHO tables (the same maths as `/growth/assess`) and then **discarded**. Adults send `weight_kg` and `height_cm` for BMI. For pregnant and breastfeeding women send your own classification in `outcomes`.
+- `outcomes` are indicators you already classified. Risk indicators take `true`/`false`. A `false` matters: it is the denominator. If both are sent, the server's classification wins.
+- Re-sending the same `submission_id` is safe.
+
+**What is never stored:** names, phone numbers, addresses, facility names, patient or device ids, exact dates, exact ages, raw measurements.
+Any field outside the list above is **rejected**, so identifiers cannot slip in by accident. A record keeps only: month, district and region,
+population group, sex, age band, setting, app label and the classified outcomes.
+
+The response lists how many records were `stored`, `already_received` and `rejected` (by position, with the reason, never echoing the content).
+If every record is rejected the status is `422`.
+
+### Indicators
+
+`stunting`, `wasting`, `underweight`, `muac_gam`, `acute_malnutrition` (worst of wasting, low MUAC and oedema), `overweight`, `thinness`,
+`adult_underweight`, `adult_overweight`, `maternal_muac_low`, and yes/no risk indicators `anaemia_suspected`, `low_dietary_diversity`,
+`food_insecure_household`, `recent_diarrhoea`, `bilateral_oedema`, `not_exclusively_breastfed`. `GET /surveillance/reference` lists the population groups
+and statuses for each.
+
+### Reading the analysis
+
+All analysis routes take a window: `?months=` (1 to 36, default 12) or `?from=2026-01&to=2026-09`.
+
+- **Hotspots**: `?population_group=&indicator=&min_n=`. A district is a hotspot when its rate is above the national rate by an exact binomial test, corrected across districts (Benjamini-Hochberg, q at most 0.10). Priority is `critical`, `high` or `medium` from the ratio to the national rate and the WHO band. Pass `indicator` to list every district. Districts with fewer than `min_n` records (default 30) are not compared.
+- **Trends**: `?indicator=` (required) `&population_group=&district=&months=`. Cochran-Armitage trend test and a weighted slope in percentage points per month, plus change against the same month a year earlier when available.
+- **Alerts**: `?recent_months=3&baseline_months=9&min_increase_pp=2`. A district is flagged when its recent months are significantly higher than its own baseline. Needs at least 30 records in the recent window and 30 in the baseline.
+- **Insights**: hotspots, rising districts, national trends and data gaps in one list, sorted by priority. Each has `evidence`, `confidence`, `suggested_actions` and `research_questions`, followed by `data_quality`.
+
+Wasting, low MUAC and acute malnutrition overlap, so in `/insights` one district flagged on several of them is shown once (as acute malnutrition), with the others listed in `also_flagged`.
+
+### Trying it with demo data
+
+`scripts/surveillance_demo.mjs` loads about 6,000 clearly labelled synthetic records (`source: "demo"`) that contain known hotspots, rising districts and data gaps, so you can watch the engine find them:
+
+```bash
+CHAKUDYA_API_KEY=your_key node scripts/surveillance_demo.mjs --dry-run   # only shows what would be sent
+CHAKUDYA_API_KEY=your_key node scripts/surveillance_demo.mjs             # sends it (about 80 seconds)
+```
+
+Remove it all afterwards in the Supabase SQL editor: `delete from surveillance_records where source = 'demo';`
+
+### Privacy and honesty about the data
+
+- Reads return aggregates only, never rows. Any district or month with fewer than the minimum cell size is hidden (`classification: "suppressed"`).
+- This is programme screening data, not a random survey. Figures describe the people who were screened, not whole districts, and WHO prevalence bands are indicative only. Confirm important findings with a representative survey (SMART, DHS, MICS) before large resource decisions. Every analysis response carries this caveat.
+- `data_quality` reports districts with too little data, districts reporting in fewer than half the months, and a heavy facility bias, because a district with no data is not a district with no problem.
+- Suggested actions are decision support for programme teams, not clinical advice or directives.
+- Many districts and indicators are tested at once, so some flagged findings will be chance (the error rate is set at about 1 in 10). That is why every insight lists research questions: check a finding against other sources before acting on it.
+
+If `sql/037` has not been run, the read routes return `{"available": false}` with a note instead of an error.
 
 ## Response Format
 

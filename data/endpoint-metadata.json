@@ -2273,6 +2273,798 @@
         "scope": "ip"
       },
       "note": "Calculation from the request body. An activity_log reads the activity table (read only). Nothing is stored."
+    },
+    {
+      "method": "POST",
+      "path": "/paediatric/energy",
+      "auth": "key",
+      "rateLimit": {
+        "limit": 100,
+        "windowSeconds": 60,
+        "scope": "ip"
+      },
+      "note": "Calculation from the request body. Nothing is stored."
+    },
+    {
+      "method": "POST",
+      "path": "/paediatric/protein",
+      "auth": "key",
+      "rateLimit": {
+        "limit": 100,
+        "windowSeconds": 60,
+        "scope": "ip"
+      },
+      "note": "Calculation from the request body. Nothing is stored."
+    },
+    {
+      "method": "POST",
+      "path": "/paediatric/fluid",
+      "auth": "key",
+      "rateLimit": {
+        "limit": 100,
+        "windowSeconds": 60,
+        "scope": "ip"
+      },
+      "note": "Calculation from the request body. Nothing is stored."
+    },
+    {
+      "method": "POST",
+      "path": "/paediatric/preterm",
+      "auth": "key",
+      "rateLimit": {
+        "limit": 100,
+        "windowSeconds": 60,
+        "scope": "ip"
+      },
+      "note": "Calculation from the request body. Nothing is stored."
+    },
+    {
+      "method": "POST",
+      "path": "/paediatric/growth-velocity",
+      "auth": "key",
+      "rateLimit": {
+        "limit": 100,
+        "windowSeconds": 60,
+        "scope": "ip"
+      },
+      "note": "Calculation from the request body. Nothing is stored."
+    },
+    {
+      "method": "POST",
+      "path": "/paediatric/catch-up",
+      "auth": "key",
+      "rateLimit": {
+        "limit": 100,
+        "windowSeconds": 60,
+        "scope": "ip"
+      },
+      "note": "Calculation from the request body. catch-up (and plan with catch_up:true) also reads one who_weight_for_length_height row (read only). Nothing is stored."
+    },
+    {
+      "method": "POST",
+      "path": "/paediatric/enteral-feeds",
+      "auth": "key",
+      "rateLimit": {
+        "limit": 100,
+        "windowSeconds": 60,
+        "scope": "ip"
+      },
+      "note": "Calculation from the request body. Nothing is stored."
+    },
+    {
+      "method": "POST",
+      "path": "/paediatric/plan",
+      "auth": "key",
+      "rateLimit": {
+        "limit": 100,
+        "windowSeconds": 60,
+        "scope": "ip"
+      },
+      "note": "Calculation from the request body. catch-up (and plan with catch_up:true) also reads one who_weight_for_length_height row (read only). Nothing is stored."
+    },
+    {
+      "method": "GET",
+      "path": "/paediatric/reference",
+      "auth": "key",
+      "rateLimit": {
+        "limit": 100,
+        "windowSeconds": 60,
+        "scope": "ip"
+      },
+      "note": "Static reference tables, no database."
+    },
+    {
+      "method": "POST",
+      "path": "/critical-care/protein-by-stress",
+      "auth": "key",
+      "rateLimit": {
+        "limit": 100,
+        "windowSeconds": 60,
+        "scope": "ip"
+      },
+      "note": "Calculation from the request body and static tables. No database access. Nothing is stored."
+    },
+    {
+      "method": "POST",
+      "path": "/critical-care/npe-nitrogen-ratio",
+      "auth": "key",
+      "rateLimit": {
+        "limit": 100,
+        "windowSeconds": 60,
+        "scope": "ip"
+      },
+      "note": "Calculation from the request body and static tables. No database access. Nothing is stored."
+    },
+    {
+      "method": "POST",
+      "path": "/critical-care/nitrogen-balance",
+      "auth": "key",
+      "rateLimit": {
+        "limit": 100,
+        "windowSeconds": 60,
+        "scope": "ip"
+      },
+      "note": "Calculation from the request body and static tables. No database access. Nothing is stored."
+    },
+    {
+      "method": "POST",
+      "path": "/critical-care/carbohydrate",
+      "auth": "key",
+      "rateLimit": {
+        "limit": 100,
+        "windowSeconds": 60,
+        "scope": "ip"
+      },
+      "note": "Calculation from the request body and static tables. No database access. Nothing is stored."
+    },
+    {
+      "method": "GET",
+      "path": "/critical-care/fat",
+      "auth": "key",
+      "rateLimit": {
+        "limit": 100,
+        "windowSeconds": 60,
+        "scope": "ip"
+      },
+      "note": "Static reference tables, no database."
+    },
+    {
+      "method": "POST",
+      "path": "/critical-care/propofol-fat",
+      "auth": "key",
+      "rateLimit": {
+        "limit": 100,
+        "windowSeconds": 60,
+        "scope": "ip"
+      },
+      "note": "Calculation from the request body and static tables. No database access. Nothing is stored."
+    },
+    {
+      "method": "GET",
+      "path": "/critical-care/cho-fat-ratio",
+      "auth": "key",
+      "rateLimit": {
+        "limit": 100,
+        "windowSeconds": 60,
+        "scope": "ip"
+      },
+      "note": "Static reference tables, no database."
+    },
+    {
+      "method": "POST",
+      "path": "/critical-care/electrolytes",
+      "auth": "key",
+      "rateLimit": {
+        "limit": 100,
+        "windowSeconds": 60,
+        "scope": "ip"
+      },
+      "note": "Calculation from the request body and static tables. No database access. Nothing is stored."
+    },
+    {
+      "method": "POST",
+      "path": "/critical-care/potassium-deficit",
+      "auth": "key",
+      "rateLimit": {
+        "limit": 100,
+        "windowSeconds": 60,
+        "scope": "ip"
+      },
+      "note": "Calculation from the request body and static tables. No database access. Nothing is stored."
+    },
+    {
+      "method": "POST",
+      "path": "/critical-care/fluid",
+      "auth": "key",
+      "rateLimit": {
+        "limit": 100,
+        "windowSeconds": 60,
+        "scope": "ip"
+      },
+      "note": "Calculation from the request body and static tables. No database access. Nothing is stored."
+    },
+    {
+      "method": "GET",
+      "path": "/critical-care/reference",
+      "auth": "key",
+      "rateLimit": {
+        "limit": 100,
+        "windowSeconds": 60,
+        "scope": "ip"
+      },
+      "note": "Static reference tables, no database."
+    },
+    {
+      "method": "POST",
+      "path": "/research/harmonise",
+      "auth": "key",
+      "rateLimit": {
+        "limit": 30,
+        "windowSeconds": 60,
+        "scope": "ip"
+      },
+      "note": "Standardises the request body. Reads ncp_diagnosis_terms (read only) only when diagnoses are sent. Nothing is stored."
+    },
+    {
+      "method": "POST",
+      "path": "/research/convert",
+      "auth": "key",
+      "rateLimit": {
+        "limit": 100,
+        "windowSeconds": 60,
+        "scope": "ip"
+      },
+      "note": "Calculation from the request body. Nothing is stored."
+    },
+    {
+      "method": "GET",
+      "path": "/research/variables",
+      "auth": "key",
+      "rateLimit": {
+        "limit": 100,
+        "windowSeconds": 60,
+        "scope": "ip"
+      },
+      "note": "Static reference tables, no database."
+    },
+    {
+      "method": "GET",
+      "path": "/research/reference",
+      "auth": "key",
+      "rateLimit": {
+        "limit": 100,
+        "windowSeconds": 60,
+        "scope": "ip"
+      },
+      "note": "Static reference tables, no database."
+    },
+    {
+      "method": "POST",
+      "path": "/longitudinal/analyse",
+      "auth": "key",
+      "rateLimit": {
+        "limit": 60,
+        "windowSeconds": 60,
+        "scope": "ip"
+      },
+      "note": "Analysis of the request body. Reads the WHO growth reference tables (read only, a few batched queries per request). Nothing is stored."
+    },
+    {
+      "method": "POST",
+      "path": "/longitudinal/cohort",
+      "auth": "key",
+      "rateLimit": {
+        "limit": 20,
+        "windowSeconds": 60,
+        "scope": "ip"
+      },
+      "note": "Analysis of the request body. Reads the WHO growth reference tables (read only, a few batched queries per request). Nothing is stored."
+    },
+    {
+      "method": "GET",
+      "path": "/longitudinal/reference",
+      "auth": "key",
+      "rateLimit": {
+        "limit": 100,
+        "windowSeconds": 60,
+        "scope": "ip"
+      },
+      "note": "Static reference tables, no database."
+    },
+    {
+      "method": "POST",
+      "path": "/malnutrition/analyse",
+      "auth": "key",
+      "rateLimit": {
+        "limit": 20,
+        "windowSeconds": 60,
+        "scope": "ip"
+      },
+      "note": "Analysis of the request body. Reads the WHO growth reference tables (read only, a few batched queries per request). Nothing is stored."
+    },
+    {
+      "method": "GET",
+      "path": "/malnutrition/reference",
+      "auth": "key",
+      "rateLimit": {
+        "limit": 100,
+        "windowSeconds": 60,
+        "scope": "ip"
+      },
+      "note": "Static reference tables, no database."
+    },
+    {
+      "method": "POST",
+      "path": "/export/dataset",
+      "auth": "key",
+      "rateLimit": {
+        "limit": 20,
+        "windowSeconds": 60,
+        "scope": "ip"
+      },
+      "note": "Builds the file from the request body. Reads ncp_diagnosis_terms (read only) only when diagnoses are sent. Nothing is stored."
+    },
+    {
+      "method": "POST",
+      "path": "/export/verify",
+      "auth": "key",
+      "rateLimit": {
+        "limit": 100,
+        "windowSeconds": 60,
+        "scope": "ip"
+      },
+      "note": "Calculation from the request body. Nothing is stored."
+    },
+    {
+      "method": "GET",
+      "path": "/export/reference",
+      "auth": "key",
+      "rateLimit": {
+        "limit": 100,
+        "windowSeconds": 60,
+        "scope": "ip"
+      },
+      "note": "Static reference tables, no database."
+    },
+    {
+      "method": "POST",
+      "path": "/data-quality/audit",
+      "auth": "key",
+      "rateLimit": {
+        "limit": 20,
+        "windowSeconds": 60,
+        "scope": "ip"
+      },
+      "note": "Analysis of the request body. Reads the WHO growth reference tables (read only, a few batched queries per request). Nothing is stored."
+    },
+    {
+      "method": "GET",
+      "path": "/data-quality/reference",
+      "auth": "key",
+      "rateLimit": {
+        "limit": 100,
+        "windowSeconds": 60,
+        "scope": "ip"
+      },
+      "note": "Static reference tables, no database."
+    },
+    {
+      "method": "POST",
+      "path": "/epidemiology/analyse",
+      "auth": "key",
+      "rateLimit": {
+        "limit": 30,
+        "windowSeconds": 60,
+        "scope": "ip"
+      },
+      "note": "Calculation from the request body. No database access. Nothing is stored."
+    },
+    {
+      "method": "POST",
+      "path": "/epidemiology/counts",
+      "auth": "key",
+      "rateLimit": {
+        "limit": 100,
+        "windowSeconds": 60,
+        "scope": "ip"
+      },
+      "note": "Calculation from the request body. No database access. Nothing is stored."
+    },
+    {
+      "method": "GET",
+      "path": "/epidemiology/reference",
+      "auth": "key",
+      "rateLimit": {
+        "limit": 100,
+        "windowSeconds": 60,
+        "scope": "ip"
+      },
+      "note": "Static reference tables, no database."
+    },
+    {
+      "method": "POST",
+      "path": "/micronutrients/assess",
+      "auth": "key",
+      "rateLimit": {
+        "limit": 100,
+        "windowSeconds": 60,
+        "scope": "ip"
+      },
+      "note": "Calculation from the request body against static DRI tables. No database access. Nothing is stored."
+    },
+    {
+      "method": "GET",
+      "path": "/micronutrients/requirements",
+      "auth": "key",
+      "rateLimit": {
+        "limit": 100,
+        "windowSeconds": 60,
+        "scope": "ip"
+      },
+      "note": "Static DRI tables, no database."
+    },
+    {
+      "method": "GET",
+      "path": "/micronutrients/reference",
+      "auth": "key",
+      "rateLimit": {
+        "limit": 100,
+        "windowSeconds": 60,
+        "scope": "ip"
+      },
+      "note": "Static DRI tables, no database."
+    },
+    {
+      "method": "POST",
+      "path": "/enteral-nutrition/calculate",
+      "auth": "key",
+      "rateLimit": {
+        "limit": 100,
+        "windowSeconds": 60,
+        "scope": "ip"
+      },
+      "note": "Calculation from the request body. Reads enteral_formulas (read only) when formula_id or formula_name is sent. Nothing is stored."
+    },
+    {
+      "method": "GET",
+      "path": "/enteral-nutrition/reference",
+      "auth": "key",
+      "rateLimit": {
+        "limit": 100,
+        "windowSeconds": 60,
+        "scope": "ip"
+      },
+      "note": "Static reference tables, no database."
+    },
+    {
+      "method": "POST",
+      "path": "/burns/fluid-resuscitation",
+      "auth": "key",
+      "rateLimit": {
+        "limit": 100,
+        "windowSeconds": 60,
+        "scope": "ip"
+      },
+      "note": "Calculation from the request body plus reference rows read from clinical_reference_values (read only, cached in the Worker). Nothing is stored."
+    },
+    {
+      "method": "POST",
+      "path": "/burns/energy",
+      "auth": "key",
+      "rateLimit": {
+        "limit": 100,
+        "windowSeconds": 60,
+        "scope": "ip"
+      },
+      "note": "Calculation from the request body plus reference rows read from clinical_reference_values (read only, cached in the Worker). Nothing is stored."
+    },
+    {
+      "method": "POST",
+      "path": "/burns/protein",
+      "auth": "key",
+      "rateLimit": {
+        "limit": 100,
+        "windowSeconds": 60,
+        "scope": "ip"
+      },
+      "note": "Calculation from the request body plus reference rows read from clinical_reference_values (read only, cached in the Worker). Nothing is stored."
+    },
+    {
+      "method": "POST",
+      "path": "/burns/nitrogen-balance",
+      "auth": "key",
+      "rateLimit": {
+        "limit": 100,
+        "windowSeconds": 60,
+        "scope": "ip"
+      },
+      "note": "Calculation from the request body plus reference rows read from clinical_reference_values (read only, cached in the Worker). Nothing is stored."
+    },
+    {
+      "method": "POST",
+      "path": "/burns/micronutrients",
+      "auth": "key",
+      "rateLimit": {
+        "limit": 100,
+        "windowSeconds": 60,
+        "scope": "ip"
+      },
+      "note": "Calculation from the request body plus reference rows read from clinical_reference_values (read only, cached in the Worker). Nothing is stored."
+    },
+    {
+      "method": "POST",
+      "path": "/burns/glycemic-targets",
+      "auth": "key",
+      "rateLimit": {
+        "limit": 100,
+        "windowSeconds": 60,
+        "scope": "ip"
+      },
+      "note": "Calculation from the request body plus reference rows read from clinical_reference_values (read only, cached in the Worker). Nothing is stored."
+    },
+    {
+      "method": "POST",
+      "path": "/burns/maintenance-fluid",
+      "auth": "key",
+      "rateLimit": {
+        "limit": 100,
+        "windowSeconds": 60,
+        "scope": "ip"
+      },
+      "note": "Calculation from the request body plus reference rows read from clinical_reference_values (read only, cached in the Worker). Nothing is stored."
+    },
+    {
+      "method": "POST",
+      "path": "/burns/indirect-calorimetry",
+      "auth": "key",
+      "rateLimit": {
+        "limit": 100,
+        "windowSeconds": 60,
+        "scope": "ip"
+      },
+      "note": "Calculation from the request body plus reference rows read from clinical_reference_values (read only, cached in the Worker). Nothing is stored."
+    },
+    {
+      "method": "POST",
+      "path": "/burns/pediatric-equations",
+      "auth": "key",
+      "rateLimit": {
+        "limit": 100,
+        "windowSeconds": 60,
+        "scope": "ip"
+      },
+      "note": "Calculation from the request body plus reference rows read from clinical_reference_values (read only, cached in the Worker). Nothing is stored."
+    },
+    {
+      "method": "POST",
+      "path": "/burns/pharmacology",
+      "auth": "key",
+      "rateLimit": {
+        "limit": 100,
+        "windowSeconds": 60,
+        "scope": "ip"
+      },
+      "note": "Calculation from the request body plus reference rows read from clinical_reference_values (read only, cached in the Worker). Nothing is stored."
+    },
+    {
+      "method": "GET",
+      "path": "/burns/reference",
+      "auth": "key",
+      "rateLimit": {
+        "limit": 100,
+        "windowSeconds": 60,
+        "scope": "ip"
+      },
+      "note": "Reference rows read from clinical_reference_values (read only, cached in the Worker)."
+    },
+    {
+      "method": "POST",
+      "path": "/refeeding/risk-adult",
+      "auth": "key",
+      "rateLimit": {
+        "limit": 100,
+        "windowSeconds": 60,
+        "scope": "ip"
+      },
+      "note": "Calculation from the request body plus reference rows read from clinical_reference_values (read only, cached in the Worker). Nothing is stored."
+    },
+    {
+      "method": "POST",
+      "path": "/refeeding/risk-pediatric",
+      "auth": "key",
+      "rateLimit": {
+        "limit": 100,
+        "windowSeconds": 60,
+        "scope": "ip"
+      },
+      "note": "Calculation from the request body plus reference rows read from clinical_reference_values (read only, cached in the Worker). Nothing is stored."
+    },
+    {
+      "method": "POST",
+      "path": "/refeeding/severity",
+      "auth": "key",
+      "rateLimit": {
+        "limit": 100,
+        "windowSeconds": 60,
+        "scope": "ip"
+      },
+      "note": "Calculation from the request body plus reference rows read from clinical_reference_values (read only, cached in the Worker). Nothing is stored."
+    },
+    {
+      "method": "POST",
+      "path": "/refeeding/initiation",
+      "auth": "key",
+      "rateLimit": {
+        "limit": 100,
+        "windowSeconds": 60,
+        "scope": "ip"
+      },
+      "note": "Calculation from the request body plus reference rows read from clinical_reference_values (read only, cached in the Worker). Nothing is stored."
+    },
+    {
+      "method": "GET",
+      "path": "/refeeding/reference",
+      "auth": "key",
+      "rateLimit": {
+        "limit": 100,
+        "windowSeconds": 60,
+        "scope": "ip"
+      },
+      "note": "Reference rows read from clinical_reference_values (read only, cached in the Worker)."
+    },
+    {
+      "method": "POST",
+      "path": "/stress-factors/harris-benedict",
+      "auth": "key",
+      "rateLimit": {
+        "limit": 100,
+        "windowSeconds": 60,
+        "scope": "ip"
+      },
+      "note": "Calculation from the request body plus reference rows read from clinical_reference_values (read only, cached in the Worker). Nothing is stored."
+    },
+    {
+      "method": "POST",
+      "path": "/stress-factors/fever",
+      "auth": "key",
+      "rateLimit": {
+        "limit": 100,
+        "windowSeconds": 60,
+        "scope": "ip"
+      },
+      "note": "Calculation from the request body plus reference rows read from clinical_reference_values (read only, cached in the Worker). Nothing is stored."
+    },
+    {
+      "method": "GET",
+      "path": "/stress-factors/conditions",
+      "auth": "key",
+      "rateLimit": {
+        "limit": 100,
+        "windowSeconds": 60,
+        "scope": "ip"
+      },
+      "note": "Reference rows read from clinical_reference_values (read only, cached in the Worker)."
+    },
+    {
+      "method": "GET",
+      "path": "/stress-factors/adjustments",
+      "auth": "key",
+      "rateLimit": {
+        "limit": 100,
+        "windowSeconds": 60,
+        "scope": "ip"
+      },
+      "note": "Reference rows read from clinical_reference_values (read only, cached in the Worker)."
+    },
+    {
+      "method": "GET",
+      "path": "/stress-factors/reference",
+      "auth": "key",
+      "rateLimit": {
+        "limit": 100,
+        "windowSeconds": 60,
+        "scope": "ip"
+      },
+      "note": "Reference rows read from clinical_reference_values (read only, cached in the Worker)."
+    },
+    {
+      "method": "POST",
+      "path": "/carb-counting/carbohydrate-content",
+      "auth": "key",
+      "rateLimit": {
+        "limit": 100,
+        "windowSeconds": 60,
+        "scope": "ip"
+      },
+      "note": "Calculation from the request body plus reference rows read from clinical_reference_values (read only, cached in the Worker). Nothing is stored."
+    },
+    {
+      "method": "POST",
+      "path": "/carb-counting/insulin-dose",
+      "auth": "key",
+      "rateLimit": {
+        "limit": 100,
+        "windowSeconds": 60,
+        "scope": "ip"
+      },
+      "note": "Calculation from the request body plus reference rows read from clinical_reference_values (read only, cached in the Worker). Nothing is stored."
+    },
+    {
+      "method": "GET",
+      "path": "/carb-counting/foods",
+      "auth": "key",
+      "rateLimit": {
+        "limit": 100,
+        "windowSeconds": 60,
+        "scope": "ip"
+      },
+      "note": "Reference rows read from clinical_reference_values (read only, cached in the Worker)."
+    },
+    {
+      "method": "GET",
+      "path": "/carb-counting/handy-measures",
+      "auth": "key",
+      "rateLimit": {
+        "limit": 100,
+        "windowSeconds": 60,
+        "scope": "ip"
+      },
+      "note": "Reference rows read from clinical_reference_values (read only, cached in the Worker)."
+    },
+    {
+      "method": "GET",
+      "path": "/carb-counting/insulin-types",
+      "auth": "key",
+      "rateLimit": {
+        "limit": 100,
+        "windowSeconds": 60,
+        "scope": "ip"
+      },
+      "note": "Reference rows read from clinical_reference_values (read only, cached in the Worker)."
+    },
+    {
+      "method": "GET",
+      "path": "/carb-counting/dose-adjustment",
+      "auth": "key",
+      "rateLimit": {
+        "limit": 100,
+        "windowSeconds": 60,
+        "scope": "ip"
+      },
+      "note": "Reference rows read from clinical_reference_values (read only, cached in the Worker)."
+    },
+    {
+      "method": "GET",
+      "path": "/carb-counting/reference",
+      "auth": "key",
+      "rateLimit": {
+        "limit": 100,
+        "windowSeconds": 60,
+        "scope": "ip"
+      },
+      "note": "Reference rows read from clinical_reference_values (read only, cached in the Worker)."
+    },
+    {
+      "method": "POST",
+      "path": "/dietary-assessment",
+      "auth": "key",
+      "rateLimit": {
+        "limit": 10,
+        "windowSeconds": 60,
+        "scope": "ip"
+      },
+      "note": "Resolves up to 40 ingredients (one food lookup each) plus up to 3 ranking reads, so it shares the recipes and meals tier. Nothing is stored."
+    },
+    {
+      "method": "GET",
+      "path": "/dietary-assessment/reference",
+      "auth": "key",
+      "rateLimit": {
+        "limit": 100,
+        "windowSeconds": 60,
+        "scope": "ip"
+      },
+      "note": "Static reference tables, no database."
     }
   ]
 }

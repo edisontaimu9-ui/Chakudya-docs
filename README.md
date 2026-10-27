@@ -13,7 +13,7 @@ it's a separate, deployable-on-its-own frontend.
 Everything documented here was verified against the actual repository
 (`src/index.js`'s router and `routePolicy()`, the `src/fhir*.js` modules,
 `src/ragPipeline.js` and `wrangler.toml`) - nothing here was
-invented. Currently in line with API **v1.53.0**.
+invented. Currently in line with API **v1.69.0**.
 
 ---
 
@@ -216,11 +216,11 @@ of the OpenAPI document - they're read out of `routePolicy()` in
 
 ---
 
-## 6. Endpoints documented (214 of 214)
+## 6. Endpoints documented (286)
 
-Every route the Worker actually serves is documented - nothing was skipped.
+Every route in the API's OpenAPI spec is documented. The `/surveillance` routes (added in API v1.54.0) are the one gap: the API's own spec does not list them yet, so they are not here either.
 `/manufacturers`, `/products`, and `/nutrition` were removed from the API in
-v1.15.0-v1.16.0 and no longer appear here. The list below matches API v1.53.0.
+v1.15.0-v1.16.0 and no longer appear here. The list below matches API v1.69.0.
 
 The portal UI renders **every** route in `openapi.json`: public, API-key, admin,
 root-only, login-token and webhook routes alike. Each endpoint page carries a
@@ -433,6 +433,108 @@ only)" summary in the spec.
 - `POST /weight-management/gain-plan` - Weight-gain plan for underweight adults
 - `POST /weight-management/progress` - Track progress from weigh-ins
 - `POST /weight-management/diet-pattern` - Classify a daily macronutrient pattern
+
+**Dietary assessment** (calculations, nothing stored)
+- `POST /dietary-assessment` - Dietary assessment - intake analysis, comparison with requirements, dietary gaps (API key, rate-limited)
+- `GET /dietary-assessment/reference` - Assessable nutrients, status definitions, accepted input and method notes (API key)
+
+**Paediatric nutrition** (calculations, nothing stored; `/pediatric` is an alias)
+- `POST /paediatric/energy` - Paediatric energy requirements (API key)
+- `POST /paediatric/protein` - Paediatric protein requirements (API key)
+- `POST /paediatric/fluid` - Paediatric maintenance fluid, Holliday-Segar (API key)
+- `POST /paediatric/preterm` - Preterm infant requirements and growth monitoring (API key)
+- `POST /paediatric/growth-velocity` - Growth velocity against the reference (API key)
+- `POST /paediatric/catch-up` - Catch-up growth energy and protein (API key)
+- `POST /paediatric/enteral-feeds` - Age-specific enteral feed calculations (API key)
+- `POST /paediatric/plan` - Paediatric nutrition plan in one call (API key)
+- `GET /paediatric/reference` - Paediatric reference tables and their sources (API key)
+
+**Critical care nutrition** (calculations, nothing stored)
+- `POST /critical-care/protein-by-stress` - Protein by metabolic stress level (API key)
+- `POST /critical-care/npe-nitrogen-ratio` - Non-protein energy to nitrogen ratio (API key)
+- `POST /critical-care/nitrogen-balance` - Nitrogen output and stress grade (general ICU) (API key)
+- `POST /critical-care/carbohydrate` - Carbohydrate requirement reference (API key)
+- `GET /critical-care/fat` - Fat requirement reference (API key)
+- `POST /critical-care/propofol-fat` - Propofol dose and fat delivered (API key)
+- `GET /critical-care/cho-fat-ratio` - CHO:fat ratio of non-protein energy (API key)
+- `POST /critical-care/electrolytes` - Phosphate, potassium and magnesium replacement reference (API key)
+- `POST /critical-care/potassium-deficit` - Total potassium deficit band from serum potassium (API key)
+- `POST /critical-care/fluid` - Adult ICU fluid reference range (API key)
+- `GET /critical-care/reference` - Critical care reference tables and known issues (API key)
+
+**Burn nutrition** (calculations; reference values are stored in the database)
+- `POST /burns/fluid-resuscitation` - Burn resuscitation fluid, Parkland formula (API key)
+- `POST /burns/energy` - Burn energy requirement, Toronto (adult) or weight-only Schofield (child) (API key)
+- `POST /burns/protein` - Burn protein requirement (API key)
+- `POST /burns/nitrogen-balance` - Burn nitrogen balance (API key)
+- `POST /burns/micronutrients` - Burn micronutrient dosing guidance (API key)
+- `POST /burns/glycemic-targets` - Burn carbohydrate ceiling and glucose targets (API key)
+- `POST /burns/maintenance-fluid` - Paediatric maintenance fluid, Holliday-Segar (API key)
+- `POST /burns/indirect-calorimetry` - REE from indirect calorimetry, modified Weir (API key)
+- `POST /burns/pediatric-equations` - Paediatric burn predictive equations side by side (API key)
+- `POST /burns/pharmacology` - Burn hypermetabolism drug dosing reference (API key)
+- `GET /burns/reference` - Stored burn reference values (API key)
+
+**Refeeding syndrome** (ASPEN consensus; reference values are stored in the database)
+- `POST /refeeding/risk-adult` - Refeeding risk, adults (ASPEN Table 3) (API key)
+- `POST /refeeding/risk-pediatric` - Refeeding risk, paediatric (ASPEN Table 5) (API key)
+- `POST /refeeding/severity` - Refeeding syndrome severity (ASPEN definition) (API key)
+- `POST /refeeding/initiation` - Refeeding initiation and advancement (ASPEN Tables 6 and 7) (API key)
+- `GET /refeeding/reference` - Stored refeeding reference values (API key)
+
+**Energy and stress factors** (reference values are stored in the database; the `/energy` engine is unchanged)
+- `POST /stress-factors/harris-benedict` - Harris-Benedict BEE with optional stress, adjustment and temperature factors (API key)
+- `POST /stress-factors/fever` - Fever adjustment of a baseline REE (API key)
+- `GET /stress-factors/conditions` - Clinical stress factors (Barak et al, 2002) (API key)
+- `GET /stress-factors/adjustments` - 24-hour energy expenditure adjustment factors (API key)
+- `GET /stress-factors/reference` - Stored stress factor reference values (API key)
+
+**Carbohydrate counting** (separate from `/diabetes`; reference values are stored in the database)
+- `POST /carb-counting/carbohydrate-content` - Carbohydrate in a weighed portion, or the portion weight for a carbohydrate target (API key)
+- `POST /carb-counting/insulin-dose` - Mealtime quick-acting insulin dose, carbohydrate plus optional correction (API key)
+- `GET /carb-counting/foods` - Food groups that do and do not affect blood glucose (API key)
+- `GET /carb-counting/handy-measures` - Handy carbohydrate measures and weighing rules (API key)
+- `GET /carb-counting/insulin-types` - Background and quick-acting insulin types (API key)
+- `GET /carb-counting/dose-adjustment` - Stepwise carbohydrate counting and dose adjustment (API key)
+- `GET /carb-counting/reference` - Stored carb counting reference values (API key)
+
+**Enteral nutrition** (calculations, nothing stored)
+- `POST /enteral-nutrition/calculate` - Tube feeding prescription calculator (API key)
+- `GET /enteral-nutrition/reference` - Enteral nutrition steps, limits and request fields (API key)
+
+**Micronutrient assessment** (calculations, nothing stored)
+- `POST /micronutrients/assess` - Micronutrient intake assessment against the DRI (API key)
+- `GET /micronutrients/requirements` - Vitamin and mineral requirements by life stage (API key)
+- `GET /micronutrients/reference` - Micronutrients covered and the adequacy rules (API key)
+
+**Research engine** (standardise study data, nothing stored)
+- `POST /research/harmonise` - Standardise nutrition variables across one or several clinical studies (API key)
+- `POST /research/convert` - Convert one nutrition value between units, with a plausibility check (API key)
+- `GET /research/variables` - Data dictionary of standardised variables (API key)
+- `GET /research/reference` - Matching rules, unit factors, diagnosis concepts and outcome definitions (API key)
+
+**Longitudinal outcomes** (nothing stored)
+- `POST /longitudinal/analyse` - Follow one participant's nutrition outcomes over repeated visits (API key)
+- `POST /longitudinal/cohort` - Analyse a cohort's nutrition outcomes over follow-up (API key)
+- `GET /longitudinal/reference` - Request fields, variables, condition definitions, pattern rules, thresholds and limits (API key)
+
+**Nutrition epidemiology** (nothing stored)
+- `POST /epidemiology/analyse` - Prevalence, incidence, risk and odds ratios with confidence intervals from a research dataset (API key)
+- `POST /epidemiology/counts` - The same estimators from published or tabulated counts (API key)
+- `GET /epidemiology/reference` - Design rules, measure definitions, methods and limits (API key)
+
+**Data quality** (nothing stored)
+- `POST /data-quality/audit` - Audit a nutrition dataset for unit errors, implausible measurements and inconsistencies (API key)
+- `GET /data-quality/reference` - What each check means, the screening bands and the limits (API key)
+
+**Malnutrition research** (nothing stored)
+- `POST /malnutrition/analyse` - Population-level malnutrition indicators from survey or study records (API key)
+- `GET /malnutrition/reference` - Case definitions, thresholds and limits (API key)
+
+**Dataset export** (files built from the request, nothing stored)
+- `POST /export/dataset` - De-identified, analysis-ready dataset files with dictionary, provenance and loaders (API key)
+- `POST /export/verify` - Check files against the SHA-256 hashes in a provenance file (API key)
+- `GET /export/reference` - Request fields, de-identification rules, file layouts, naming, provenance and limits (API key)
 
 **Fenton Preterm** (licensed data — no list/dump route; every read returns a computed result, static metadata, or a rendered image, never raw L/M/S)
 - `GET /fenton-preterm/classify` - Classify a preterm infant measurement (weight, length, or head circumference)

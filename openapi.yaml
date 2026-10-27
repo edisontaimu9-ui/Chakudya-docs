@@ -27,7 +27,7 @@ info:
     there. Anonymous calls receive 401 with the code `api_key_required`. OAuth 2.0 was removed in v1.34.0.
 
     '
-  version: 1.53.0
+  version: 1.69.0
   contact:
     name: Edison Taimu
     x-location: Blantyre, Malawi
@@ -76,6 +76,25 @@ tags:
 - name: Food Log
 - name: Recipes
 - name: Meals
+- name: Dietary assessment
+- name: Paediatric nutrition
+- name: Critical care nutrition
+- name: Burn nutrition
+  description: Burn nutrition calculators (Parkland fluid, Toronto and pediatric energy equations, protein, nitrogen balance, micronutrients, glycaemic targets, Holliday-Segar, Weir, hypermetabolism drugs). Reference values are stored in clinical_reference_values, not coded.
+- name: Refeeding syndrome
+  description: ASPEN consensus refeeding syndrome risk (adult and paediatric), severity and initiation guidance. Reference values are stored in clinical_reference_values (condition refeeding), not coded.
+- name: Energy and stress factors
+  description: Harris-Benedict BEE with Barak et al (2002) clinical stress factors, 24-hour energy adjustment factors and the fever (Hardy and DuBois) adjustment. Reference values are stored in clinical_reference_values (condition stress_factors), not coded.
+- name: Carbohydrate counting
+  description: Carbohydrate counting and mealtime insulin dose calculators and reference lists from a UK diabetes network patient-education guide (units per 10 g, mmol/L). Reference values are stored in clinical_reference_values (condition carb_counting), not coded. Separate from /diabetes.
+- name: Enteral nutrition
+- name: Micronutrient assessment
+- name: Research engine
+- name: Longitudinal outcomes
+- name: Nutrition epidemiology
+- name: Data quality
+- name: Malnutrition research
+- name: Dataset export
 - name: Ingredients
 - name: DRI
 - name: RAG
@@ -6808,6 +6827,2056 @@ paths:
           $ref: '#/components/responses/BadRequest'
         '429':
           $ref: '#/components/responses/RateLimited'
+  /paediatric/energy:
+    post:
+      tags:
+      - Paediatric nutrition
+      summary: Paediatric energy requirements (API key)
+      description: 'Basal metabolic rate by Schofield (1985, needs height) and WHO (1985), multiplied by activity and stress factor ranges (activity_level or activity_factor, stress_condition or stress_factor, with a position low, mid, high or 0-1); DRI/FAO 2004 total energy expenditure in kcal/kg/day; and the IOM estimated energy requirement through the energy engine (pal_category needed from 3 years). Returns a recommended value and macronutrient grams by the AMDR for the age. Estimates for a dietitian or doctor to review.'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+              - sex
+              - weight_kg
+              properties:
+                sex: {type: string, enum: [male, female]}
+                age_months: {type: number}
+                age_years: {type: number}
+                weight_kg: {type: number}
+                height_cm: {type: number, description: 'Length if under 2 years.'}
+                pal_category: {type: string, enum: [sedentary, low_active, active, very_active]}
+                activity_level: {type: string, enum: [confined_to_bed, light, moderate, vigorous]}
+                activity_factor: {type: number}
+                stress_condition: {type: string, enum: [starvation, surgery, infection_sepsis, closed_head_injury, trauma, burn, growth_failure]}
+                stress_factor: {type: number}
+                activity_position: {type: string}
+                stress_position: {type: string}
+            example:
+              sex: female
+              age_years: 6
+              weight_kg: 20
+              height_cm: 115
+              pal_category: low_active
+      responses:
+        '200':
+          $ref: '#/components/responses/MutationSuccess'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+  /paediatric/protein:
+    post:
+      tags:
+      - Paediatric nutrition
+      summary: Paediatric protein requirements (API key)
+      description: 'IOM protein RDA/AI for healthy growth and the sick-child dose (g/kg/day and g/day) for the age, with the one matching clinical_status (healthy or sick) as the recommendation. Send energy_kcal to see protein as a share of energy against the AMDR.'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+              - weight_kg
+              properties:
+                age_months: {type: number}
+                age_years: {type: number}
+                weight_kg: {type: number}
+                clinical_status: {type: string, enum: [healthy, sick]}
+                energy_kcal: {type: number}
+            example:
+              age_months: 30
+              weight_kg: 12
+              clinical_status: sick
+      responses:
+        '200':
+          $ref: '#/components/responses/MutationSuccess'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+  /paediatric/fluid:
+    post:
+      tags:
+      - Paediatric nutrition
+      summary: Paediatric maintenance fluid, Holliday-Segar (API key)
+      description: 'Daily maintenance fluid from weight: 100-150 mL/kg up to 10 kg, 1000 mL + 50 mL per kg above 10 kg to 20 kg, and 1500 mL + 20 mL per kg above 20 kg. Returns mL/day, mL/kg/day and mL/hour.'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+              - weight_kg
+              properties:
+                weight_kg: {type: number}
+            example:
+              weight_kg: 15
+      responses:
+        '200':
+          $ref: '#/components/responses/MutationSuccess'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+  /paediatric/preterm:
+    post:
+      tags:
+      - Paediatric nutrition
+      summary: Preterm infant requirements and growth monitoring (API key)
+      description: 'Enteral fluid (120-200 mL/kg/day), energy (110-130 kcal/kg/day) and protein by weight band, with the monitoring targets. Add monitoring to check initial weight loss (up to 15%, regained in 10-14 days), weight gain (15-20 g/kg/day), length (more than 1 cm/week) and head circumference (0.8-1 cm/week).'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+              - weight_g
+              properties:
+                weight_g: {type: number, description: 'Birth or current weight in grams.'}
+                monitoring: {type: object, properties: {birth_weight_g: {type: number}, nadir_weight_g: {type: number}, days_to_regain_birth_weight: {type: number}, weight_g_start: {type: number}, weight_g_end: {type: number}, days: {type: number}, length_cm_start: {type: number}, length_cm_end: {type: number}, hc_cm_start: {type: number}, hc_cm_end: {type: number}}}
+            example:
+              weight_g: 1200
+      responses:
+        '200':
+          $ref: '#/components/responses/MutationSuccess'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+  /paediatric/growth-velocity:
+    post:
+      tags:
+      - Paediatric nutrition
+      summary: Growth velocity against the reference (API key)
+      description: 'Weight g/day and length or height mm/day over an interval, compared with the reference normal velocity for the age at the start (birth to 24 months by sex, then 2 to under 11 years). Send start and end values with days, or the velocity directly. Girls 3-6 months have no usable weight reference. For WHO z-scores use POST /growth/assess.'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+              - sex
+              - days
+              properties:
+                sex: {type: string, enum: [male, female]}
+                age_months: {type: number}
+                age_years: {type: number}
+                days: {type: number}
+                weight_g_start: {type: number}
+                weight_g_end: {type: number}
+                height_cm_start: {type: number}
+                height_cm_end: {type: number}
+                weight_gain_g_per_day: {type: number}
+                length_mm_per_day: {type: number}
+            example:
+              sex: male
+              age_months: 2
+              days: 30
+              weight_g_start: 4200
+              weight_g_end: 4800
+      responses:
+        '200':
+          $ref: '#/components/responses/MutationSuccess'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+  /paediatric/catch-up:
+    post:
+      tags:
+      - Paediatric nutrition
+      summary: Catch-up growth energy and protein (API key)
+      description: 'Weight-age method: catch-up kcal/kg/day = reference kcal/kg for the weight-age x ideal weight for length/height / actual weight, and the same for protein g/kg/day. The ideal weight is ideal_weight_kg, or for a child under 5 years with height_cm the WHO median weight-for-length/height is read from who_weight_for_length_height. Also gives the BMR x growth-failure stress factor (1.5-2) estimate, percent of ideal weight and the reference velocity. Severe wasting needs a stabilisation protocol first.'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+              - sex
+              - weight_kg
+              properties:
+                sex: {type: string, enum: [male, female]}
+                age_months: {type: number}
+                age_years: {type: number}
+                weight_kg: {type: number}
+                height_cm: {type: number}
+                ideal_weight_kg: {type: number}
+                weight_age_months: {type: number}
+            example:
+              sex: male
+              age_months: 24
+              weight_kg: 9
+              height_cm: 82
+      responses:
+        '200':
+          $ref: '#/components/responses/MutationSuccess'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '422':
+          description: The WHO weight-for-length/height row could not be read. Send ideal_weight_kg instead.
+        '429':
+          $ref: '#/components/responses/RateLimited'
+  /paediatric/enteral-feeds:
+    post:
+      tags:
+      - Paediatric nutrition
+      summary: Age-specific enteral feed calculations (API key)
+      description: 'Initiation, advancement and goal for continuous or bolus feeds for the child''s weight in the age group (0-12 months, 1-6 years, 7 years and over), steps and hours to goal, goal volume per day, and, with formula_kcal_per_ml, the energy delivered at goal and its share of energy_target_kcal.'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+              - weight_kg
+              properties:
+                age_months: {type: number}
+                age_years: {type: number}
+                weight_kg: {type: number}
+                route: {type: string, enum: [continuous, bolus]}
+                formula_kcal_per_ml: {type: number}
+                energy_target_kcal: {type: number}
+            example:
+              age_months: 8
+              weight_kg: 8
+              route: continuous
+              formula_kcal_per_ml: 0.67
+      responses:
+        '200':
+          $ref: '#/components/responses/MutationSuccess'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+  /paediatric/plan:
+    post:
+      tags:
+      - Paediatric nutrition
+      summary: Paediatric nutrition plan in one call (API key)
+      description: 'Energy, protein, fluid and macronutrient grams together. Add catch_up true (reads the WHO median weight for a child under 5 years with height_cm) or ideal_weight_kg for catch-up targets, and feeding_route for enteral feed rates. Same inputs as the single calculators.'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+              - sex
+              - weight_kg
+              properties:
+                sex: {type: string, enum: [male, female]}
+                age_months: {type: number}
+                age_years: {type: number}
+                weight_kg: {type: number}
+                height_cm: {type: number}
+                pal_category: {type: string}
+                clinical_status: {type: string, enum: [healthy, sick]}
+                catch_up: {type: boolean}
+                ideal_weight_kg: {type: number}
+                feeding_route: {type: string, enum: [continuous, bolus]}
+            example:
+              sex: female
+              age_years: 6
+              weight_kg: 20
+              height_cm: 115
+              pal_category: low_active
+      responses:
+        '200':
+          $ref: '#/components/responses/MutationSuccess'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+  /paediatric/reference:
+    get:
+      tags:
+      - Paediatric nutrition
+      summary: Paediatric reference tables and their sources (API key)
+      description: 'All tables behind the paediatric calculators. Use section to get one of: fluid, energy_equations, activity_factors, stress_factors, dri_fao_2004_tee, macronutrient_distribution, protein, preterm, growth_velocity, enteral_feeds, sources. /pediatric works as an alias for /paediatric.'
+      parameters:
+      - name: section
+        in: query
+        required: false
+        schema:
+          type: string
+      responses:
+        '200':
+          $ref: '#/components/responses/MutationSuccess'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+  /critical-care/protein-by-stress:
+    post:
+      tags:
+      - Critical care nutrition
+      summary: Protein by metabolic stress level (API key)
+      description: 'g/kg/day protein by stress level (0 normal 0.8, 1 mild 0.8-1, 2 moderate 1.2-1.5, 3 severe 1.6-2.5). Send weight_kg for g/day. Omit stress_level for the whole table. Compensate separately for wound, stoma or fistula losses. Not often above 16 g N (100 g protein) a day except in catabolic critical illness.'
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                stress_level: {type: integer, minimum: 0, maximum: 3}
+                weight_kg: {type: number}
+            example: {stress_level: 2, weight_kg: 70}
+      responses:
+        '200':
+          $ref: '#/components/responses/MutationSuccess'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+  /critical-care/npe-nitrogen-ratio:
+    post:
+      tags:
+      - Critical care nutrition
+      summary: Non-protein energy to nitrogen ratio (API key)
+      description: 'g N2 = g protein / 6.25; ratio = NPE kcal / g N2. Above 150:1 normal or mildly elevated, 100-150:1 moderate stress, 80-100:1 severe stress, below 80:1 is outside the source table.'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+              - npe_kcal
+              - protein_g
+              properties:
+                npe_kcal: {type: number, description: Non-protein energy kcal per 24h}
+                protein_g: {type: number, description: Protein g per 24h}
+            example: {npe_kcal: 1500, protein_g: 75}
+      responses:
+        '200':
+          $ref: '#/components/responses/MutationSuccess'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+  /critical-care/nitrogen-balance:
+    post:
+      tags:
+      - Critical care nutrition
+      summary: Nitrogen output and stress grade (general ICU) (API key)
+      description: 'Urinary N = urine volume L x urinary urea mmol/L x 0.028 (urea-derived only); total urinary N = x 1.2; total N output = total urinary N + 4 g obligatory losses; graded against the urinary N2 table. Unreliable in unstable patients and does not count wound or fistula losses. Burn patients use a different formula.'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+              - urine_volume_l
+              - urinary_urea_mmol_l
+              properties:
+                urine_volume_l: {type: number}
+                urinary_urea_mmol_l: {type: number}
+            example: {urine_volume_l: 2, urinary_urea_mmol_l: 250}
+      responses:
+        '200':
+          $ref: '#/components/responses/MutationSuccess'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+  /critical-care/carbohydrate:
+    post:
+      tags:
+      - Critical care nutrition
+      summary: Carbohydrate requirement reference (API key)
+      description: 'Usual 60-70% of NPE, 30-70% of total energy or 2-4 mg/kg/min; minimum 150-200 g/24h; maximum 6-7 mg/kg/min without metabolic stress and 4-5 mg/kg/min in severe stress or TPN. Send weight_kg for g/day. The source prints the usual figure as 3-5 g/kg/min, which cannot be right; it is flagged in the response.'
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                weight_kg: {type: number}
+            example: {weight_kg: 70}
+      responses:
+        '200':
+          $ref: '#/components/responses/MutationSuccess'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+  /critical-care/fat:
+    get:
+      tags:
+      - Critical care nutrition
+      summary: Fat requirement reference (API key)
+      description: 'Usual 30-40% of non-protein energy; minimum 100-200 g/week for essential fatty acids; maximum 1-2 g/kg/day (ESPEN 2009). Acute pancreatitis: 0.8-1.5 g/kg via TPN, triglycerides under 12 mmol/L.'
+      responses:
+        '200':
+          $ref: '#/components/responses/MutationSuccess'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+  /critical-care/propofol-fat:
+    post:
+      tags:
+      - Critical care nutrition
+      summary: Propofol dose and fat delivered (API key)
+      description: '1 mL of propofol 1% holds 10 mg propofol and 0.1 g fat; 1 mL of propofol 2% holds 20 mg propofol and 0.1 g fat.'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+              - propofol_percent
+              - volume_ml
+              properties:
+                propofol_percent: {type: string, enum: ['1', '2']}
+                volume_ml: {type: number}
+            example: {propofol_percent: '1', volume_ml: 100}
+      responses:
+        '200':
+          $ref: '#/components/responses/MutationSuccess'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+  /critical-care/cho-fat-ratio:
+    get:
+      tags:
+      - Critical care nutrition
+      summary: CHO:fat ratio of non-protein energy (API key)
+      description: '70:30 for normal requirements; 60:40 for glucose intolerance (blood glucose above 10 mmol/L); 50:50 when weaning from the ventilator is difficult or in respiratory failure (high pCO2).'
+      responses:
+        '200':
+          $ref: '#/components/responses/MutationSuccess'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+  /critical-care/electrolytes:
+    post:
+      tags:
+      - Critical care nutrition
+      summary: Phosphate, potassium and magnesium replacement reference (API key)
+      description: 'Reference dosing. Send electrolyte (phosphate, potassium or magnesium) for one, or omit it for all three.'
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                electrolyte: {type: string, enum: [phosphate, potassium, magnesium]}
+            example: {electrolyte: potassium}
+      responses:
+        '200':
+          $ref: '#/components/responses/MutationSuccess'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+  /critical-care/potassium-deficit:
+    post:
+      tags:
+      - Critical care nutrition
+      summary: Total potassium deficit band from serum potassium (API key)
+      description: 'Serum K 3-4 mmol/L is a 100-200 mmol deficit; 2-3 mmol/L is 200-400 mmol. Serum K rises about 0.25 mmol/L for each 20 mmol KCl given IV.'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+              - serum_k_mmol_l
+              properties:
+                serum_k_mmol_l: {type: number}
+            example: {serum_k_mmol_l: 2.6}
+      responses:
+        '200':
+          $ref: '#/components/responses/MutationSuccess'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+  /research/harmonise:
+    post:
+      tags:
+      - Research engine
+      summary: Standardise nutrition variables across one or several clinical studies (API key)
+      description: 'Puts anthropometry, dietary intake, biochemistry, clinical signs, diagnoses and outcomes on one set of names and units. Send records for one study, or studies[] (each with study_id, records and optionally its own columns, units, date_format) for a pooled table. Units are never guessed: a value with no unit is reported as assumed_canonical. Out-of-range values are flagged with the units in which they would be plausible and are not altered. Derived: BMI and WHO adult class, % weight change (positive = loss), MUAC status, macronutrient % energy and per kg, GLIM, length of stay, 28- and 90-day mortality. Diagnoses (free text, ICD-10, NCP codes) map to a fixed concept list; negation and ambiguity return status review. Up to 500 records, 150 columns. Screening and standardisation aid, not a diagnosis.'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                study_id: {type: string}
+                records: {type: array, maxItems: 500, items: {type: object}}
+                studies:
+                  type: array
+                  maxItems: 10
+                  items:
+                    type: object
+                    required: [study_id, records]
+                    properties:
+                      study_id: {type: string}
+                      records: {type: array, items: {type: object}}
+                      columns: {type: object, description: 'source column -> {variable, unit?, value_map?}'}
+                      units: {type: object, additionalProperties: {type: string}}
+                unit_system: {type: string, enum: [conventional, si]}
+                target_units: {type: object, additionalProperties: {type: string}}
+                columns: {type: object}
+                units: {type: object, additionalProperties: {type: string}}
+                missing_codes: {type: array, maxItems: 20, items: {}}
+                date_format: {type: string, enum: [dmy, mdy, ymd]}
+                population: {type: string, enum: [adult, paediatric, mixed]}
+                glim_bmi_cutoffs: {type: string, enum: [default, asian]}
+                muac_scheme: {type: string, enum: [cmam, who_hiv_2008]}
+                implausible: {type: string, enum: [flag, 'null']}
+                keep: {type: array, maxItems: 20, items: {type: string}}
+                assume_alive_without_death_date: {type: boolean}
+            example: {study_id: QECH, units: {albumin: g/L}, columns: {sex_code: {variable: sex, value_map: {'1': male, '2': female}}}, records: [{id: p1, age: 54, sex_code: 2, weight_lb: 150, height_cm: 165, albumin: 32, crp: '<5', diagnosis: 'Severe acute malnutrition; HIV positive'}]}
+      responses:
+        '200':
+          $ref: '#/components/responses/MutationSuccess'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+  /research/convert:
+    post:
+      tags:
+      - Research engine
+      summary: Convert one nutrition value between units, with a plausibility check (API key)
+      description: 'Send {variable, value, from, to?} or {conversions: [...]} (up to 100). to defaults to the canonical unit, or the SI unit when unit_system is si. The value is converted and marked plausible or not; it is never refused for being out of range.'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                variable: {type: string}
+                value: {}
+                from: {type: string}
+                to: {type: string}
+                unit_system: {type: string, enum: [conventional, si]}
+                conversions: {type: array, maxItems: 100, items: {type: object}}
+            example: {conversions: [{variable: glucose, value: 5.5, from: mmol/L}, {variable: hba1c, value: 48, from: mmol/mol}]}
+      responses:
+        '200':
+          $ref: '#/components/responses/MutationSuccess'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+  /research/variables:
+    get:
+      tags:
+      - Research engine
+      summary: Data dictionary of standardised variables (API key)
+      description: 'Name, domain, kind, canonical and SI unit, accepted units, LOINC code (only where the API already registers one), plausibility range, aliases; plus the derived variables and their rules.'
+      parameters:
+      - {name: domain, in: query, schema: {type: string, enum: [anthropometry, biochemical, clinical, demographic, diagnosis, dietary, nfpe, outcome, timeline]}}
+      - {name: q, in: query, schema: {type: string}, description: 'search name, alias or label'}
+      - {name: name, in: query, schema: {type: string}, description: 'one variable by name or alias'}
+      responses:
+        '200':
+          $ref: '#/components/responses/MutationSuccess'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+  /research/reference:
+    get:
+      tags:
+      - Research engine
+      summary: Matching rules, unit factors, diagnosis concepts and outcome definitions (API key)
+      parameters:
+      - {name: section, in: query, schema: {type: string, enum: [rules, units, diagnoses, outcomes, limits]}}
+      responses:
+        '200':
+          $ref: '#/components/responses/MutationSuccess'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+  /longitudinal/analyse:
+    post:
+      tags:
+      - Longitudinal outcomes
+      summary: Follow one participant's nutrition outcomes over repeated visits (API key)
+      description: 'Send one participant and their visits. Each visit returns weight, length/height, BMI, MUAC and head circumference, WHO z-scores (weight-, length/height-, weight-for-length/height-, BMI-, head-circumference- and MUAC-for-age, birth to 19 years), the adult BMI class and fixed MUAC status, change since the previous visit and since baseline, and data-quality flags. Per variable: a least-squares trend with a 95% interval. Per condition (stunting, wasting, underweight, thinness, overweight/obesity, low MUAC, oedema, adult under- and overnutrition): new onset, recovered, relapsed, persistent or never. Intake totals and any other numeric outcome ride along in intake and measures. Age comes from birth_date, else the visit age_months, else baseline_age_months moved forward (flagged as estimated). Nothing is stored. Up to 60 visits. Screening and research aid, not a diagnosis.'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [visits]
+              properties:
+                id: {type: string}
+                sex: {type: string, enum: [boys, girls, male, female]}
+                birth_date: {type: string, format: date}
+                baseline_age_months: {type: integer, minimum: 0, maximum: 1500}
+                measured: {type: string, enum: [lying, standing]}
+                visits:
+                  type: array
+                  maxItems: 60
+                  items:
+                    type: object
+                    required: [date]
+                    properties:
+                      date: {type: string, format: date}
+                      age_months: {type: integer}
+                      weight_kg: {type: number}
+                      length_cm: {type: number}
+                      height_cm: {type: number}
+                      muac_cm: {type: number}
+                      hc_cm: {type: number}
+                      oedema: {type: boolean}
+                      pregnant: {type: boolean}
+                      intake: {type: object, additionalProperties: {type: number}}
+                      measures: {type: object, additionalProperties: {type: number}}
+                options:
+                  type: object
+                  properties:
+                    implausible: {type: string, enum: [exclude, keep]}
+                    muac_scheme: {type: string, enum: [cmam, who_hiv_2008]}
+                    z_change_threshold: {type: number, minimum: 0.1, maximum: 3}
+                    recovery_consecutive_visits: {type: integer, minimum: 1, maximum: 10}
+                    population: {type: string, enum: [child, adult]}
+            example: {id: C1, sex: boys, birth_date: '2024-01-15', visits: [{date: '2024-07-15', weight_kg: 7.2, length_cm: 65, muac_cm: 14, intake: {energy_kcal: 600}}, {date: '2024-10-15', weight_kg: 7.6, length_cm: 67, muac_cm: 13.5, intake: {energy_kcal: 700}}, {date: '2025-01-15', weight_kg: 7.9, length_cm: 69, muac_cm: 12.2, measures: {hb: 9.1}}]}
+      responses:
+        '200':
+          $ref: '#/components/responses/MutationSuccess'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+  /longitudinal/cohort:
+    post:
+      tags:
+      - Longitudinal outcomes
+      summary: Analyse a cohort's nutrition outcomes over follow-up (API key)
+      description: 'Send up to 300 participants (3000 visits in all), each as for /longitudinal/analyse plus an optional group. Returns paired change with 95% intervals, status transition tables (first to last assessed visit), incidence and recovery for each condition, follow-up time, retention against a visit schedule (schedule_days, schedule_tolerance_days), a two-group comparison when participants carry a group, and optionally a flat participant-visit table for R or pandas (include_table). A participant that cannot be analysed is listed under excluded with the reason; the rest are still analysed. Nothing is stored.'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [participants]
+              properties:
+                participants:
+                  type: array
+                  maxItems: 300
+                  items:
+                    type: object
+                    required: [visits]
+                    properties:
+                      id: {type: string}
+                      group: {type: string}
+                      sex: {type: string}
+                      birth_date: {type: string, format: date}
+                      baseline_age_months: {type: integer}
+                      visits: {type: array, maxItems: 60, items: {type: object}}
+                options:
+                  type: object
+                  properties:
+                    schedule_days: {type: array, maxItems: 20, items: {type: integer, minimum: 0, maximum: 14600}, description: 'scheduled visit days since each participant''s first visit'}
+                    schedule_tolerance_days: {type: integer, minimum: 0, maximum: 180, default: 14}
+                    include_visits: {type: boolean, description: 'full visit-by-visit detail for every participant'}
+                    include_table: {type: boolean, description: 'flat participant-visit table'}
+                    implausible: {type: string, enum: [exclude, keep]}
+                    muac_scheme: {type: string, enum: [cmam, who_hiv_2008]}
+                    z_change_threshold: {type: number}
+                    recovery_consecutive_visits: {type: integer}
+                    population: {type: string, enum: [child, adult]}
+            example: {participants: [{id: a, group: intervention, sex: girls, birth_date: '2023-06-01', visits: [{date: '2024-06-01', muac_cm: 11.2}, {date: '2024-09-01', muac_cm: 12.8}]}, {id: b, group: control, sex: boys, birth_date: '2023-05-10', visits: [{date: '2024-06-02', muac_cm: 11.9}, {date: '2024-09-03', muac_cm: 12.0}]}], options: {schedule_days: [0, 90], include_table: true}}
+      responses:
+        '200':
+          $ref: '#/components/responses/MutationSuccess'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+  /longitudinal/reference:
+    get:
+      tags:
+      - Longitudinal outcomes
+      summary: Request fields, variables, condition definitions, pattern rules, thresholds and limits (API key)
+      parameters:
+      - {name: section, in: query, schema: {type: string, enum: [input, variables, conditions, patterns, thresholds, limits]}}
+      responses:
+        '200':
+          $ref: '#/components/responses/MutationSuccess'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+  /malnutrition/analyse:
+    post:
+      tags:
+      - Malnutrition research
+      summary: Population-level malnutrition indicators from survey or study records (API key)
+      description: 'Send up to 2000 child records. Measurements are validated with the /research/harmonise rules and the data quality engine; z-scores are recomputed with the WHO standards (the same classifiers as GET /growth/assess), or taken from z_columns you supply (with z_scale, for example 100 for values in hundredths, and missing_codes) for secondary analysis of survey files. Implausible z-scores are excluded by the WHO flexible limits (or against the survey mean) and counted. Reports, for the age range (default 0 to 59 months): stunting, underweight, wasting, and overweight, each with moderate and severe parts, a Wilson or exact interval and, for children under 5, the UNICEF/WHO/World Bank prevalence level for stunting, wasting and overweight (very low to very high); thinness and overweight by BMI-for-age from 60 months when the range extends; global and severe acute malnutrition by WHZ, by MUAC (125 and 115 mm), by oedema and combined, with the WHZ/MUAC overlap; concurrent wasting and stunting and the Composite Index of Anthropometric Failure; mean z-scores; the same by age group, sex and up to three columns you name, with a chi-square test for difference between groups; expected case numbers for a population; and an optional flat table. design_effect widens intervals for cluster surveys; sampling weights are not applied. Nothing is stored. Research aid, not a diagnosis.'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [records]
+              properties:
+                records: {type: array, maxItems: 2000, items: {type: object}}
+                columns: {type: object, description: 'source column -> {variable, unit?, value_map?}, as in /research/harmonise'}
+                units: {type: object, additionalProperties: {type: string}}
+                missing_codes: {type: array, maxItems: 20, items: {}}
+                date_format: {type: string, enum: [dmy, mdy, ymd]}
+                z_columns: {type: object, description: 'indicator -> column of z-scores to use instead of recomputing', properties: {haz: {type: string}, waz: {type: string}, whz: {type: string}, baz: {type: string}}}
+                z_scale: {type: number, default: 1, description: 'divide supplied z-scores by this (100 for hundredths)'}
+                oedema: {type: string, description: 'column: yes/no, true/false, 1/0 or a grade'}
+                strata: {type: array, maxItems: 3, items: {}, description: 'columns, or {variable, name?, cutpoints?}'}
+                population: {type: object, properties: {children: {type: integer}}, description: 'gives expected prevalent case numbers'}
+                confidence_level: {type: number, default: 0.95}
+                ci_method: {type: string, enum: [wilson, exact], default: wilson}
+                design_effect: {type: number, default: 1}
+                options:
+                  type: object
+                  properties:
+                    age_range: {type: array, items: {type: integer}, minItems: 2, maxItems: 2, default: [0, 59]}
+                    flag_rule: {type: string, enum: [who, survey_mean, both], default: who}
+                    z_source: {type: string, enum: [auto, supplied, recomputed], default: auto}
+                    z_tolerance: {type: number, default: 0.1}
+                    include_table: {type: boolean, default: false}
+            example: {oedema: oedema, strata: [district], confidence_level: 0.95, columns: {age_months: {variable: age-years, unit: mo}, weight_kg: {variable: weight, unit: kg}, length_cm: {variable: length, unit: cm}, height_cm: {variable: height, unit: cm}, muac_mm: {variable: muac, unit: mm}}, records: [{id: K1, sex: F, age_months: 14, weight_kg: 8.1, length_cm: 71, muac_mm: 128, oedema: 'no', district: Zomba}, {id: K2, sex: M, age_months: 30, weight_kg: 11.2, height_cm: 86.5, muac_mm: 137, oedema: 'no', district: Machinga}]}
+      responses:
+        '200':
+          $ref: '#/components/responses/MutationSuccess'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+  /malnutrition/reference:
+    get:
+      tags:
+      - Malnutrition research
+      summary: Case definitions, thresholds and limits (API key)
+      parameters:
+      - {name: section, in: query, schema: {type: string, enum: [indicators, acute_malnutrition, thresholds, anthropometric_failure, input, limits]}}
+      responses:
+        '200':
+          $ref: '#/components/responses/MutationSuccess'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+  /export/dataset:
+    post:
+      tags:
+      - Dataset export
+      summary: De-identified, analysis-ready dataset files with dictionary, provenance and loaders (API key)
+      description: 'Send up to 500 records (or several studies). Standardised with the /research/harmonise rules, then de-identified: keyed pseudonyms, relative dates, age generalisation and top-coding, k-anonymity measured (and optionally enforced by suppression). Returns files[] (CSV, dictionary CSV and JSON, Frictionless datapackage.json, R, Python and Stata loaders, provenance with SHA-256 hashes), disclosure_risk, columns_dropped and warnings. Nothing is stored. Not a certificate of anonymity.'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                records: {type: array, maxItems: 500, items: {type: object}}
+                studies: {type: array, maxItems: 10, items: {type: object, required: [study_id, records], properties: {study_id: {type: string}, records: {type: array, items: {type: object}}, columns: {type: object}, units: {type: object}}}, description: 'instead of records: pooled studies'}
+                columns: {type: object, description: 'source column -> {variable, unit?, value_map?}, as in /research/harmonise'}
+                units: {type: object, additionalProperties: {type: string}}
+                target_units: {type: object, additionalProperties: {type: string}}
+                unit_system: {type: string, enum: [conventional, si]}
+                missing_codes: {type: array, maxItems: 20, items: {}}
+                date_format: {type: string, enum: [dmy, mdy, ymd]}
+                population: {type: string, enum: [adult, paediatric, mixed]}
+                implausible: {type: string, enum: [flag, 'null']}
+                dataset:
+                  type: object
+                  properties:
+                    id: {type: string}
+                    title: {type: string}
+                    description: {type: string}
+                    creators: {type: array, items: {type: string}}
+                    licence: {type: string}
+                    version: {type: string}
+                    contact: {type: string}
+                    keywords: {type: array, items: {type: string}}
+                    funding: {type: string}
+                    ethics_approval: {type: string}
+                    access_conditions: {type: string}
+                deidentify:
+                  type: object
+                  properties:
+                    ids: {type: string, enum: [pseudonymise, drop], default: pseudonymise}
+                    id_column: {type: string}
+                    salt: {type: string, minLength: 16, maxLength: 200, description: 'secret; never returned or stored'}
+                    dates: {type: string, enum: [relative, year, drop], default: relative}
+                    age: {type: string, enum: [months, years, band, exact, drop], default: months}
+                    k: {type: integer, minimum: 2, maximum: 50, default: 5}
+                    on_violation: {type: string, enum: [report, suppress], default: report}
+                    quasi_identifiers: {type: array, maxItems: 8, items: {type: string}}
+                    pseudonymise_columns: {type: array, maxItems: 5, items: {type: string}}
+                include: {type: array, items: {type: string, enum: [data, dictionary, dictionary_json, datapackage, provenance, r, python, stata]}}
+                include_columns: {type: array, maxItems: 20, items: {type: string}, description: 'input columns to copy through after identifier and free-text checks'}
+                include_qc: {type: boolean, default: true}
+            example: {dataset: {id: zomba-2024, title: Zomba child nutrition survey, licence: CC-BY-4.0}, population: paediatric, include_columns: [district], deidentify: {salt: a-long-secret-you-keep, age: band, quasi_identifiers: [district], k: 5}, records: [{id: MW-1, sex: F, age_months: 20, weight_kg: 9.4, hb: '<7 g/dL', visit_date: '2024-06-20', district: Zomba}]}
+      responses:
+        '200':
+          $ref: '#/components/responses/MutationSuccess'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+  /export/verify:
+    post:
+      tags:
+      - Dataset export
+      summary: Check files against the SHA-256 hashes in a provenance file (API key)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [files]
+              properties:
+                files: {type: array, minItems: 1, maxItems: 12, items: {type: object, required: [name, content], properties: {name: {type: string}, content: {type: string}}}}
+                provenance: {description: 'the provenance file (object or JSON text); optional if it is among files'}
+      responses:
+        '200':
+          $ref: '#/components/responses/MutationSuccess'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+  /export/reference:
+    get:
+      tags:
+      - Dataset export
+      summary: Request fields, de-identification rules, file layouts, naming, provenance and limits (API key)
+      parameters:
+      - {name: section, in: query, schema: {type: string, enum: [request, deidentification, files, naming, provenance, limits]}}
+      responses:
+        '200':
+          $ref: '#/components/responses/MutationSuccess'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+  /data-quality/audit:
+    post:
+      tags:
+      - Data quality
+      summary: Audit a nutrition dataset for unit errors, implausible measurements and inconsistencies (API key)
+      description: 'Send up to 2000 records (a survey or study dataset). Units, ranges, missing codes and variable names are validated with the same rules as POST /research/harmonise (columns, units, missing_codes and date_format work the same way). Children with sex and age (a date of birth with an assessment date, or an age column) get WHO z-scores from the same classifiers as GET /growth/assess, and implausible ones are flagged against the WHO limits (haz -6/+6, waz -6/+5, whz -5/+5, baz -5/+5), or against the survey mean with options.flag_rule survey_mean. Consistency checks: age column against dates, visit before birth, future dates, weight above height (swapped columns), recorded BMI against weight and height, supplied z-scores (supplied_z) against recomputed ones, duplicate records, ids and visits. Survey-level quality: completeness, digit preference in weight, height and MUAC (terminal-digit counts, chi-square p and a chance-corrected heaping index), age heaping, sex ratio and age ratio (exact binomial tests), and the mean, SD, skewness and kurtosis of each z-score; group_by repeats these for each team or cluster and lists those to review. Suspected unit errors are listed with the unit in which the values would be plausible. Nothing is corrected: flagged values are left in the report and set to null in the optional analysis table (options.include_table). Screening aid, not a verdict; SMART/ENA plausibility scores are not reproduced. Nothing is stored.'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [records]
+              properties:
+                records: {type: array, maxItems: 2000, items: {type: object}}
+                columns: {type: object, description: 'source column -> {variable, unit?, value_map?}, as in /research/harmonise'}
+                units: {type: object, additionalProperties: {type: string}}
+                missing_codes: {type: array, maxItems: 20, items: {}}
+                date_format: {type: string, enum: [dmy, mdy, ymd]}
+                group_by: {type: string, description: 'column naming the team, cluster or enumerator (up to 50 groups)'}
+                supplied_z: {type: object, description: 'indicator -> column of z-scores from other software, e.g. {haz: haz_col}', additionalProperties: {type: string}}
+                options:
+                  type: object
+                  properties:
+                    flag_rule: {type: string, enum: [who, survey_mean, both], default: who}
+                    flag_range: {type: number, minimum: 1, maximum: 6, default: 3, description: 'z-score units from the survey mean (survey_mean rule)'}
+                    z_tolerance: {type: number, default: 0.1}
+                    bmi_tolerance: {type: number, default: 0.5}
+                    sd_range: {type: array, items: {type: number}, minItems: 2, maxItems: 2, default: [0.8, 1.2]}
+                    min_n: {type: integer, minimum: 10, maximum: 1000, default: 30}
+                    age_range: {type: array, items: {type: integer}, minItems: 2, maxItems: 2, default: [6, 59], description: 'whole months, for sex ratio, age ratio and the survey summaries'}
+                    age_ratio_expected: {type: number}
+                    max_issue_records: {type: integer, maximum: 2000, default: 200}
+                    include_table: {type: boolean, default: false}
+            example: {group_by: team, columns: {age_months: {variable: age-years, unit: mo}, weight_kg: {variable: weight, unit: kg}, length_cm: {variable: length, unit: cm}, muac_mm: {variable: muac, unit: mm}}, options: {include_table: true}, records: [{id: C1, team: T1, sex: F, age_months: 14, weight_kg: 8.9, length_cm: 71.2, muac_mm: 138}, {id: C2, team: T1, sex: M, age_months: 20, weight_kg: 9400, length_cm: 79, muac_mm: 141}]}
+      responses:
+        '200':
+          $ref: '#/components/responses/MutationSuccess'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+  /data-quality/reference:
+    get:
+      tags:
+      - Data quality
+      summary: What each check means, the screening bands and the limits (API key)
+      parameters:
+      - {name: section, in: query, schema: {type: string, enum: [checks, survey_indicators, input, limits]}}
+      responses:
+        '200':
+          $ref: '#/components/responses/MutationSuccess'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+  /epidemiology/analyse:
+    post:
+      tags:
+      - Nutrition epidemiology
+      summary: Prevalence, incidence, risk and odds ratios with confidence intervals from a research dataset (API key)
+      description: 'Send a dataset, the study design, an outcome and optionally an exposure and strata. The design decides what is reported. cross_sectional: prevalence with Wilson or exact intervals, prevalence ratio, difference and odds ratio. cohort: cumulative incidence (risk), risk ratio, difference and odds ratio; with a person_time column, incidence rates (exact Poisson interval) and rate ratios; baseline_outcome removes people who already have the outcome. case_control: the odds ratio only; prevalence, risk, incidence and risk ratios are refused. Outcome and exposure are binary rules on a column (positive values, or below / at_or_below / above / at_or_above / between for a numeric cut-off such as haz below -2). Unrecognised or missing values are excluded, counted and shown, never guessed. strata (up to 3, categories or numeric bands) give stratified prevalence, stratum-specific effect measures, Mantel-Haenszel pooled estimates, a Cochran-Mantel-Haenszel test, a heterogeneity test and a crude-versus-adjusted comparison; adjust_for cross-classifies several strata. indicators and means add other binary indicators and group means. design_effect widens intervals for cluster surveys; weights and clustering are not modelled. Up to 5000 records. Nothing is stored. Research aid, not a diagnosis.'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [design, records, outcome]
+              properties:
+                design: {type: string, enum: [cross_sectional, cohort, case_control]}
+                records: {type: array, maxItems: 5000, items: {type: object}}
+                outcome: {$ref: '#/components/schemas/EpidemiologyRule'}
+                exposure:
+                  allOf:
+                  - $ref: '#/components/schemas/EpidemiologyRule'
+                  - type: object
+                    properties:
+                      reference: {description: 'compare every other level of this variable with this level (up to 10 levels)'}
+                      cutpoints: {type: array, items: {type: number}}
+                strata:
+                  type: array
+                  maxItems: 3
+                  items:
+                    oneOf:
+                    - {type: string, description: 'column name'}
+                    - type: object
+                      required: [variable]
+                      properties:
+                        variable: {type: string}
+                        name: {type: string}
+                        cutpoints: {type: array, maxItems: 19, items: {type: number}, description: 'numeric bands: [6, 24, 60] gives <6, 6 to <24, 24 to <60, 60+'}
+                adjust_for: {type: array, items: {type: string}, description: 'strata names to adjust for jointly (Mantel-Haenszel, up to 100 cells)'}
+                indicators: {type: array, maxItems: 10, items: {$ref: '#/components/schemas/EpidemiologyRule'}}
+                means: {type: array, maxItems: 10, items: {type: string}}
+                person_time: {type: string, description: 'cohort: column of follow-up time per participant'}
+                baseline_outcome: {description: 'cohort: column positive when the outcome was already present at baseline'}
+                missing_codes: {type: array, maxItems: 20, items: {}}
+                confidence_level: {type: number, minimum: 0.5, maximum: 0.999, default: 0.95}
+                ci_method: {type: string, enum: [wilson, exact], default: wilson}
+                design_effect: {type: number, minimum: 1, maximum: 20, default: 1}
+                rate_per: {type: number, default: 1000}
+            example: {design: cross_sectional, confidence_level: 0.95, outcome: {variable: haz, below: -2}, exposure: {variable: food_insecure, positive: 'yes'}, strata: [sex, {variable: age_months, name: age, cutpoints: [6, 24]}], records: [{food_insecure: 'yes', sex: F, age_months: 14, haz: -2.4}, {food_insecure: 'no', sex: M, age_months: 30, haz: -0.6}]}
+      responses:
+        '200':
+          $ref: '#/components/responses/MutationSuccess'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+  /epidemiology/counts:
+    post:
+      tags:
+      - Nutrition epidemiology
+      summary: The same estimators from published or tabulated counts (API key)
+      description: 'For numbers from a paper or a table: proportions [{label, events, n}] with intervals; a 2x2 table {a, b, c, d} (a = exposed with the outcome, b = exposed without, c = unexposed with, d = unexposed without) with the measures the design permits; strata [{label, a, b, c, d}] for Mantel-Haenszel pooling, a heterogeneity test and a crude-versus-adjusted comparison; and rates {events_exposed, person_time_exposed, events_unexposed, person_time_unexposed} for a cohort. Counts must be whole numbers. Zero cells get 0.5 added for the ratios and the response says so.'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [design]
+              properties:
+                design: {type: string, enum: [cross_sectional, cohort, case_control]}
+                proportions: {type: array, maxItems: 50, items: {type: object, properties: {label: {type: string}, events: {type: integer}, n: {type: integer}}}}
+                table: {$ref: '#/components/schemas/EpidemiologyTable'}
+                strata:
+                  type: array
+                  minItems: 2
+                  maxItems: 50
+                  items: {$ref: '#/components/schemas/EpidemiologyTable'}
+                rates: {type: object, properties: {events_exposed: {type: integer}, person_time_exposed: {type: number}, events_unexposed: {type: integer}, person_time_unexposed: {type: number}}}
+                confidence_level: {type: number, default: 0.95}
+                ci_method: {type: string, enum: [wilson, exact]}
+                design_effect: {type: number, default: 1}
+                rate_per: {type: number, default: 1000}
+            example: {design: cohort, table: {a: 20, b: 80, c: 10, d: 90}}
+      responses:
+        '200':
+          $ref: '#/components/responses/MutationSuccess'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+  /epidemiology/reference:
+    get:
+      tags:
+      - Nutrition epidemiology
+      summary: Design rules, measure definitions, methods and limits (API key)
+      parameters:
+      - {name: section, in: query, schema: {type: string, enum: [designs, measures, methods, input, limits]}}
+      responses:
+        '200':
+          $ref: '#/components/responses/MutationSuccess'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+  /micronutrients/assess:
+    post:
+      tags:
+      - Micronutrient assessment
+      summary: Micronutrient intake assessment against the DRI (API key)
+      description: 'Age- and sex-specific screen of micronutrient intake. Below the EAR is likely inadequate, EAR to RDA is borderline, below an AI is possibly low, above the UL is flagged. Send intake as nutrient totals (one day, or days[] of up to 7, averaged). Nutrients not sent are listed in not_provided, not counted as zero. For foods use POST /dietary-assessment.'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                age: {type: number}
+                sex: {type: string, enum: [male, female]}
+                life_stage: {type: string}
+                life_stage_type: {type: string, enum: [normal, pregnancy, lactation]}
+                plant_based_diet: {type: boolean}
+                intake: {type: object, additionalProperties: {type: number}}
+                days:
+                  type: array
+                  maxItems: 7
+                  items:
+                    type: object
+                    properties:
+                      date: {type: string}
+                      intake: {type: object, additionalProperties: {type: number}}
+            example: {age: 25, sex: female, plant_based_diet: true, intake: {iron_mg: 9, calcium_mg: 600, vitc_mg: 40, zinc_mg: 6, vitb12_mcg: 1.5}}
+      responses:
+        '200':
+          $ref: '#/components/responses/MutationSuccess'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+  /micronutrients/requirements:
+    get:
+      tags:
+      - Micronutrient assessment
+      summary: Vitamin and mineral requirements by life stage (API key)
+      description: 'EAR, RDA, AI and UL for the life stage that matches age, sex and life_stage_type, or for a life_stage code.'
+      parameters:
+      - {name: age, in: query, schema: {type: number}}
+      - {name: sex, in: query, schema: {type: string, enum: [male, female]}}
+      - {name: life_stage, in: query, schema: {type: string}}
+      - {name: life_stage_type, in: query, schema: {type: string, enum: [normal, pregnancy, lactation]}}
+      - {name: group, in: query, schema: {type: string, enum: [vitamin, mineral]}}
+      responses:
+        '200':
+          $ref: '#/components/responses/MutationSuccess'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+  /micronutrients/reference:
+    get:
+      tags:
+      - Micronutrient assessment
+      summary: Micronutrients covered and the adequacy rules (API key)
+      responses:
+        '200':
+          $ref: '#/components/responses/MutationSuccess'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+  /enteral-nutrition/calculate:
+    post:
+      tags:
+      - Enteral nutrition
+      summary: Tube feeding prescription calculator (API key)
+      description: 'Volume, rate, energy, protein, formula water, free water flush and delivery adequacy, following the Edge Nutrition Tube Feeding Calculation Guide. The formula comes from formula_id or formula_name (enteral_formulas, read only) or from the body; body values override the row. Returns 422 if a looked-up row has no readable energy density.'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                formula_id: {type: string}
+                formula_name: {type: string}
+                formula:
+                  type: object
+                  properties:
+                    kcal_per_ml: {type: number}
+                    protein_g_per_l: {type: number}
+                    water_ml_per_l: {type: number}
+                kcal_needs: {type: number}
+                protein_needs_g: {type: number}
+                fluid_needs_ml: {type: number}
+                weight_kg: {type: number}
+                medication_kcal: {type: number}
+                mode: {type: string, enum: [continuous, cyclic, bolus, trophic, volume_based]}
+                hours_per_day: {type: number}
+                feeds_per_day: {type: number}
+                trophic_rate_ml_hr: {type: number}
+                flush_every_hours: {type: number}
+                patient_type: {type: string, enum: [adult, paediatric]}
+                refeeding_risk: {type: boolean}
+                refeeding_kcal_per_kg: {type: number}
+                refeeding_start_pct: {type: number}
+                mechanically_ventilated: {type: boolean}
+                high_risk_tolerance: {type: boolean}
+                delivered_pct: {type: number}
+                delivered_volume_ml: {type: number}
+                protein_modular:
+                  type: object
+                  properties:
+                    protein_g_per_serving: {type: number}
+                    kcal_per_serving: {type: number}
+            example: {kcal_needs: 1800, protein_needs_g: 100, fluid_needs_ml: 2100, weight_kg: 70, formula: {kcal_per_ml: 1.2, protein_g_per_l: 55.5, water_ml_per_l: 807}}
+      responses:
+        '200':
+          $ref: '#/components/responses/MutationSuccess'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+  /enteral-nutrition/reference:
+    get:
+      tags:
+      - Enteral nutrition
+      summary: Enteral nutrition steps, limits and request fields (API key)
+      description: 'Use section to get one of: steps, limits, quick_math, modes, request_fields.'
+      parameters:
+      - name: section
+        in: query
+        schema:
+          type: string
+      responses:
+        '200':
+          $ref: '#/components/responses/MutationSuccess'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+  /critical-care/fluid:
+    post:
+      tags:
+      - Critical care nutrition
+      summary: Adult ICU fluid reference range (API key)
+      description: '30-35 mL/kg/day. In intensive care the treating doctor decides fluid requirements; this is a reference range only.'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+              - weight_kg
+              properties:
+                weight_kg: {type: number}
+            example: {weight_kg: 70}
+      responses:
+        '200':
+          $ref: '#/components/responses/MutationSuccess'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+  /critical-care/reference:
+    get:
+      tags:
+      - Critical care nutrition
+      summary: Critical care reference tables and known issues (API key)
+      description: 'All tables behind the critical care calculators. Use section to get one of: protein_by_stress, urinary_nitrogen, npe_n2_bands, cho_fat_ratio, electrolytes, known_issues.'
+      parameters:
+      - name: section
+        in: query
+        required: false
+        schema:
+          type: string
+      responses:
+        '200':
+          $ref: '#/components/responses/MutationSuccess'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+  /burns/fluid-resuscitation:
+    post:
+      tags:
+      - Burn nutrition
+      summary: Burn resuscitation fluid, Parkland formula (API key)
+      description: '24-hour crystalloid volume (4 mL x kg x %TBSA), half in the first 8 hours from injury and half over the next 16, with rates and, if hours_since_burn is sent, the volume left in the current window. Indicated above 10% TBSA.'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+              - weight_kg
+              - tbsa_burned_percent
+              properties:
+                weight_kg: {type: number}
+                tbsa_burned_percent: {type: number}
+                hours_since_burn: {type: number}
+            example: {weight_kg: 70, tbsa_burned_percent: 40}
+      responses:
+        '200':
+          $ref: '#/components/responses/MutationSuccess'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '503':
+          description: The stored reference values are missing or unreadable (run sql/039_add_clinical_reference_values.sql).
+  /burns/energy:
+    post:
+      tags:
+      - Burn nutrition
+      summary: Burn energy requirement, Toronto (adult) or weight-only Schofield (child) (API key)
+      description: 'Adults (18 y and over) need tbsa_burned_percent, kcal_intake_past_24h, body_temp_c and days_post_burn for the Toronto equation; children use the weight-only Schofield equation. Indirect calorimetry is the gold standard.'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+              - weight_kg
+              - height_cm
+              - age_years
+              - sex
+              properties:
+                weight_kg: {type: number}
+                height_cm: {type: number}
+                age_years: {type: number}
+                sex: {type: string, enum: [male, female]}
+                tbsa_burned_percent: {type: number}
+                kcal_intake_past_24h: {type: number}
+                body_temp_c: {type: number}
+                days_post_burn: {type: number}
+            example: {weight_kg: 70, height_cm: 170, age_years: 35, sex: male, tbsa_burned_percent: 20, kcal_intake_past_24h: 1500, body_temp_c: 37.5, days_post_burn: 3}
+      responses:
+        '200':
+          $ref: '#/components/responses/MutationSuccess'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '503':
+          description: The stored reference values are missing or unreadable (run sql/039_add_clinical_reference_values.sql).
+  /burns/protein:
+    post:
+      tags:
+      - Burn nutrition
+      summary: Burn protein requirement (API key)
+      description: 'g/kg/day range and non-protein calorie to nitrogen ratio by burn size (adult), or the 1.5-3 g/kg/day paediatric range with is_pediatric.'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+              - tbsa_burned_percent
+              properties:
+                tbsa_burned_percent: {type: number}
+                weight_kg: {type: number}
+                is_pediatric: {type: boolean}
+            example: {tbsa_burned_percent: 35, weight_kg: 70}
+      responses:
+        '200':
+          $ref: '#/components/responses/MutationSuccess'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '503':
+          description: The stored reference values are missing or unreadable (run sql/039_add_clinical_reference_values.sql).
+  /burns/nitrogen-balance:
+    post:
+      tags:
+      - Burn nutrition
+      summary: Burn nitrogen balance (API key)
+      description: 'Nitrogen balance from protein intake and 24 h urine urea nitrogen, plus the Gottschlich estimate of nitrogen lost through burned tissue when open_wound_percent is sent.'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+              - protein_intake_g
+              - uun_g
+              properties:
+                protein_intake_g: {type: number}
+                uun_g: {type: number}
+                open_wound_percent: {type: number}
+                weight_kg: {type: number}
+            example: {protein_intake_g: 100, uun_g: 10, open_wound_percent: 40, weight_kg: 70}
+      responses:
+        '200':
+          $ref: '#/components/responses/MutationSuccess'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '503':
+          description: The stored reference values are missing or unreadable (run sql/039_add_clinical_reference_values.sql).
+  /burns/micronutrients:
+    post:
+      tags:
+      - Burn nutrition
+      summary: Burn micronutrient dosing guidance (API key)
+      description: 'Vitamin and trace-element guidance by burn size, the vitamin A half-dose flag (BMI under 18, age under 18 or chronic malnutrition) and IV trace element duration.'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+              - tbsa_burned_percent
+              properties:
+                tbsa_burned_percent: {type: number}
+                bmi: {type: number}
+                age_years: {type: number}
+                chronically_malnourished: {type: boolean}
+                open_wound_percent: {type: number}
+            example: {tbsa_burned_percent: 30}
+      responses:
+        '200':
+          $ref: '#/components/responses/MutationSuccess'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '503':
+          description: The stored reference values are missing or unreadable (run sql/039_add_clinical_reference_values.sql).
+  /burns/glycemic-targets:
+    post:
+      tags:
+      - Burn nutrition
+      summary: Burn carbohydrate ceiling and glucose targets (API key)
+      description: 'Carbohydrate limit (55-60% of energy, 5 mg/kg/min) and blood glucose targets (5-8 mmol/l) for burn patients.'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                weight_kg: {type: number}
+                total_energy_kcal_per_day: {type: number}
+            example: {weight_kg: 70, total_energy_kcal_per_day: 2000}
+      responses:
+        '200':
+          $ref: '#/components/responses/MutationSuccess'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '503':
+          description: The stored reference values are missing or unreadable (run sql/039_add_clinical_reference_values.sql).
+  /burns/maintenance-fluid:
+    post:
+      tags:
+      - Burn nutrition
+      summary: Paediatric maintenance fluid, Holliday-Segar (API key)
+      description: 'Daily maintenance fluid (not resuscitation fluid): 100 mL/kg to 10 kg, then 50 mL/kg to 20 kg, then 20 mL/kg.'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+              - weight_kg
+              properties:
+                weight_kg: {type: number}
+            example: {weight_kg: 15}
+      responses:
+        '200':
+          $ref: '#/components/responses/MutationSuccess'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '503':
+          description: The stored reference values are missing or unreadable (run sql/039_add_clinical_reference_values.sql).
+  /burns/indirect-calorimetry:
+    post:
+      tags:
+      - Burn nutrition
+      summary: REE from indirect calorimetry, modified Weir (API key)
+      description: 'REE from measured VO2 and VCO2, with the optional 1.4 activity factor and a 10-20% daytime adjustment.'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+              - vo2_ml_per_min
+              - vco2_ml_per_min
+              properties:
+                vo2_ml_per_min: {type: number}
+                vco2_ml_per_min: {type: number}
+                apply_activity_factor: {type: boolean}
+                daytime_variability_percent: {type: number}
+                tbsa_burned_percent: {type: number}
+            example: {vo2_ml_per_min: 250, vco2_ml_per_min: 200}
+      responses:
+        '200':
+          $ref: '#/components/responses/MutationSuccess'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '503':
+          description: The stored reference values are missing or unreadable (run sql/039_add_clinical_reference_values.sql).
+  /burns/pediatric-equations:
+    post:
+      tags:
+      - Burn nutrition
+      summary: Paediatric burn predictive equations side by side (API key)
+      description: 'Curreri Junior, Galveston, Mayes, weight-only Schofield and WHO for the child, side by side; the first three need tbsa_burned_percent. All have historically over-predicted BMR.'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+              - sex
+              - age_years
+              - weight_kg
+              properties:
+                sex: {type: string, enum: [male, female]}
+                age_years: {type: number}
+                weight_kg: {type: number}
+                tbsa_burned_percent: {type: number}
+            example: {sex: female, age_years: 2, weight_kg: 10, tbsa_burned_percent: 20}
+      responses:
+        '200':
+          $ref: '#/components/responses/MutationSuccess'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '503':
+          description: The stored reference values are missing or unreadable (run sql/039_add_clinical_reference_values.sql).
+  /burns/pharmacology:
+    post:
+      tags:
+      - Burn nutrition
+      summary: Burn hypermetabolism drug dosing reference (API key)
+      description: 'Growth hormone, IGF-1/IGFBP-3, insulin, propranolol and oxandrolone, with weight-scaled doses when weight_kg is sent. Includes the FDA oxandrolone withdrawal (23 June 2023).'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                weight_kg: {type: number}
+            example: {weight_kg: 20}
+      responses:
+        '200':
+          $ref: '#/components/responses/MutationSuccess'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '503':
+          description: The stored reference values are missing or unreadable (run sql/039_add_clinical_reference_values.sql).
+  /burns/reference:
+    get:
+      tags:
+      - Burn nutrition
+      summary: Stored burn reference values (API key)
+      description: 'Lists the sections of clinical_reference_values (condition burns); use section to get the rows of one. The values can be edited in Supabase and reach the calculators within five minutes.'
+      parameters:
+      - name: section
+        in: query
+        required: false
+        schema:
+          type: string
+      responses:
+        '200':
+          $ref: '#/components/responses/MutationSuccess'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '503':
+          description: The stored reference values are missing or unreadable (run sql/039_add_clinical_reference_values.sql).
+  /refeeding/risk-adult:
+    post:
+      tags:
+      - Refeeding syndrome
+      summary: Refeeding risk, adults (ASPEN Table 3) (API key)
+      description: 'Moderate risk needs two criteria at moderate or higher; significant risk needs one at significant. BMI and weight loss are classified from numbers; the other criteria are the clinician-assessed level.'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                bmi: {type: number}
+                weight_loss_percent: {type: number}
+                weight_loss_timeframe: {type: string, enum: [1_month, 3_months, 6_months]}
+                caloric_intake_level: {type: string, enum: [none, moderate, significant]}
+                prefeeding_electrolyte_abnormality_level: {type: string, enum: [none, moderate, significant]}
+                subcutaneous_fat_loss: {type: string, enum: [none, moderate, significant]}
+                muscle_mass_loss: {type: string, enum: [none, moderate, significant]}
+                comorbidity_severity: {type: string, enum: [none, moderate, significant]}
+            example: {bmi: 15, caloric_intake_level: moderate}
+      responses:
+        '200':
+          $ref: '#/components/responses/MutationSuccess'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '503':
+          description: The stored reference values are missing or unreadable (run sql/040_add_refeeding_reference_values.sql).
+  /refeeding/risk-pediatric:
+    post:
+      tags:
+      - Refeeding syndrome
+      summary: Refeeding risk, paediatric (ASPEN Table 5) (API key)
+      description: 'Mild risk needs three criteria at mild or higher, moderate two at moderate or higher, significant one at significant. Not for neonates 28 days of life or younger.'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                z_score_change_from_baseline: {type: number}
+                weight_gain_percent_of_expected: {type: number}
+                low_intake_days: {type: number}
+                muac_z_score: {type: number}
+                prefeeding_electrolyte_abnormality_level: {type: string, enum: [none, mild, moderate, significant]}
+                comorbidity_severity: {type: string, enum: [none, mild, moderate, significant]}
+                subcutaneous_fat_loss: {type: string, enum: [none, mild, moderate, significant]}
+                muscle_mass_loss: {type: string, enum: [none, moderate, significant]}
+            example: {low_intake_days: 6, muac_z_score: -2.4}
+      responses:
+        '200':
+          $ref: '#/components/responses/MutationSuccess'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '503':
+          description: The stored reference values are missing or unreadable (run sql/040_add_refeeding_reference_values.sql).
+  /refeeding/severity:
+    post:
+      tags:
+      - Refeeding syndrome
+      summary: Refeeding syndrome severity (ASPEN definition) (API key)
+      description: 'Phosphorus, potassium and magnesium fall of 10-20% (mild), 20-30% (moderate) or over 30% (severe); organ dysfunction or thiamin deficiency is severe. Send baseline and current, or a percent decrease, for each electrolyte measured.'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                phosphorus_baseline: {type: number}
+                phosphorus_current: {type: number}
+                phosphorus_percent_decrease: {type: number}
+                potassium_baseline: {type: number}
+                potassium_current: {type: number}
+                potassium_percent_decrease: {type: number}
+                magnesium_baseline: {type: number}
+                magnesium_current: {type: number}
+                magnesium_percent_decrease: {type: number}
+                organ_dysfunction_from_electrolyte_decrease: {type: boolean}
+                thiamin_deficiency: {type: boolean}
+                within_5_days_of_refeeding: {type: boolean}
+            example: {potassium_baseline: 4, potassium_current: 3, within_5_days_of_refeeding: true}
+      responses:
+        '200':
+          $ref: '#/components/responses/MutationSuccess'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '503':
+          description: The stored reference values are missing or unreadable (run sql/040_add_refeeding_reference_values.sql).
+  /refeeding/initiation:
+    post:
+      tags:
+      - Refeeding syndrome
+      summary: Refeeding initiation and advancement (ASPEN Tables 6 and 7) (API key)
+      description: 'Weight-based starting calories (adult) or starting percent of goal and glucose infusion rate (paediatric), advancement, electrolyte, thiamin and monitoring guidance.'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+              - population
+              - weight_kg
+              properties:
+                population: {type: string, enum: [adult, pediatric]}
+                weight_kg: {type: number}
+                at_risk_for_rs: {type: boolean}
+                prefeeding_electrolytes_severely_low: {type: boolean}
+            example: {population: adult, weight_kg: 60}
+      responses:
+        '200':
+          $ref: '#/components/responses/MutationSuccess'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '503':
+          description: The stored reference values are missing or unreadable (run sql/040_add_refeeding_reference_values.sql).
+  /refeeding/reference:
+    get:
+      tags:
+      - Refeeding syndrome
+      summary: Stored refeeding reference values (API key)
+      description: 'Lists the sections of clinical_reference_values (condition refeeding); use section to get the rows of one. The values can be edited in Supabase and reach the calculators within five minutes.'
+      parameters:
+      - name: section
+        in: query
+        required: false
+        schema:
+          type: string
+      responses:
+        '200':
+          $ref: '#/components/responses/MutationSuccess'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '503':
+          description: The stored reference values are missing or unreadable (run sql/040_add_refeeding_reference_values.sql).
+  /stress-factors/harris-benedict:
+    post:
+      tags:
+      - Energy and stress factors
+      summary: Harris-Benedict BEE with optional stress, adjustment and temperature factors (API key)
+      description: 'Basal energy expenditure from the Harris-Benedict equation (coefficients stored in clinical_reference_values). Optionally multiplies by one stress factor (use the highest applicable one, see GET /stress-factors/conditions), a 24-hour adjustment factor (see GET /stress-factors/adjustments) and a body temperature change of 13% per degree C from 37 C. Returns every step.'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [sex, weight_kg, height_cm, age_years]
+              properties:
+                sex: {type: string, enum: [male, female]}
+                weight_kg: {type: number}
+                height_cm: {type: number}
+                age_years: {type: number}
+                stress_factor: {type: number}
+                adjustment_factor: {type: number}
+                body_temp_c: {type: number}
+            example: {sex: male, weight_kg: 70, height_cm: 175, age_years: 40, stress_factor: 1.2}
+      responses:
+        '200':
+          $ref: '#/components/responses/MutationSuccess'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '503':
+          description: The stored reference values are missing or unreadable (run sql/041_add_stress_factor_reference_values.sql).
+  /stress-factors/fever:
+    post:
+      tags:
+      - Energy and stress factors
+      summary: Fever adjustment of a baseline REE (API key)
+      description: 'Hardy and DuBois relationship as cited in Nelms/Ireton-Jones Ch. 2: about 7% per degree F above 98.6 F or 13% per degree C above 37 C. Send body_temp_f or body_temp_c (Fahrenheit is used when both are sent). A temperature at or below normal gives 0%.'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [ree_kcal_per_day]
+              properties:
+                ree_kcal_per_day: {type: number}
+                body_temp_f: {type: number}
+                body_temp_c: {type: number}
+            example: {ree_kcal_per_day: 1500, body_temp_c: 39}
+      responses:
+        '200':
+          $ref: '#/components/responses/MutationSuccess'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '503':
+          description: The stored reference values are missing or unreadable (run sql/041_add_stress_factor_reference_values.sql).
+  /stress-factors/conditions:
+    get:
+      tags:
+      - Energy and stress factors
+      summary: Clinical stress factors (Barak et al, 2002) (API key)
+      description: 'The stress factor table (starvation, post-op, surgery, sepsis, trauma, pancreatitis, TBI, spinal cord injury, ICU, cancer, liver disease, wound healing and others). Send condition_key for one row. When more than one condition applies, use only the single highest factor.'
+      parameters:
+      - name: condition_key
+        in: query
+        required: false
+        schema:
+          type: string
+      responses:
+        '200':
+          $ref: '#/components/responses/MutationSuccess'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '503':
+          description: The stored reference values are missing or unreadable (run sql/041_add_stress_factor_reference_values.sql).
+  /stress-factors/adjustments:
+    get:
+      tags:
+      - Energy and stress factors
+      summary: 24-hour energy expenditure adjustment factors (API key)
+      description: 'Ventilation (0.95), body temperature (13% per degree C from 37 C), sedatives and paralytics (0.75 to 1.00), activity when bedridden and awake (1.1 to 1.2) and very restless (1.2 to 1.45). Multiply with BEE, or with BEE x stress factor when one applies.'
+      responses:
+        '200':
+          $ref: '#/components/responses/MutationSuccess'
+        '503':
+          description: The stored reference values are missing or unreadable (run sql/041_add_stress_factor_reference_values.sql).
+  /stress-factors/reference:
+    get:
+      tags:
+      - Energy and stress factors
+      summary: Stored stress factor reference values (API key)
+      description: 'Lists the sections of clinical_reference_values (condition stress_factors); use section to get the rows of one. The values can be edited in Supabase and reach the calculators within five minutes.'
+      parameters:
+      - name: section
+        in: query
+        required: false
+        schema:
+          type: string
+      responses:
+        '200':
+          $ref: '#/components/responses/MutationSuccess'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '503':
+          description: The stored reference values are missing or unreadable (run sql/041_add_stress_factor_reference_values.sql).
+  /carb-counting/carbohydrate-content:
+    post:
+      tags:
+      - Carbohydrate counting
+      summary: Carbohydrate in a weighed portion, or the portion weight for a carbohydrate target (API key)
+      description: 'Send carb_per_100g (the Carbohydrate line of the food label, not the of-which-sugars line) with exactly one of portion_weight_g (returns carb_in_portion_g) or target_carb_g (returns the portion weight needed).'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [carb_per_100g]
+              properties:
+                carb_per_100g: {type: number}
+                portion_weight_g: {type: number}
+                target_carb_g: {type: number}
+            example: {carb_per_100g: 60, portion_weight_g: 150}
+      responses:
+        '200':
+          $ref: '#/components/responses/MutationSuccess'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '503':
+          description: The stored reference values are missing or unreadable (run sql/042_add_carb_counting_reference_values.sql).
+  /carb-counting/insulin-dose:
+    post:
+      tags:
+      - Carbohydrate counting
+      summary: Mealtime quick-acting insulin dose, carbohydrate plus optional correction (API key)
+      description: 'Carb dose = (total_carb_g / 10) x icr_units_per_10g. To add a correction send current_bg_mmol_l with target_bg_low_mmol_l and target_bg_high_mmol_l: correction = (current - target midpoint) / isf_mmol_l_per_unit, with the ISF defaulting to the stored value (2.5 mmol/L per unit). A glucose below the target midpoint gives a correction of 0, never a negative one. Doses are rounded to the stored step (half a unit). Starting estimate only: the ratio, correction factor and targets belong to the person''s diabetes team.'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [total_carb_g, icr_units_per_10g]
+              properties:
+                total_carb_g: {type: number}
+                icr_units_per_10g: {type: number}
+                current_bg_mmol_l: {type: number}
+                target_bg_low_mmol_l: {type: number}
+                target_bg_high_mmol_l: {type: number}
+                isf_mmol_l_per_unit: {type: number}
+            example: {total_carb_g: 50, icr_units_per_10g: 1, current_bg_mmol_l: 12, target_bg_low_mmol_l: 6, target_bg_high_mmol_l: 8, isf_mmol_l_per_unit: 2.5}
+      responses:
+        '200':
+          $ref: '#/components/responses/MutationSuccess'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '503':
+          description: The stored reference values are missing or unreadable (run sql/042_add_carb_counting_reference_values.sql).
+  /carb-counting/foods:
+    get:
+      tags:
+      - Carbohydrate counting
+      summary: Food groups that do and do not affect blood glucose (API key)
+      description: 'Food groups that need quick-acting insulin matching and those that do not, with tips on non-starchy vegetables and sugary drinks. Send list to get only one of the two lists.'
+      parameters:
+      - name: list
+        in: query
+        required: false
+        schema:
+          type: string
+          enum: [affects_blood_glucose, does_not_affect_blood_glucose]
+      responses:
+        '200':
+          $ref: '#/components/responses/MutationSuccess'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '503':
+          description: The stored reference values are missing or unreadable (run sql/042_add_carb_counting_reference_values.sql).
+  /carb-counting/handy-measures:
+    get:
+      tags:
+      - Carbohydrate counting
+      summary: Handy carbohydrate measures and weighing rules (API key)
+      description: 'Everyday portions with their carbohydrate in grams (for example 1 thin slice of bread = 10 g) and the weighing rules of thumb: about half of bread weight, one third of cooked pasta, rice, noodles and chips, one fifth of a cooked jacket potato.'
+      responses:
+        '200':
+          $ref: '#/components/responses/MutationSuccess'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '503':
+          description: The stored reference values are missing or unreadable (run sql/042_add_carb_counting_reference_values.sql).
+  /carb-counting/insulin-types:
+    get:
+      tags:
+      - Carbohydrate counting
+      summary: Background and quick-acting insulin types (API key)
+      description: 'Background insulin names and quick-acting insulin onset, peak and duration, with the timing note. Send category to get only one.'
+      parameters:
+      - name: category
+        in: query
+        required: false
+        schema:
+          type: string
+          enum: [background, quick_acting]
+      responses:
+        '200':
+          $ref: '#/components/responses/MutationSuccess'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '503':
+          description: The stored reference values are missing or unreadable (run sql/042_add_carb_counting_reference_values.sql).
+  /carb-counting/dose-adjustment:
+    get:
+      tags:
+      - Carbohydrate counting
+      summary: Stepwise carbohydrate counting and dose adjustment (API key)
+      description: 'The 7-step approach and the checklist for problem-solving out-of-range readings. Send section to get only one.'
+      parameters:
+      - name: section
+        in: query
+        required: false
+        schema:
+          type: string
+          enum: [stepwise_approach, dose_adjustment_checklist]
+      responses:
+        '200':
+          $ref: '#/components/responses/MutationSuccess'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '503':
+          description: The stored reference values are missing or unreadable (run sql/042_add_carb_counting_reference_values.sql).
+  /carb-counting/reference:
+    get:
+      tags:
+      - Carbohydrate counting
+      summary: Stored carb counting reference values (API key)
+      description: 'Lists the sections of clinical_reference_values (condition carb_counting); use section to get the rows of one. The values can be edited in Supabase and reach the calculators within five minutes.'
+      parameters:
+      - name: section
+        in: query
+        required: false
+        schema:
+          type: string
+      responses:
+        '200':
+          $ref: '#/components/responses/MutationSuccess'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '503':
+          description: The stored reference values are missing or unreadable (run sql/042_add_carb_counting_reference_values.sql).
+  /dietary-assessment:
+    post:
+      tags:
+      - Dietary assessment
+      summary: Dietary assessment - intake analysis, comparison with requirements, dietary gaps (API key, rate-limited)
+      description: 'Takes 1-7 days of intake and returns the average intake of every assessable nutrient against the DRI of
+        the person''s life stage, with ranked gaps and excesses. Intake comes from `meals`, `ingredients` (resolved with the
+        same resolver as /meals/analyze, max 40 ingredients in total) or `intake` (nutrient totals, for example the
+        total_nutrients from /meals/analyze, no food lookups). Nutrients with an EAR and RDA are judged below EAR (likely
+        inadequate), between EAR and RDA (borderline) or adequate. Nutrients with only an AI are adequate or possibly low.
+        Sodium is judged against the CDRR as a limit. The UL is flagged on average intake from food. Energy is compared with
+        the caller''s `energy_target_kcal` or the IOM EER (weight_kg, height_cm, pal_category). Macronutrient shares are
+        compared with the AMDR for the age, and food-group coverage is reported per day. Each nutrient carries a confidence
+        from the share of foods that have a value, so a low result caused by missing food-table data is marked. Unless
+        `suggest_foods` is false, the foods richest in the top gap nutrients (per 100 g) are added. Eleven nutrients beyond
+        those in /dri/compare are covered (thiamin, riboflavin, niacin, B6, E, pantothenic acid, biotin, phosphorus,
+        selenium, copper, manganese). A screen against reference values, not a diagnosis.
+
+        '
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                age:
+                  type: number
+                life_stage:
+                  type: string
+                  description: A code from GET /dri/life-stages. Alternative to age + sex.
+                sex:
+                  type: string
+                  enum:
+                  - male
+                  - female
+                life_stage_type:
+                  type: string
+                  enum:
+                  - normal
+                  - pregnancy
+                  - lactation
+                  default: normal
+                weight_kg:
+                  type: number
+                height_cm:
+                  type: number
+                pal_category:
+                  type: string
+                  enum:
+                  - sedentary
+                  - low_active
+                  - active
+                  - very_active
+                trimester:
+                  type: integer
+                  description: 1-3, adds the energy of pregnancy to the target.
+                months_postpartum:
+                  type: number
+                  description: Adds the energy of lactation to the target.
+                energy_target_kcal:
+                  type: number
+                  description: Overrides the calculated energy target.
+                suggest_foods:
+                  type: boolean
+                  default: true
+                days:
+                  type: array
+                  minItems: 1
+                  maxItems: 7
+                  description: Each day has exactly one of meals, ingredients or intake. For a single day these may be sent at the top level instead.
+                  items:
+                    type: object
+                    properties:
+                      date:
+                        type: string
+                        format: date
+                      meals:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            meal_type:
+                              type: string
+                            ingredients:
+                              type: array
+                              items:
+                                type: object
+                                properties:
+                                  food_id:
+                                    type: integer
+                                  food_name:
+                                    type: string
+                                  quantity:
+                                    type: number
+                                  unit:
+                                    type: string
+                      ingredients:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            food_id:
+                              type: integer
+                            food_name:
+                              type: string
+                            quantity:
+                              type: number
+                            unit:
+                              type: string
+                      intake:
+                        type: object
+                        additionalProperties:
+                          type: number
+                        example:
+                          kcal: 1800
+                          iron_mg: 9
+            example:
+              age: 25
+              sex: female
+              weight_kg: 60
+              height_cm: 162
+              pal_category: low_active
+              days:
+              - date: '2026-10-20'
+                meals:
+                - meal_type: lunch
+                  ingredients:
+                  - food_name: maize flour
+                    quantity: 300
+                  - food_name: beans
+                    quantity: 100
+      responses:
+        '200':
+          $ref: '#/components/responses/MutationSuccess'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '422':
+          description: No ingredient could be resolved; the body lists unresolved_ingredients.
+        '429':
+          $ref: '#/components/responses/RateLimited'
+  /dietary-assessment/reference:
+    get:
+      tags:
+      - Dietary assessment
+      summary: Assessable nutrients, status definitions, accepted input and method notes (API key)
+      responses:
+        '200':
+          $ref: '#/components/responses/MutationSuccess'
   /ingredients/parse:
     post:
       tags:
@@ -9374,6 +11443,29 @@ components:
             - $ref: '#/components/schemas/ListSuccess'
             - $ref: '#/components/schemas/CursorSuccess'
   schemas:
+    EpidemiologyRule:
+      type: object
+      required: [variable]
+      description: 'A binary rule on one column. Send at most one of positive, below, at_or_below, above, at_or_above, between. With none, the column is read as yes/no, true/false or 1/0.'
+      properties:
+        variable: {type: string}
+        positive: {description: 'value or list of values that count as positive (case-insensitive)'}
+        negative: {description: 'optional: values that count as negative; any other value is then excluded as unrecognised'}
+        below: {type: number}
+        at_or_below: {type: number}
+        above: {type: number}
+        at_or_above: {type: number}
+        between: {type: array, minItems: 2, maxItems: 2, items: {type: number}, description: '[low, high): low included, high not'}
+        name: {type: string, description: 'label for an indicator'}
+    EpidemiologyTable:
+      type: object
+      required: [a, b, c, d]
+      properties:
+        label: {type: string}
+        a: {type: integer, minimum: 0, description: 'exposed with the outcome'}
+        b: {type: integer, minimum: 0, description: 'exposed without the outcome'}
+        c: {type: integer, minimum: 0, description: 'unexposed with the outcome'}
+        d: {type: integer, minimum: 0, description: 'unexposed without the outcome'}
     Error:
       type: object
       properties:
