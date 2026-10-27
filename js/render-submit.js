@@ -14,6 +14,10 @@ const RenderSubmit = (() => {
   ];
   const MAX_PHOTOS = 5;
 
+  // Dot spinner (styles in css/landing.css). Decorative: the status message beside it is what screen readers hear.
+  const spinner = (hidden) => `<span class="dot-spinner"${hidden ? " hidden" : ""} aria-hidden="true">${'<span class="dot-spinner__dot"></span>'.repeat(8)}</span>`;
+  const setBusy = (form, on) => { const sp = form.querySelector(".lp-contrib__actions .dot-spinner"); if (sp) sp.hidden = !on; };
+
   function el(html) {
     const t = document.createElement("template");
     t.innerHTML = html.trim();
@@ -86,6 +90,7 @@ const RenderSubmit = (() => {
               <div class="lp-contrib__trap" aria-hidden="true"><label>Website <input type="text" name="website" tabindex="-1" autocomplete="off" /></label></div>
               <div class="lp-contrib__actions">
                 <button class="btn btn--primary btn--lg btn-cut" type="submit" id="lp-photo-btn">Submit photos for review</button>
+                ${spinner(true)}
                 <p class="lp-contrib__msg" id="lp-photo-msg" role="status" aria-live="polite"></p>
               </div>
             </form>
@@ -114,6 +119,7 @@ const RenderSubmit = (() => {
               <div class="lp-contrib__trap" aria-hidden="true"><label>Website <input type="text" name="website" tabindex="-1" autocomplete="off" /></label></div>
               <div class="lp-contrib__actions">
                 <button class="btn btn--primary btn--lg btn-cut" type="submit" id="lp-submit-btn">Submit for review</button>
+                ${spinner(true)}
                 <p class="lp-contrib__msg" id="lp-submit-msg" role="status" aria-live="polite"></p>
               </div>
             </form>
@@ -161,7 +167,7 @@ const RenderSubmit = (() => {
       thumbs.innerHTML = items.map((it, i) => `
         <li class="lp-contrib__thumb"><img src="${it.dataUrl}" alt="Photo ${i + 1}" />
           <button type="button" class="lp-contrib__rm" data-id="${it.id}" aria-label="Remove photo ${i + 1}">\u00D7</button></li>`).join("") +
-        (busy ? `<li class="lp-contrib__thumb lp-contrib__thumb--busy" aria-label="Preparing photo">\u2026</li>` : "");
+        (busy ? `<li class="lp-contrib__thumb lp-contrib__thumb--busy" aria-label="Preparing photo">${spinner(false)}</li>` : "");
       countEl.textContent = `${items.length} of ${MAX_PHOTOS} photos`;
       const found = items.find((it) => it.barcode);
       if (!typed) bcIn.value = found ? found.barcode : "";
@@ -203,11 +209,11 @@ const RenderSubmit = (() => {
       const barcode = bcIn.value.replace(/[\s-]/g, "");
       if (!/^\d{8,14}$/.test(barcode)) return say("Enter the barcode, 8 to 14 digits.", "error");
       if (!LabelScan.gs1Ok(barcode)) return say("That barcode does not look right. Check the digits and try again.", "error");
-      btn.disabled = true; say("Sending photos and reading the label. This can take a few seconds\u2026");
+      btn.disabled = true; setBusy(form, true); say("Sending photos and reading the label. This can take a few seconds\u2026");
       const payload = { images: items.map((it) => it.dataUrl), barcode, website: form.elements.website.value };
       const url = ApiClient.buildUrl(AppState.state.baseUrl, "/packaged/scan", {}, {});
       const r = await ApiClient.execute({ url, method: "POST", headers: ApiClient.buildHeaders({ hasBody: true }), body: JSON.stringify(payload) });
-      btn.disabled = false;
+      btn.disabled = false; setBusy(form, false);
       const j = r.bodyJson || {};
       if (r.networkError) return say("Could not reach the server. Check your connection and try again.", "error");
       if (r.status === 201 || r.status === 200) {
@@ -244,10 +250,10 @@ const RenderSubmit = (() => {
       if (payload.product_name.length < 2) return say("Please enter the product name.", "error");
       if (!/^\d{8,14}$/.test(payload.barcode)) return say("The barcode should be 8 to 14 digits.", "error");
       if (per.value === "serving" && !payload.serving_size) return say("Please add the serving size, for example 30g.", "error");
-      btn.disabled = true; say("Sending\u2026");
+      btn.disabled = true; setBusy(form, true); say("Sending\u2026");
       const url = ApiClient.buildUrl(AppState.state.baseUrl, "/packaged/submit", {}, {});
       const r = await ApiClient.execute({ url, method: "POST", headers: ApiClient.buildHeaders({ hasBody: true }), body: JSON.stringify(payload) });
-      btn.disabled = false;
+      btn.disabled = false; setBusy(form, false);
       const j = r.bodyJson || {};
       if (r.networkError) return say("Could not reach the server. Check your connection and try again.", "error");
       if (r.status === 201 || r.status === 200) {
