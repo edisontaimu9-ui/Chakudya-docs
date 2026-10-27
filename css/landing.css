@@ -269,3 +269,31 @@ body.is-landing .content { max-width: 1180px; padding: 24px 28px 0; }
 .lp-contrib__rm { position: absolute; top: 4px; right: 4px; width: 26px; height: 26px; border-radius: 50%; border: 0; background: rgba(0,0,0,.65); color: #fff; font-size: 17px; line-height: 1; cursor: pointer; }
 .lp-contrib__msg[data-kind="info"] { color: var(--accent); }
 .lp-contrib__form[hidden] { display: none; }
+
+/* ── Landing: link to the Submit page ── */
+.lp-contrib__cta { margin-top: 22px; }
+
+/* ── Submit page (route "#/submit") - see js/render-submit.js ── */
+.submit-link { white-space: nowrap; }
+.submit-page { max-width: 880px; margin: 0 auto; padding-bottom: 48px; }
+.submit-crumb { font-size: 13px; color: var(--text-tertiary); margin: 4px 0 18px; }
+.submit-crumb a { color: var(--text-secondary); text-decoration: none; }
+.submit-crumb a:hover { color: var(--accent-strong); }
+.submit-head { margin-bottom: 24px; }
+.submit-title { font-size: clamp(28px, 4vw, 40px); line-height: 1.1; letter-spacing: -.5px; margin: 0; }
+.submit-info { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 14px; }
+.submit-card { padding: 22px; }
+.submit-card__title { font-size: 17px; margin: 0 0 12px; }
+.submit-card__sub { margin: 14px 0 6px; font-size: 12px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--text-tertiary); }
+.submit-card__title + .submit-card__sub { margin-top: 0; }
+.submit-list { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 6px; font-size: 14px; color: var(--text-secondary); line-height: 1.55; }
+.submit-list strong { color: var(--text-primary); }
+.submit-flow { margin-top: 36px; scroll-margin-top: calc(var(--header-h) + 8px); }
+.submit-flow__title { font-size: 22px; margin: 0 0 6px; }
+.submit-step { display: flex; align-items: center; gap: 10px; margin: 22px 0 0; font-size: 15px; font-weight: 600; }
+.submit-step__n { display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; border-radius: 50%; background: var(--accent-bg); color: var(--accent-strong); font-size: 12.5px; font-weight: 700; }
+.submit-page .lp-contrib__modes { margin-top: 12px; }
+.submit-page .lp-contrib__form { margin-top: 12px; }
+.submit-done { margin-top: 18px; padding: 24px; display: flex; flex-direction: column; gap: 12px; border-color: var(--green); }
+.submit-done h3 { margin: 0; font-size: 19px; }
+.submit-done[hidden], #submit-body[hidden] { display: none; }

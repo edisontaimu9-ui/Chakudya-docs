@@ -227,17 +227,6 @@ const RenderLanding = (() => {
     }
   }
 
-  const SUBMIT_NUTRIENTS = [
-    ["energy_kcal", "Energy (kcal)", true],
-    ["protein_g", "Protein (g)"],
-    ["fat_g", "Fat (g)"],
-    ["saturated_fat_g", "Saturated fat (g)"],
-    ["carbs_g", "Carbohydrate (g)"],
-    ["sugar_g", "Sugars (g)"],
-    ["fiber_g", "Fibre (g)"],
-    ["sodium_mg", "Sodium (mg)"],
-  ];
-
   function contributeSection() {
     const steps = [
       ["Submit", "Take up to 5 photos of the pack, or type in the barcode and the numbers printed on its label."],
@@ -259,182 +248,11 @@ const RenderLanding = (() => {
               <p>${d}</p>
             </li>`).join("")}
         </ol>
-        <div class="lp-contrib__modes" role="group" aria-label="How to submit">
-          <button type="button" class="lp-chip" data-mode="photo" aria-pressed="true">Photograph the label</button>
-          <button type="button" class="lp-chip" data-mode="manual" aria-pressed="false">Type it in</button>
+        <div class="lp-contrib__cta">
+          <a class="btn btn--primary btn--lg" href="#/submit">Submit a food <span aria-hidden="true">\u2192</span></a>
         </div>
-        <form class="lp-card lp-contrib__form" id="lp-photo-form" novalidate>
-          <p class="lp-contrib__hint">Add up to <strong>5 photos</strong>. The barcode and the nutrition label are often on different sides of the pack, so photograph each one. Keep the text flat, sharp and well lit.</p>
-          <div class="lp-contrib__pick">
-            <button type="button" class="btn" id="lp-photo-cam">Take a photo</button>
-            <button type="button" class="btn" id="lp-photo-up">Upload photos</button>
-            <span class="lp-contrib__count" id="lp-photo-count" aria-live="polite">0 of 5 photos</span>
-            <input type="file" id="lp-photo-cam-in" accept="image/*" capture="environment" hidden />
-            <input type="file" id="lp-photo-up-in" accept="image/*" multiple hidden />
-          </div>
-          <ul class="lp-contrib__thumbs" id="lp-photo-thumbs" aria-label="Selected photos"></ul>
-          <label class="field"><span class="field__label">Barcode <span class="param-required">required</span></span>
-            <input type="text" name="barcode" id="lp-photo-barcode" inputmode="numeric" maxlength="20" placeholder="Read from your photos, or type it" autocomplete="off" />
-            <span class="field__hint" id="lp-photo-barcode-note">We try to read the barcode from your photos. If that fails, type the digits under the bars.</span></label>
-          <div class="lp-contrib__trap" aria-hidden="true"><label>Website <input type="text" name="website" tabindex="-1" autocomplete="off" /></label></div>
-          <div class="lp-contrib__actions">
-            <button class="btn btn--primary btn--lg" type="submit" id="lp-photo-btn">Send photos for review</button>
-            <p class="lp-contrib__msg" id="lp-photo-msg" role="status" aria-live="polite"></p>
-          </div>
-        </form>
-        <form class="lp-card lp-contrib__form" hidden id="lp-submit-form" novalidate>
-          <div class="field-grid">
-            <label class="field"><span class="field__label">Product name <span class="param-required">required</span></span>
-              <input type="text" name="product_name" maxlength="120" autocomplete="off" required /></label>
-            <label class="field"><span class="field__label">Barcode <span class="param-required">required</span></span>
-              <input type="text" name="barcode" inputmode="numeric" maxlength="20" placeholder="8 to 14 digits" autocomplete="off" required /></label>
-            <label class="field"><span class="field__label">Brand</span>
-              <input type="text" name="brand" maxlength="80" autocomplete="off" /></label>
-            <label class="field"><span class="field__label">Label values are per</span>
-              <select name="per"><option value="100g">100 g</option><option value="100ml">100 ml</option><option value="serving">One serving</option></select></label>
-            <label class="field" id="lp-serving-wrap" hidden><span class="field__label">Serving size <span class="param-required">required</span></span>
-              <input type="text" name="serving_size" maxlength="30" placeholder="e.g. 30g" autocomplete="off" /></label>
-          </div>
-          <div class="field-grid">
-            ${SUBMIT_NUTRIENTS.map(([k, l, req]) => `
-            <label class="field"><span class="field__label">${l}${req ? ' <span class="param-required">required</span>' : ""}</span>
-              <input type="text" name="${k}" inputmode="decimal" autocomplete="off" /></label>`).join("")}
-          </div>
-          <label class="field"><span class="field__label">Ingredients</span>
-            <textarea name="ingredients_text" maxlength="1000" rows="3"></textarea>
-            <span class="field__hint">Optional. Copy them as printed on the pack.</span></label>
-          <div class="lp-contrib__trap" aria-hidden="true"><label>Website <input type="text" name="website" tabindex="-1" autocomplete="off" /></label></div>
-          <div class="lp-contrib__actions">
-            <button class="btn btn--primary btn--lg" type="submit" id="lp-submit-btn">Submit for review</button>
-            <p class="lp-contrib__msg" id="lp-submit-msg" role="status" aria-live="polite"></p>
-          </div>
-        </form>
       </section>
     `);
-  }
-
-  function hydratePhotos(root) {
-    const form = root.querySelector("#lp-photo-form"), manual = root.querySelector("#lp-submit-form");
-    if (!form || !manual) return;
-    const MAX = 5;
-    const items = []; // { id, dataUrl, barcode }
-    let nextId = 1, busy = 0;
-    const thumbs = form.querySelector("#lp-photo-thumbs"), countEl = form.querySelector("#lp-photo-count");
-    const bcIn = form.querySelector("#lp-photo-barcode"), bcNote = form.querySelector("#lp-photo-barcode-note");
-    const msg = form.querySelector("#lp-photo-msg"), btn = form.querySelector("#lp-photo-btn");
-    const say = (text, kind) => { msg.textContent = text; msg.dataset.kind = kind || ""; };
-    let typed = false; // the person edited the barcode themselves, so a photo read never overwrites it
-
-    // Switch between photo and manual entry.
-    root.querySelectorAll(".lp-contrib__modes [data-mode]").forEach((b) => b.addEventListener("click", () => {
-      const photo = b.dataset.mode === "photo";
-      form.hidden = !photo; manual.hidden = photo;
-      root.querySelectorAll(".lp-contrib__modes [data-mode]").forEach((x) => x.setAttribute("aria-pressed", String(x === b)));
-    }));
-
-    function render() {
-      thumbs.innerHTML = items.map((it, i) => `
-        <li class="lp-contrib__thumb"><img src="${it.dataUrl}" alt="Photo ${i + 1}" />
-          <button type="button" class="lp-contrib__rm" data-id="${it.id}" aria-label="Remove photo ${i + 1}">\u00D7</button></li>`).join("") +
-        (busy ? `<li class="lp-contrib__thumb lp-contrib__thumb--busy" aria-label="Preparing photo">…</li>` : "");
-      countEl.textContent = `${items.length} of ${MAX} photos`;
-      const found = items.find((it) => it.barcode);
-      if (!typed) bcIn.value = found ? found.barcode : "";
-      bcNote.textContent = found && !typed ? `Barcode read from photo ${items.indexOf(found) + 1}. Check it matches the digits on the pack.`
-        : "We try to read the barcode from your photos. If that fails, type the digits under the bars.";
-    }
-
-    async function addFiles(fileList) {
-      const files = Array.from(fileList || []).filter((f) => /^image\//.test(f.type) || !f.type);
-      if (!files.length) return;
-      const room = MAX - items.length - busy;
-      if (room <= 0) return say(`You can add up to ${MAX} photos. Remove one to add another.`, "error");
-      if (files.length > room) say(`Only ${MAX} photos are allowed, so the first ${room} were added.`, "info"); else say("");
-      for (const file of files.slice(0, room)) {
-        busy++; render();
-        try { const r = await LabelScan.prepare(file); items.push({ id: nextId++, dataUrl: r.dataUrl, barcode: r.barcode }); }
-        catch (e) { say(e.message || "That photo could not be used.", "error"); }
-        busy--; render();
-      }
-    }
-    for (const [btnId, inId] of [["#lp-photo-cam", "#lp-photo-cam-in"], ["#lp-photo-up", "#lp-photo-up-in"]]) {
-      const input = form.querySelector(inId);
-      form.querySelector(btnId).addEventListener("click", () => input.click());
-      input.addEventListener("change", () => { addFiles(input.files); input.value = ""; });
-    }
-    thumbs.addEventListener("click", (e) => {
-      const rm = e.target.closest("[data-id]");
-      if (!rm) return;
-      const i = items.findIndex((it) => String(it.id) === rm.dataset.id);
-      if (i >= 0) items.splice(i, 1);
-      render();
-    });
-    bcIn.addEventListener("input", () => { typed = bcIn.value.trim() !== ""; if (!typed) render(); });
-
-    form.addEventListener("submit", async (e) => {
-      e.preventDefault();
-      if (busy) return say("Still preparing your photos, one moment.", "info");
-      if (!items.length) return say("Add at least one photo of the label.", "error");
-      const barcode = bcIn.value.replace(/[\s-]/g, "");
-      if (!/^\d{8,14}$/.test(barcode)) return say("Enter the barcode, 8 to 14 digits.", "error");
-      if (!LabelScan.gs1Ok(barcode)) return say("That barcode does not look right. Check the digits and try again.", "error");
-      btn.disabled = true; say("Sending photos and reading the label. This can take a few seconds…");
-      const body = { images: items.map((it) => it.dataUrl), barcode, website: form.elements.website.value };
-      const url = ApiClient.buildUrl(AppState.state.baseUrl, "/packaged/scan", {}, {});
-      const r = await ApiClient.execute({ url, method: "POST", headers: ApiClient.buildHeaders({ hasBody: true }), body: JSON.stringify(body) });
-      btn.disabled = false;
-      const j = r.bodyJson || {};
-      if (r.networkError) return say("Could not reach the server. Check your connection and try again.", "error");
-      if (r.status === 201 || r.status === 200) {
-        items.length = 0; typed = false; render();
-        return say("Thank you! Your photos were read and the food will appear after review. " + (j.needs_review ? "Some numbers may need a second look, so a reviewer will check them." : ""), "ok");
-      }
-      if (r.status === 409) return say(j.message || "This barcode has already been submitted.", "info");
-      if (r.status === 422) return say(j.message || "We could not read a nutrition label in those photos. Try again with the label flat, sharp and well lit.", "error");
-      if (r.status === 413) return say("The photos are too large. Remove one or retake them.", "error");
-      if (r.status === 429) return say("Too many submissions right now. Please wait a minute and try again.", "error");
-      say(j.message || j.error || "Something went wrong. Please try again.", "error");
-    });
-    render();
-  }
-
-  function hydrateContribute(root) {
-    const form = root.querySelector("#lp-submit-form");
-    if (!form) return;
-    const msg = form.querySelector("#lp-submit-msg"), btn = form.querySelector("#lp-submit-btn");
-    const per = form.elements.per, wrap = form.querySelector("#lp-serving-wrap");
-    const say = (text, kind) => { msg.textContent = text; msg.dataset.kind = kind || ""; };
-    per.addEventListener("change", () => { wrap.hidden = per.value !== "serving"; });
-    form.addEventListener("submit", async (e) => {
-      e.preventDefault();
-      const f = form.elements;
-      const body = { per: f.per.value };
-      for (const k of ["product_name", "barcode", "brand", "ingredients_text", "website"]) body[k] = f[k].value.trim();
-      body.barcode = body.barcode.replace(/[\s-]/g, "");
-      if (per.value === "serving") body.serving_size = f.serving_size.value.trim();
-      for (const [k, l, req] of SUBMIT_NUTRIENTS) {
-        const v = f[k].value.trim().replace(",", ".");
-        if (!v) { if (req) return say(`${l} is required.`, "error"); continue; }
-        if (!/^\d+(\.\d+)?$/.test(v)) return say(`${l} must be a number.`, "error");
-        body[k] = Number(v);
-      }
-      if (body.product_name.length < 2) return say("Please enter the product name.", "error");
-      if (!/^\d{8,14}$/.test(body.barcode)) return say("The barcode should be 8 to 14 digits.", "error");
-      if (per.value === "serving" && !body.serving_size) return say("Please add the serving size, for example 30g.", "error");
-      btn.disabled = true; say("Sending…");
-      const url = ApiClient.buildUrl(AppState.state.baseUrl, "/packaged/submit", {}, {});
-      const r = await ApiClient.execute({ url, method: "POST", headers: ApiClient.buildHeaders({ hasBody: true }), body: JSON.stringify(body) });
-      btn.disabled = false;
-      const j = r.bodyJson || {};
-      if (r.networkError) return say("Could not reach the server. Check your connection and try again.", "error");
-      if (r.status === 201 || r.status === 200) {
-        form.reset(); wrap.hidden = true;
-        return say("Thank you! Your food was submitted and will appear after review." + (j.needs_review ? " Its calories do not closely match the nutrients entered, so please double-check the label." : ""), "ok");
-      }
-      if (r.status === 409) return say(j.message || "This barcode has already been submitted.", "info");
-      if (r.status === 429) return say("Too many submissions right now. Please wait a minute and try again.", "error");
-      say(j.message || j.error || "Something went wrong. Please try again.", "error");
-    });
   }
 
   function aboutSection() {
@@ -796,8 +614,6 @@ const RenderLanding = (() => {
     }));
 
     observe(root);
-    hydrateContribute(root);
-    hydratePhotos(root);
     const statsEl = root.querySelector("#lp-stat-grid");
     if (statsEl && "IntersectionObserver" in window) {
       const io = new IntersectionObserver((es) => { if (es[0].isIntersecting) { io.disconnect(); hydrateStats(root); } }, { rootMargin: "400px" });

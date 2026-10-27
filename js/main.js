@@ -118,8 +118,10 @@
     const activeNav = isLanding ? "nav-home"
       : isNutri ? "nav-nutrimind"
       : isGuide && guideId !== "api-reference" ? "nav-docs"
-      : hash === "account" || isLegal ? ""
+      : hash === "account" || hash === "submit" || isLegal ? ""
       : "nav-reference";
+    const submitLink = document.getElementById("submit-link");
+    if (submitLink) { if (hash === "submit") submitLink.setAttribute("aria-current", "page"); else submitLink.removeAttribute("aria-current"); }
     ["nav-home", "nav-nutrimind", "nav-docs", "nav-reference"].forEach((id) => {
       const a = document.getElementById(id);
       if (!a) return;
@@ -138,6 +140,16 @@
     if (isNutri) {
       RenderNutriMind.render(content);
       Seo.set("Chakudya NutriMind - Nutrition assistant", "Ask Chakudya NutriMind about Malawian foods, nutrients and nutrition guidance. Answers come with sources from the Chakudya Nutrition Registry.");
+      Sidebar.setActive(null);
+      AppState.set({ activeId: null });
+      document.getElementById("main").focus({ preventScroll: true });
+      window.scrollTo(0, 0);
+      closeSidebar();
+      return;
+    }
+    if (hash === "submit") {
+      RenderSubmit.render(content);
+      Seo.set("Submit a packaged food", "Add a missing packaged food to the Chakudya Nutrition Registry by photographing its label or typing in the details. Every submission is reviewed before it is published.");
       Sidebar.setActive(null);
       AppState.set({ activeId: null });
       document.getElementById("main").focus({ preventScroll: true });
