@@ -17,11 +17,13 @@ const RenderLanding = (() => {
   // Live record counts. One request per resource per page load, cached in memory.
   const COUNT_SOURCES = [
     { key: "foods", path: "/foods", label: "Foods in the registry", note: "Local food composition records" },
+    { key: "packaged", path: "/packaged", label: "Packaged & branded foods", note: "Barcode-scannable products" },
     { key: "gi", path: "/glycaemic-index", label: "Glycaemic index entries", note: "GI / GL reference values" },
     { key: "exchange", path: "/exchange", label: "Exchange list items", note: "Standard & therapeutic lists" },
     { key: "renal", path: "/renal", label: "Renal nutrition foods", note: "For renal dietary planning" },
     { key: "formulas", path: "/formulas", label: "Enteral formulas", note: "Clinical nutrition products" },
     { key: "drugs", path: "/drug-interactions", label: "Drug-nutrient interactions", note: "Known interactions" },
+    { key: "dri", path: "/dri/life-stages", label: "DRI life-stage groups", note: "EAR / RDA / AI / UL by age and sex", pick: (b) => b?.data?.life_stages?.length },
   ];
   // WHO growth reference tables: summed into one tile, and only shown when every table answers (a partial sum would understate it).
   const GROWTH_PATHS = ["/weight-for-age", "/length-height-for-age", "/weight-for-length-height", "/bmi-for-age", "/bmi-for-age-under-5", "/hc-for-age", "/muac-for-age", "/weight-velocity", "/length-velocity", "/hc-velocity"];
@@ -58,11 +60,11 @@ const RenderLanding = (() => {
   const countListeners = new Set();
   const bumpCounts = () => { countsDone++; countListeners.forEach((f) => f(countsDone, countsTotal)); };
 
-  async function countOf(path) {
+  async function countOf(path, pick) {
     try {
       const url = ApiClient.buildUrl(AppState.state.baseUrl, path, {}, { limit: 1 });
       const r = await ApiClient.execute({ url, method: "GET", headers: {} });
-      const n = r.ok && r.status === 200 ? r.bodyJson?.count : null;
+      const n = r.ok && r.status === 200 ? (pick ? pick(r.bodyJson) : r.bodyJson?.count) : null;
       // limit=1: a count of 1 can't be told apart from the API's fallback (rows returned), so it is never shown.
       return Number.isFinite(n) && n > 1 ? n : null;
     } catch (_) { return null; }
@@ -79,7 +81,7 @@ const RenderLanding = (() => {
         : null
     );
     const core = Promise.all(COUNT_SOURCES.map(async (src) => {
-      const n = await countOf(src.path);
+      const n = await countOf(src.path, src.pick);
       return n ? { ...src, count: n } : null;
     }));
     countsPromise = Promise.all([core, growth]).then(([rows, g]) => {
