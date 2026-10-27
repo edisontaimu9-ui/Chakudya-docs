@@ -227,9 +227,20 @@ const RenderLanding = (() => {
     }
   }
 
+  const SUBMIT_NUTRIENTS = [
+    ["energy_kcal", "Energy (kcal)", true],
+    ["protein_g", "Protein (g)"],
+    ["fat_g", "Fat (g)"],
+    ["saturated_fat_g", "Saturated fat (g)"],
+    ["carbs_g", "Carbohydrate (g)"],
+    ["sugar_g", "Sugars (g)"],
+    ["fiber_g", "Fibre (g)"],
+    ["sodium_mg", "Sodium (mg)"],
+  ];
+
   function contributeSection() {
     const steps = [
-      ["Submit", "Send a packaged food's name, barcode and nutrition label details, or photos of the label."],
+      ["Submit", "Enter the product name, barcode and the numbers printed on its nutrition label."],
       ["Review", "Every entry is checked, including a calories-versus-macros check, before it is approved."],
       ["Share", "Approved foods join the registry and become available to everyone through the API."],
     ];
@@ -238,7 +249,7 @@ const RenderLanding = (() => {
         <div class="lp-head">
           <p class="lp-kicker">Community</p>
           <h2 id="lp-contrib-h">Help grow the registry</h2>
-          <p class="lp-sub">Know a food that is missing? Submit it and help others find accurate nutrition information.</p>
+          <p class="lp-sub">Know a packaged food that is missing? Submit it below and help others find accurate nutrition information.</p>
         </div>
         <ol class="lp-contrib__steps">
           ${steps.map(([t, d], i) => `
@@ -248,11 +259,74 @@ const RenderLanding = (() => {
               <p>${d}</p>
             </li>`).join("")}
         </ol>
-        <div class="lp-cta lp-cta--center">
-          <a class="btn btn--primary btn--lg" href="${epLink("POST", "/packaged/submit")}">Submit a food</a>
-        </div>
+        <form class="lp-card lp-contrib__form" id="lp-submit-form" novalidate>
+          <div class="field-grid">
+            <label class="field"><span class="field__label">Product name <span class="param-required">required</span></span>
+              <input type="text" name="product_name" maxlength="120" autocomplete="off" required /></label>
+            <label class="field"><span class="field__label">Barcode <span class="param-required">required</span></span>
+              <input type="text" name="barcode" inputmode="numeric" maxlength="20" placeholder="8 to 14 digits" autocomplete="off" required /></label>
+            <label class="field"><span class="field__label">Brand</span>
+              <input type="text" name="brand" maxlength="80" autocomplete="off" /></label>
+            <label class="field"><span class="field__label">Label values are per</span>
+              <select name="per"><option value="100g">100 g</option><option value="100ml">100 ml</option><option value="serving">One serving</option></select></label>
+            <label class="field" id="lp-serving-wrap" hidden><span class="field__label">Serving size <span class="param-required">required</span></span>
+              <input type="text" name="serving_size" maxlength="30" placeholder="e.g. 30g" autocomplete="off" /></label>
+          </div>
+          <div class="field-grid">
+            ${SUBMIT_NUTRIENTS.map(([k, l, req]) => `
+            <label class="field"><span class="field__label">${l}${req ? ' <span class="param-required">required</span>' : ""}</span>
+              <input type="text" name="${k}" inputmode="decimal" autocomplete="off" /></label>`).join("")}
+          </div>
+          <label class="field"><span class="field__label">Ingredients</span>
+            <textarea name="ingredients_text" maxlength="1000" rows="3"></textarea>
+            <span class="field__hint">Optional. Copy them as printed on the pack.</span></label>
+          <div class="lp-contrib__trap" aria-hidden="true"><label>Website <input type="text" name="website" tabindex="-1" autocomplete="off" /></label></div>
+          <div class="lp-contrib__actions">
+            <button class="btn btn--primary btn--lg" type="submit" id="lp-submit-btn">Submit for review</button>
+            <p class="lp-contrib__msg" id="lp-submit-msg" role="status" aria-live="polite"></p>
+          </div>
+        </form>
       </section>
     `);
+  }
+
+  function hydrateContribute(root) {
+    const form = root.querySelector("#lp-submit-form");
+    if (!form) return;
+    const msg = form.querySelector("#lp-submit-msg"), btn = form.querySelector("#lp-submit-btn");
+    const per = form.elements.per, wrap = form.querySelector("#lp-serving-wrap");
+    const say = (text, kind) => { msg.textContent = text; msg.dataset.kind = kind || ""; };
+    per.addEventListener("change", () => { wrap.hidden = per.value !== "serving"; });
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const f = form.elements;
+      const body = { per: f.per.value };
+      for (const k of ["product_name", "barcode", "brand", "ingredients_text", "website"]) body[k] = f[k].value.trim();
+      body.barcode = body.barcode.replace(/[\s-]/g, "");
+      if (per.value === "serving") body.serving_size = f.serving_size.value.trim();
+      for (const [k, l, req] of SUBMIT_NUTRIENTS) {
+        const v = f[k].value.trim().replace(",", ".");
+        if (!v) { if (req) return say(`${l} is required.`, "error"); continue; }
+        if (!/^\d+(\.\d+)?$/.test(v)) return say(`${l} must be a number.`, "error");
+        body[k] = Number(v);
+      }
+      if (body.product_name.length < 2) return say("Please enter the product name.", "error");
+      if (!/^\d{8,14}$/.test(body.barcode)) return say("The barcode should be 8 to 14 digits.", "error");
+      if (per.value === "serving" && !body.serving_size) return say("Please add the serving size, for example 30g.", "error");
+      btn.disabled = true; say("Sending…");
+      const url = ApiClient.buildUrl(AppState.state.baseUrl, "/packaged/submit", {}, {});
+      const r = await ApiClient.execute({ url, method: "POST", headers: ApiClient.buildHeaders({ hasBody: true }), body: JSON.stringify(body) });
+      btn.disabled = false;
+      const j = r.bodyJson || {};
+      if (r.networkError) return say("Could not reach the server. Check your connection and try again.", "error");
+      if (r.status === 201 || r.status === 200) {
+        form.reset(); wrap.hidden = true;
+        return say("Thank you! Your food was submitted and will appear after review." + (j.needs_review ? " Its calories do not closely match the nutrients entered, so please double-check the label." : ""), "ok");
+      }
+      if (r.status === 409) return say(j.message || "This barcode has already been submitted.", "info");
+      if (r.status === 429) return say("Too many submissions right now. Please wait a minute and try again.", "error");
+      say(j.message || j.error || "Something went wrong. Please try again.", "error");
+    });
   }
 
   function aboutSection() {
@@ -614,6 +688,7 @@ const RenderLanding = (() => {
     }));
 
     observe(root);
+    hydrateContribute(root);
     const statsEl = root.querySelector("#lp-stat-grid");
     if (statsEl && "IntersectionObserver" in window) {
       const io = new IntersectionObserver((es) => { if (es[0].isIntersecting) { io.disconnect(); hydrateStats(root); } }, { rootMargin: "400px" });

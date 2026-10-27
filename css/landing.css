@@ -248,3 +248,12 @@ body.is-landing .content { max-width: 1180px; padding: 24px 28px 0; }
   .lp-flow li:not(:last-child) { margin-right: 14px; }
   .lp-flow li:not(:last-child)::after { width: 14px; }
 }
+
+.lp-contrib__form { margin-top: 18px; padding: 22px; display: flex; flex-direction: column; gap: 16px; }
+.lp-contrib__actions { display: flex; flex-wrap: wrap; align-items: center; gap: 14px; }
+.lp-contrib__msg { margin: 0; font-size: 14px; color: var(--text-secondary); flex: 1 1 240px; }
+.lp-contrib__msg[data-kind="ok"] { color: var(--green); }
+.lp-contrib__msg[data-kind="error"] { color: var(--red); }
+.lp-contrib__trap { position: absolute; left: -9999px; width: 1px; height: 1px; overflow: hidden; }
+.lp-contrib__form [hidden] { display: none; }
+@media (max-width: 640px) { .lp-contrib__actions .btn { flex: 1 1 100%; } }
