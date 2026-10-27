@@ -16,7 +16,7 @@
  *   Run it before every deploy. A new BUILD installs a new cache in the background; the page
  *   then offers a "Reload" button (see js/pwa.js) so HTML and JS are never mixed across versions.
  */
-const BUILD = "ade48293f794";
+const BUILD = "f203ce9863d6";
 
 const SHELL_CACHE = "chakudya-shell-" + BUILD;
 const DATA_CACHE = "chakudya-data-v1";
@@ -69,7 +69,7 @@ const OPTIONAL = [
   "assets/icons/favicon-32.png",
   "assets/images/hero-malawian-meal.webp",
   "assets/images/hero-malawian-meal-600.webp",
-  "assets/images/food-fish.webp",
+  "assets/images/food-barcode.webp",
   "assets/images/food-fruit-veg.webp",
   "assets/images/food-legumes-protein.webp",
   "assets/images/food-staples.webp",
