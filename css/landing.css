@@ -257,3 +257,15 @@ body.is-landing .content { max-width: 1180px; padding: 24px 28px 0; }
 .lp-contrib__trap { position: absolute; left: -9999px; width: 1px; height: 1px; overflow: hidden; }
 .lp-contrib__form [hidden] { display: none; }
 @media (max-width: 640px) { .lp-contrib__actions .btn { flex: 1 1 100%; } }
+.lp-contrib__modes { display: flex; flex-wrap: wrap; gap: 8px; margin: 22px 0 0; }
+.lp-contrib__modes .lp-chip[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+.lp-contrib__hint { margin: 0; font-size: 14px; color: var(--text-secondary); line-height: 1.55; }
+.lp-contrib__pick { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+.lp-contrib__count { font-size: 13px; color: var(--text-tertiary); margin-left: 4px; }
+.lp-contrib__thumbs { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(92px, 1fr)); gap: 10px; }
+.lp-contrib__thumbs:empty { display: none; }
+.lp-contrib__thumb { position: relative; aspect-ratio: 1; border-radius: 12px; overflow: hidden; border: 1px solid var(--border); background: var(--bg-raised); display: flex; align-items: center; justify-content: center; color: var(--text-tertiary); }
+.lp-contrib__thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.lp-contrib__rm { position: absolute; top: 4px; right: 4px; width: 26px; height: 26px; border-radius: 50%; border: 0; background: rgba(0,0,0,.65); color: #fff; font-size: 17px; line-height: 1; cursor: pointer; }
+.lp-contrib__msg[data-kind="info"] { color: var(--accent); }
+.lp-contrib__form[hidden] { display: none; }

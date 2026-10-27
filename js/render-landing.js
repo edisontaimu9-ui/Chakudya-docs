@@ -240,7 +240,7 @@ const RenderLanding = (() => {
 
   function contributeSection() {
     const steps = [
-      ["Submit", "Enter the product name, barcode and the numbers printed on its nutrition label."],
+      ["Submit", "Take up to 5 photos of the pack, or type in the barcode and the numbers printed on its label."],
       ["Review", "Every entry is checked, including a calories-versus-macros check, before it is approved."],
       ["Share", "Approved foods join the registry and become available to everyone through the API."],
     ];
@@ -249,7 +249,7 @@ const RenderLanding = (() => {
         <div class="lp-head">
           <p class="lp-kicker">Community</p>
           <h2 id="lp-contrib-h">Help grow the registry</h2>
-          <p class="lp-sub">Know a packaged food that is missing? Submit it below and help others find accurate nutrition information.</p>
+          <p class="lp-sub">Know a packaged food that is missing? Photograph its label or type the details in, and help others find accurate nutrition information.</p>
         </div>
         <ol class="lp-contrib__steps">
           ${steps.map(([t, d], i) => `
@@ -259,7 +259,30 @@ const RenderLanding = (() => {
               <p>${d}</p>
             </li>`).join("")}
         </ol>
-        <form class="lp-card lp-contrib__form" id="lp-submit-form" novalidate>
+        <div class="lp-contrib__modes" role="group" aria-label="How to submit">
+          <button type="button" class="lp-chip" data-mode="photo" aria-pressed="true">Photograph the label</button>
+          <button type="button" class="lp-chip" data-mode="manual" aria-pressed="false">Type it in</button>
+        </div>
+        <form class="lp-card lp-contrib__form" id="lp-photo-form" novalidate>
+          <p class="lp-contrib__hint">Add up to <strong>5 photos</strong>. The barcode and the nutrition label are often on different sides of the pack, so photograph each one. Keep the text flat, sharp and well lit.</p>
+          <div class="lp-contrib__pick">
+            <button type="button" class="btn" id="lp-photo-cam">Take a photo</button>
+            <button type="button" class="btn" id="lp-photo-up">Upload photos</button>
+            <span class="lp-contrib__count" id="lp-photo-count" aria-live="polite">0 of 5 photos</span>
+            <input type="file" id="lp-photo-cam-in" accept="image/*" capture="environment" hidden />
+            <input type="file" id="lp-photo-up-in" accept="image/*" multiple hidden />
+          </div>
+          <ul class="lp-contrib__thumbs" id="lp-photo-thumbs" aria-label="Selected photos"></ul>
+          <label class="field"><span class="field__label">Barcode <span class="param-required">required</span></span>
+            <input type="text" name="barcode" id="lp-photo-barcode" inputmode="numeric" maxlength="20" placeholder="Read from your photos, or type it" autocomplete="off" />
+            <span class="field__hint" id="lp-photo-barcode-note">We try to read the barcode from your photos. If that fails, type the digits under the bars.</span></label>
+          <div class="lp-contrib__trap" aria-hidden="true"><label>Website <input type="text" name="website" tabindex="-1" autocomplete="off" /></label></div>
+          <div class="lp-contrib__actions">
+            <button class="btn btn--primary btn--lg" type="submit" id="lp-photo-btn">Send photos for review</button>
+            <p class="lp-contrib__msg" id="lp-photo-msg" role="status" aria-live="polite"></p>
+          </div>
+        </form>
+        <form class="lp-card lp-contrib__form" hidden id="lp-submit-form" novalidate>
           <div class="field-grid">
             <label class="field"><span class="field__label">Product name <span class="param-required">required</span></span>
               <input type="text" name="product_name" maxlength="120" autocomplete="off" required /></label>
@@ -288,6 +311,91 @@ const RenderLanding = (() => {
         </form>
       </section>
     `);
+  }
+
+  function hydratePhotos(root) {
+    const form = root.querySelector("#lp-photo-form"), manual = root.querySelector("#lp-submit-form");
+    if (!form || !manual) return;
+    const MAX = 5;
+    const items = []; // { id, dataUrl, barcode }
+    let nextId = 1, busy = 0;
+    const thumbs = form.querySelector("#lp-photo-thumbs"), countEl = form.querySelector("#lp-photo-count");
+    const bcIn = form.querySelector("#lp-photo-barcode"), bcNote = form.querySelector("#lp-photo-barcode-note");
+    const msg = form.querySelector("#lp-photo-msg"), btn = form.querySelector("#lp-photo-btn");
+    const say = (text, kind) => { msg.textContent = text; msg.dataset.kind = kind || ""; };
+    let typed = false; // the person edited the barcode themselves, so a photo read never overwrites it
+
+    // Switch between photo and manual entry.
+    root.querySelectorAll(".lp-contrib__modes [data-mode]").forEach((b) => b.addEventListener("click", () => {
+      const photo = b.dataset.mode === "photo";
+      form.hidden = !photo; manual.hidden = photo;
+      root.querySelectorAll(".lp-contrib__modes [data-mode]").forEach((x) => x.setAttribute("aria-pressed", String(x === b)));
+    }));
+
+    function render() {
+      thumbs.innerHTML = items.map((it, i) => `
+        <li class="lp-contrib__thumb"><img src="${it.dataUrl}" alt="Photo ${i + 1}" />
+          <button type="button" class="lp-contrib__rm" data-id="${it.id}" aria-label="Remove photo ${i + 1}">\u00D7</button></li>`).join("") +
+        (busy ? `<li class="lp-contrib__thumb lp-contrib__thumb--busy" aria-label="Preparing photo">…</li>` : "");
+      countEl.textContent = `${items.length} of ${MAX} photos`;
+      const found = items.find((it) => it.barcode);
+      if (!typed) bcIn.value = found ? found.barcode : "";
+      bcNote.textContent = found && !typed ? `Barcode read from photo ${items.indexOf(found) + 1}. Check it matches the digits on the pack.`
+        : "We try to read the barcode from your photos. If that fails, type the digits under the bars.";
+    }
+
+    async function addFiles(fileList) {
+      const files = Array.from(fileList || []).filter((f) => /^image\//.test(f.type) || !f.type);
+      if (!files.length) return;
+      const room = MAX - items.length - busy;
+      if (room <= 0) return say(`You can add up to ${MAX} photos. Remove one to add another.`, "error");
+      if (files.length > room) say(`Only ${MAX} photos are allowed, so the first ${room} were added.`, "info"); else say("");
+      for (const file of files.slice(0, room)) {
+        busy++; render();
+        try { const r = await LabelScan.prepare(file); items.push({ id: nextId++, dataUrl: r.dataUrl, barcode: r.barcode }); }
+        catch (e) { say(e.message || "That photo could not be used.", "error"); }
+        busy--; render();
+      }
+    }
+    for (const [btnId, inId] of [["#lp-photo-cam", "#lp-photo-cam-in"], ["#lp-photo-up", "#lp-photo-up-in"]]) {
+      const input = form.querySelector(inId);
+      form.querySelector(btnId).addEventListener("click", () => input.click());
+      input.addEventListener("change", () => { addFiles(input.files); input.value = ""; });
+    }
+    thumbs.addEventListener("click", (e) => {
+      const rm = e.target.closest("[data-id]");
+      if (!rm) return;
+      const i = items.findIndex((it) => String(it.id) === rm.dataset.id);
+      if (i >= 0) items.splice(i, 1);
+      render();
+    });
+    bcIn.addEventListener("input", () => { typed = bcIn.value.trim() !== ""; if (!typed) render(); });
+
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      if (busy) return say("Still preparing your photos, one moment.", "info");
+      if (!items.length) return say("Add at least one photo of the label.", "error");
+      const barcode = bcIn.value.replace(/[\s-]/g, "");
+      if (!/^\d{8,14}$/.test(barcode)) return say("Enter the barcode, 8 to 14 digits.", "error");
+      if (!LabelScan.gs1Ok(barcode)) return say("That barcode does not look right. Check the digits and try again.", "error");
+      btn.disabled = true; say("Sending photos and reading the label. This can take a few seconds…");
+      const body = { images: items.map((it) => it.dataUrl), barcode, website: form.elements.website.value };
+      const url = ApiClient.buildUrl(AppState.state.baseUrl, "/packaged/scan", {}, {});
+      const r = await ApiClient.execute({ url, method: "POST", headers: ApiClient.buildHeaders({ hasBody: true }), body: JSON.stringify(body) });
+      btn.disabled = false;
+      const j = r.bodyJson || {};
+      if (r.networkError) return say("Could not reach the server. Check your connection and try again.", "error");
+      if (r.status === 201 || r.status === 200) {
+        items.length = 0; typed = false; render();
+        return say("Thank you! Your photos were read and the food will appear after review. " + (j.needs_review ? "Some numbers may need a second look, so a reviewer will check them." : ""), "ok");
+      }
+      if (r.status === 409) return say(j.message || "This barcode has already been submitted.", "info");
+      if (r.status === 422) return say(j.message || "We could not read a nutrition label in those photos. Try again with the label flat, sharp and well lit.", "error");
+      if (r.status === 413) return say("The photos are too large. Remove one or retake them.", "error");
+      if (r.status === 429) return say("Too many submissions right now. Please wait a minute and try again.", "error");
+      say(j.message || j.error || "Something went wrong. Please try again.", "error");
+    });
+    render();
   }
 
   function hydrateContribute(root) {
@@ -689,6 +797,7 @@ const RenderLanding = (() => {
 
     observe(root);
     hydrateContribute(root);
+    hydratePhotos(root);
     const statsEl = root.querySelector("#lp-stat-grid");
     if (statsEl && "IntersectionObserver" in window) {
       const io = new IntersectionObserver((es) => { if (es[0].isIntersecting) { io.disconnect(); hydrateStats(root); } }, { rootMargin: "400px" });
