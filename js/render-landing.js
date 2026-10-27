@@ -53,6 +53,11 @@ const RenderLanding = (() => {
 
   /* ───────── live data ───────── */
 
+  // Progress of the live counts: each count request that finishes (found or not) moves the bar on the loading tile.
+  let countsDone = 0, countsTotal = 0;
+  const countListeners = new Set();
+  const bumpCounts = () => { countsDone++; countListeners.forEach((f) => f(countsDone, countsTotal)); };
+
   async function countOf(path) {
     try {
       const url = ApiClient.buildUrl(AppState.state.baseUrl, path, {}, { limit: 1 });
@@ -61,10 +66,13 @@ const RenderLanding = (() => {
       // limit=1: a count of 1 can't be told apart from the API's fallback (rows returned), so it is never shown.
       return Number.isFinite(n) && n > 1 ? n : null;
     } catch (_) { return null; }
+    finally { bumpCounts(); }
   }
 
   function fetchCounts() {
     if (countsPromise) return countsPromise;
+    countsDone = 0;
+    countsTotal = COUNT_SOURCES.length + GROWTH_PATHS.length;
     const growth = Promise.all(GROWTH_PATHS.map(countOf)).then((ns) =>
       ns.every((n) => n !== null)
         ? { key: "growth", label: "WHO growth reference points", note: `Across ${ns.length} reference tables`, count: ns.reduce((a, b) => a + b, 0) }
@@ -173,7 +181,7 @@ const RenderLanding = (() => {
           <p class="lp-sub">Live record counts from the Chakudya registry, loaded when this page opens.</p>
         </div>
         <div class="lp-stat-grid" id="lp-stat-grid">
-          <div class="lp-stat lp-stat--loading" id="lp-stat-loading"><div class="lp-stat__num" aria-hidden="true">…</div><div class="lp-stat__label">Loading live counts</div><div class="lp-stat__note">Fetching from the API</div></div>
+          <div class="lp-stat lp-stat--loading" id="lp-stat-loading"><div class="lp-stat__num" aria-hidden="true">…</div><div class="lp-stat__label">Loading live counts</div><div class="lp-stat__note">Fetching from the API</div>${Progress.html({ text: "Starting", pct: 0, id: "lp-stat-progress" })}</div>
         </div>
       </section>
     `);
@@ -182,7 +190,15 @@ const RenderLanding = (() => {
   async function hydrateStats(root) {
     const grid = root.querySelector("#lp-stat-grid");
     if (!grid) return;
-    const rows = await fetchCounts();
+    const onCount = (done, total) => {
+      const bar = grid.querySelector("#lp-stat-progress");
+      if (bar && total) Progress.set(bar, (done / total) * 100, `Loaded ${done} of ${total}`);
+    };
+    const pending = fetchCounts(); // starts the requests (or returns the finished ones), so the totals are set before the bar reads them
+    countListeners.add(onCount);
+    onCount(countsDone, countsTotal);
+    const rows = await pending;
+    countListeners.delete(onCount);
     if (!grid.isConnected) return; // navigated away
     grid.querySelector("#lp-stat-loading")?.remove();
     rows.forEach((r) => {

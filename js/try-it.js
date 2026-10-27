@@ -199,9 +199,17 @@ const TryIt = (() => {
     btn.disabled = true;
     btn.textContent = "Sending…";
     resultBox.classList.add("is-visible");
-    resultBox.innerHTML = `<div class="loading-state" style="padding:24px 0"><div class="spinner"></div><p>Waiting for response…</p></div>`;
+    resultBox.innerHTML = `<div class="loading-state" style="padding:24px 0"><div class="spinner"></div>${Progress.html({ text: "Waiting for response… 0 s", run: true })}</div>`;
 
-    const result = await ApiClient.execute({ url, method: endpoint.method, headers, body: bodyText });
+    // The wait can't be measured as a percentage, so the bar just moves and the text counts the seconds.
+    const started = Date.now();
+    const tick = setInterval(() => {
+      const t = resultBox.querySelector(".progress__text");
+      if (t) t.textContent = `Waiting for response… ${Math.floor((Date.now() - started) / 1000)} s`;
+    }, 1000);
+    let result;
+    try { result = await ApiClient.execute({ url, method: endpoint.method, headers, body: bodyText }); }
+    finally { clearInterval(tick); }
 
     btn.disabled = false;
     btn.textContent = "Send request";

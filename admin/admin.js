@@ -68,6 +68,15 @@
   /* ───── helpers ───── */
   const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
   const fmt = (n) => (typeof n === "number" ? n.toLocaleString() : "n/a");
+  // Progress bar. pct is the headline percentage (0 when there is nothing yet). segs = [{ pct, cls }] draws a split bar;
+  // run = true is the indeterminate "working" bar with no percentage; noPct hides the number (for a failed state).
+  const clampPct = (n) => (typeof n === "number" && isFinite(n) ? Math.max(0, Math.min(100, n)) : 0);
+  const bar = ({ text = "", pct = 0, cls = "", segs, run = false, noPct = false }) => {
+    const p = clampPct(pct);
+    const parts = (segs || [{ pct: p, cls }]).map((x) => `<i class="${esc(x.cls || "")}"${run ? "" : ` style="width:${clampPct(x.pct)}%"`}></i>`).join("");
+    return `<div class="pbar-row"><span>${esc(text)}</span><b>${run || noPct ? "" : +p.toFixed(1) + "%"}</b></div>`
+      + `<div class="pbar${run ? " run" : ""}" role="progressbar" aria-label="${esc(text || "Progress")}" aria-valuemin="0" aria-valuemax="100"${run ? "" : ` aria-valuenow="${Math.round(p)}"`}>${parts}</div>`;
+  };
   const stat = (label, n) => `<div class="stat${typeof n === "number" ? "" : " null"}"><b>${fmt(n)}</b><span>${esc(label)}</span></div>`;
   const msFmt = (n) => (n >= 1000 ? (n / 1000).toFixed(1) + " s" : Math.round(n) + " ms");
   function ago(iso) {
@@ -264,5 +273,5 @@
     else start();
   }
 
-  window.Admin = { $, esc, fmt, stat, ago, msFmt, dayLabel, trendBars, chips, call, loadSession, overview, authFail, fatal, reload: load, mount };
+  window.Admin = { $, esc, fmt, stat, bar, ago, msFmt, dayLabel, trendBars, chips, call, loadSession, overview, authFail, fatal, reload: load, mount };
 })();

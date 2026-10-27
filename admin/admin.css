@@ -147,3 +147,13 @@
   ul.tips { margin:6px 0 0; padding-left:18px; font-size:13.5px; color:var(--text); }
   ul.tips li { margin:3px 0; }
   .filters select { flex:1 1 200px; min-width:160px; }
+
+  /* progress bars: determinate, segmented, or indeterminate (.run) */
+  .pbar-row { display:flex; justify-content:space-between; gap:10px; margin-top:8px; font-size:12px; color:var(--text2); font-variant-numeric:tabular-nums; }
+  .pbar-row b { color:var(--text); font-weight:600; }
+  .pbar { display:flex; height:8px; margin:5px 0 3px; border-radius:99px; background:var(--border); overflow:hidden; }
+  .pbar > i { display:block; height:100%; background:var(--accent); transition:width .4s ease; }
+  .pbar > i.ok { background:var(--ok); } .pbar > i.bad { background:var(--bad); } .pbar > i.warn { background:var(--warn); }
+  .pbar.run > i { width:35%; animation:pbslide 1.2s ease-in-out infinite; }
+  @keyframes pbslide { 0% { transform:translateX(-100%); } 100% { transform:translateX(290%); } }
+  @media (prefers-reduced-motion: reduce) { .pbar.run > i { animation:none; width:100%; opacity:.5; } }

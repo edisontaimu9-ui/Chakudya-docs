@@ -14,6 +14,7 @@
 <template id="tpl">
   <h2>RAG ingest jobs</h2>
   <div id="jobs" class="grid"></div>
+  <div id="jProgress" class="card" style="margin-top:10px"></div>
   <div class="bar" style="gap:6px;margin:12px 0 8px" id="jFilter">
     <button data-st="" class="chip on">All</button><button data-st="queued" class="chip">Queued</button><button data-st="processing" class="chip">Processing</button><button data-st="done" class="chip">Done</button><button data-st="failed" class="chip">Failed</button>
   </div>
@@ -28,12 +29,34 @@
 <script>
 (() => {
   "use strict";
-  const { $, esc, fmt, stat, ago, call } = Admin;
+  const { $, esc, fmt, stat, bar, ago, call } = Admin;
   const J_PAGE = 20;
   let jStatus = "";
   let jLoaded = [];
   let jTotal = null;
   const JOB_CLS = { queued: "warn", processing: "run", done: "ok", failed: "bad" };
+
+  // Only a status is stored per job (no live percentage), so a job shows 0% while queued, a working bar while processing and 100% when done.
+  function jobBar(j) {
+    if (j.status === "queued") return bar({ text: "Waiting in queue", pct: 0 });
+    if (j.status === "processing") return bar({ text: "Processing", run: true });
+    if (j.status === "done") return bar({ text: "Done", pct: 100, cls: "ok" });
+    if (j.status === "failed") return bar({ text: "Failed", pct: 100, cls: "bad", noPct: true });
+    return "";
+  }
+
+  // Share of all jobs by state. Finished = done; failed and in-progress shown beside it. 0% with an empty bar when there are no jobs.
+  function renderProgress(j) {
+    const n = (k) => Math.max(0, Number(j[k]) || 0);
+    const q = n("queued"), p = n("processing"), d = n("done"), f = n("failed"), total = q + p + d + f;
+    const share = (x) => (total ? (x / total) * 100 : 0);
+    const text = total ? `${fmt(d)} of ${fmt(total)} jobs finished` : "No ingest jobs yet";
+    const legend = total
+      ? `Done ${+share(d).toFixed(1)}% · Processing ${+share(p).toFixed(1)}% · Queued ${+share(q).toFixed(1)}% · Failed ${+share(f).toFixed(1)}%`
+      : "Done 0% · Processing 0% · Queued 0% · Failed 0%";
+    $("jProgress").innerHTML = bar({ text, pct: share(d), segs: [{ pct: share(d), cls: "ok" }, { pct: share(p) }, { pct: share(f), cls: "bad" }] })
+      + `<div class="muted">${esc(legend)}</div>`;
+  }
 
   function jobCard(j) {
     const cls = JOB_CLS[j.status] || "";
@@ -44,6 +67,7 @@
       <span class="muted">${esc(ago(j.created_at))}</span></div>
       <div class="muted" style="word-break:break-word">${esc(j.source || "")}</div>
       <div class="muted">Updated ${esc(ago(j.updated_at))}${chunks}${tries} · <span style="font-family:var(--mono)">${esc(String(j.id || "").slice(0, 8))}</span></div>
+      ${jobBar(j)}
       ${j.error ? `<p class="err-text">${esc(j.error)}</p>` : ""}</div>`;
   }
 
@@ -85,6 +109,7 @@
       const d = await Admin.overview();
       if (!d) return;
       const j = d.rag_ingest_jobs || {};
+      renderProgress(j);
       $("jobs").innerHTML = ["queued", "processing", "done", "failed"].map((k) => stat(k[0].toUpperCase() + k.slice(1), j[k])).join("");
       await loadJobs(true);
     },

@@ -528,3 +528,13 @@
   .console-metrics .metric:last-child { grid-column: 1 / -1; }
   .access-grid, .next-steps { grid-template-columns: 1fr; }
 }
+
+/* ── Progress bar (js/progress.js) ───────────────────────── */
+.progress { width: 100%; max-width: 360px; margin-top: 10px; }
+.progress__row { display: flex; justify-content: space-between; gap: 12px; font-size: 12.5px; color: var(--text-tertiary); font-variant-numeric: tabular-nums; }
+.progress__row b { color: var(--text-secondary, var(--text-tertiary)); font-weight: 600; }
+.progress__track { height: 6px; margin-top: 6px; border-radius: 99px; background: var(--border); overflow: hidden; }
+.progress__fill { display: block; height: 100%; width: 0; border-radius: inherit; background: var(--accent); transition: width .3s ease; }
+.progress--indeterminate .progress__fill { width: 35%; animation: progress-slide 1.2s ease-in-out infinite; }
+@keyframes progress-slide { 0% { transform: translateX(-100%); } 100% { transform: translateX(290%); } }
+@media (prefers-reduced-motion: reduce) { .progress--indeterminate .progress__fill { animation: none; width: 100%; opacity: .5; } }

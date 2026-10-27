@@ -32,7 +32,7 @@
 <script>
 (() => {
   "use strict";
-  const { $, esc, fmt, ago, msFmt, call } = Admin;
+  const { $, esc, fmt, ago, msFmt, bar, call } = Admin;
   let hHours = 24;
   const IDS = ["hStats", "hServices", "hIncidents", "hDaily"];
   const pct = (n) => (typeof n === "number" ? n + "%" : "n/a");
@@ -44,6 +44,7 @@
     const cls = s.errors ? (s.uptime_pct < 99 ? "bad" : "warn") : "ok";
     const req = s.required ? " · required" : "";
     return `<div class="ev"><div class="head"><div class="op">${esc(name)}</div><span class="pill ${cls}">${esc(pct(s.uptime_pct))}</span></div>
+      ${typeof s.uptime_pct === "number" ? bar({ text: "Uptime", pct: s.uptime_pct, cls }) : ""}
       <div class="muted">${fmt(s.checks)} checks · ${fmt(s.errors)} error${s.errors === 1 ? "" : "s"} · avg ${esc(msFmt(s.avg_ms))} · p95 ${esc(msFmt(s.p95_ms))} · max ${esc(msFmt(s.max_ms))}${req}</div></div>`;
   }
 
@@ -59,6 +60,7 @@
   function dayRow(d) {
     const cls = d.uptime_pct >= 99.9 ? "ok" : d.uptime_pct >= 99 ? "warn" : "bad";
     return `<div class="ev"><div class="head"><div class="op">${esc(d.day)}</div><span class="pill ${cls}">${esc(pct(d.uptime_pct))}</span></div>
+      ${typeof d.uptime_pct === "number" ? bar({ text: "Uptime", pct: d.uptime_pct, cls }) : ""}
       <div class="muted">${fmt(d.healthy)} healthy of ${fmt(d.checks)} checks</div></div>`;
   }
 
