@@ -297,3 +297,8 @@ body.is-landing .content { max-width: 1180px; padding: 24px 28px 0; }
 .submit-done { margin-top: 18px; padding: 24px; display: flex; flex-direction: column; gap: 12px; border-color: var(--green); }
 .submit-done h3 { margin: 0; font-size: 19px; }
 .submit-done[hidden], #submit-body[hidden] { display: none; }
+
+/* Footer: Connect as icon buttons */
+.lp-footer__social { display: flex; flex-wrap: wrap; gap: 10px; }
+.lp-footer nav .lp-social { display: inline-flex; align-items: center; justify-content: center; width: 44px; height: 44px; padding: 0; border: 1px solid var(--border); border-radius: 12px; color: var(--text-secondary); text-decoration: none; }
+.lp-footer nav .lp-social:hover { color: var(--accent-strong); border-color: var(--accent); background: var(--surface-hover); text-decoration: none; }

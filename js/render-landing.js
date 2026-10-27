@@ -512,6 +512,17 @@ const RenderLanding = (() => {
     `);
   }
 
+  function socialIcon(name) {
+    const p = {
+      mail: '<rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/>',
+      linkedin: '<rect x="3" y="3" width="18" height="18" rx="3"/><path d="M8 11v6M8 7.5v.01M12 17v-6M12 13.5a3 3 0 0 1 6 0V17"/>',
+      x: '<path d="M4 4l16 16M20 4 4 20"/>',
+      facebook: '<path d="M14 8.5V7a1.5 1.5 0 0 1 1.5-1.5H17V2h-2.5A4.5 4.5 0 0 0 10 6.5v2H7V12h3v9h4v-9h3l.5-3.5H14Z"/>',
+      globe: '<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/>',
+    }[name] || "";
+    return `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${p}</svg>`;
+  }
+
   function footer() {
     return el(`
       <footer class="lp-footer">
@@ -529,15 +540,17 @@ const RenderLanding = (() => {
             <a href="#/docs/api-reference">API Reference</a>
             <a href="openapi.json" download>OpenAPI spec</a>
             <a href="https://github.com/edisontaimu9-ui/chakudya-api" target="_blank" rel="noopener">GitHub</a>
+            <a href="https://wa.me/265886295324" target="_blank" rel="noopener">Thanzi Coach on WhatsApp</a>
           </nav>
           <nav aria-label="Connect">
             <h3 class="lp-footer__h">Connect</h3>
-            <a href="mailto:edisontaimu9@gmail.com">Email</a>
-            <a href="https://www.linkedin.com/in/edison-taimu-a37415367" target="_blank" rel="noopener">LinkedIn</a>
-            <a href="https://x.com/edisontaimu" target="_blank" rel="noopener">X (Twitter)</a>
-            <a href="https://www.facebook.com/share/1GixAae4hT/" target="_blank" rel="noopener">Facebook</a>
-            <a href="https://minutriq.me" target="_blank" rel="noopener">Portfolio</a>
-            <a href="https://wa.me/265886295324" target="_blank" rel="noopener">WhatsApp: Thanzi Coach</a>
+            <div class="lp-footer__social">
+              <a class="lp-social" href="mailto:edisontaimu9@gmail.com" aria-label="Email" title="Email">${socialIcon("mail")}</a>
+              <a class="lp-social" href="https://www.linkedin.com/in/edison-taimu-a37415367" target="_blank" rel="noopener" aria-label="LinkedIn" title="LinkedIn">${socialIcon("linkedin")}</a>
+              <a class="lp-social" href="https://x.com/edisontaimu" target="_blank" rel="noopener" aria-label="X (Twitter)" title="X (Twitter)">${socialIcon("x")}</a>
+              <a class="lp-social" href="https://www.facebook.com/share/1GixAae4hT/" target="_blank" rel="noopener" aria-label="Facebook" title="Facebook">${socialIcon("facebook")}</a>
+              <a class="lp-social" href="https://minutriq.me" target="_blank" rel="noopener" aria-label="Portfolio" title="Portfolio">${socialIcon("globe")}</a>
+            </div>
           </nav>
           <nav aria-label="Legal">
             <h3 class="lp-footer__h">Legal</h3>
