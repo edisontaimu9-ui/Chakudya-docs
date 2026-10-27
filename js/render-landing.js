@@ -178,7 +178,7 @@ const RenderLanding = (() => {
         <div class="lp-head">
           <p class="lp-kicker">At a glance</p>
           <h2 id="lp-stats-h">Chakudya in numbers</h2>
-          <p class="lp-sub">Live record counts from the Chakudya registry, loaded when this page opens.</p>
+          <p class="lp-sub">How much data Chakudya holds, counted fresh each time you visit.</p>
         </div>
         <div class="lp-stat-grid" id="lp-stat-grid">
           <div class="lp-stat lp-stat--loading" id="lp-stat-loading"><div class="lp-stat__num" aria-hidden="true">…</div><div class="lp-stat__label">Loading live counts</div><div class="lp-stat__note">Fetching from the API</div>${Progress.html({ text: "Starting", pct: 0, id: "lp-stat-progress" })}</div>
@@ -201,9 +201,10 @@ const RenderLanding = (() => {
     countListeners.delete(onCount);
     if (!grid.isConnected) return; // navigated away
     grid.querySelector("#lp-stat-loading")?.remove();
-    rows.forEach((r) => {
+    rows.forEach((r, i) => {
       const card = el(`
         <div class="lp-stat lp-stat--live">
+          <div class="lp-stat__idx" aria-hidden="true">${String(i + 1).padStart(2, "0")}</div>
           <div class="lp-stat__num" data-count="${r.count}">0</div>
           <div class="lp-stat__label">${esc(r.label)}</div>
           <div class="lp-stat__note">${esc(r.note)}</div>
@@ -211,7 +212,7 @@ const RenderLanding = (() => {
       grid.appendChild(card);
     });
     if (!rows.length) {
-      grid.appendChild(el(`<p class="lp-stat__offline">${navigator.onLine === false ? "You're offline, so live record counts aren't shown." : "Live record counts are unavailable right now."} The documentation below still works.</p>`));
+      grid.appendChild(el(`<p class="lp-stat__offline">${navigator.onLine === false ? "You're offline, so the counts aren't shown." : "The counts are unavailable right now."} The documentation below still works.</p>`));
     }
     // Counters added after the observer ran: start the ones already on screen.
     if (reduceMotion() || !("IntersectionObserver" in window)) {
