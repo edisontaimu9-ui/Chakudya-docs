@@ -304,3 +304,4 @@ body.is-landing .content { max-width: 1180px; padding: 24px 28px 0; }
 .lp-footer nav .lp-social:hover { color: var(--accent-strong); border-color: var(--accent); background: var(--surface-hover); text-decoration: none; }
 .lp-footer__connect { margin-top: 24px; }
 .lp-footer nav .lp-social { width: 40px; height: 40px; }
+.lp-footer__note a { color: var(--accent-strong); font-weight: 600; }

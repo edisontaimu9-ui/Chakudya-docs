@@ -560,7 +560,7 @@ const RenderLanding = (() => {
             <a href="#/legal/disclaimer">Clinical Disclaimer</a>
           </nav>
         </div>
-        <p class="lp-footer__note">Growth and clinical tools are for screening and decision support only. They do not replace professional judgment or establish a diagnosis. Always consult a qualified health professional.</p>
+        <p class="lp-footer__note">For screening and decision support only, not a diagnosis. See the <a href="#/legal/disclaimer">Clinical Disclaimer</a>.</p>
         <p class="lp-footer__copy">© 2026 Chakudya Nutrition Registry. All rights reserved.</p>
       </footer>
     `);
