@@ -180,7 +180,7 @@ body.is-landing .content { max-width: 1180px; padding: 24px 28px 0; }
 }
 .lp-closing h2 { font-size: clamp(26px, 4vw, 42px); max-width: 20ch; margin: 0 auto; letter-spacing: -.6px; line-height: 1.12; }
 .lp-footer { margin-top: 56px; padding: 36px 0 48px; border-top: 1px solid var(--border); color: var(--text-secondary); font-size: 13.5px; }
-.lp-footer__grid { display: grid; grid-template-columns: 1.5fr 1fr 1fr 1fr; gap: 28px 36px; }
+.lp-footer__grid { display: grid; grid-template-columns: 1.6fr 1fr 1fr; gap: 28px 36px; }
 .lp-footer__logo { display: block; width: 72px; height: 72px; object-fit: contain; background: #fff; border-radius: 14px; padding: 6px; margin-bottom: 12px; border: 1px solid var(--border); }
 .lp-footer p { margin: 0; }
 .lp-footer__name { color: var(--text-primary); font-weight: 700; font-size: 15px; }
@@ -302,3 +302,5 @@ body.is-landing .content { max-width: 1180px; padding: 24px 28px 0; }
 .lp-footer__social { display: flex; flex-wrap: wrap; gap: 10px; }
 .lp-footer nav .lp-social { display: inline-flex; align-items: center; justify-content: center; width: 44px; height: 44px; padding: 0; border: 1px solid var(--border); border-radius: 12px; color: var(--text-secondary); text-decoration: none; }
 .lp-footer nav .lp-social:hover { color: var(--accent-strong); border-color: var(--accent); background: var(--surface-hover); text-decoration: none; }
+.lp-footer__connect { margin-top: 24px; }
+.lp-footer nav .lp-social { width: 40px; height: 40px; }

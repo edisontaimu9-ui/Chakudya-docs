@@ -531,6 +531,16 @@ const RenderLanding = (() => {
             <img class="lp-footer__logo" src="assets/images/chakudya-logo-192.webp" alt="Chakudya Nutrition Registry logo" width="72" height="72" loading="lazy" onerror="this.remove()" />
             <p class="lp-footer__name">Chakudya Nutrition Registry</p>
             <p class="lp-footer__tag">Better food data. Healthier Malawi.</p>
+            <nav class="lp-footer__connect" aria-label="Connect">
+              <h3 class="lp-footer__h">Connect</h3>
+              <div class="lp-footer__social">
+                <a class="lp-social" href="mailto:edisontaimu9@gmail.com" aria-label="Email" title="Email">${socialIcon("mail")}</a>
+                <a class="lp-social" href="https://www.linkedin.com/in/edison-taimu-a37415367" target="_blank" rel="noopener" aria-label="LinkedIn" title="LinkedIn">${socialIcon("linkedin")}</a>
+                <a class="lp-social" href="https://x.com/edisontaimu" target="_blank" rel="noopener" aria-label="X (Twitter)" title="X (Twitter)">${socialIcon("x")}</a>
+                <a class="lp-social" href="https://www.facebook.com/share/1GixAae4hT/" target="_blank" rel="noopener" aria-label="Facebook" title="Facebook">${socialIcon("facebook")}</a>
+                <a class="lp-social" href="https://minutriq.me" target="_blank" rel="noopener" aria-label="Portfolio" title="Portfolio">${socialIcon("globe")}</a>
+              </div>
+            </nav>
           </div>
           <nav aria-label="Resources">
             <h3 class="lp-footer__h">Resources</h3>
@@ -541,16 +551,6 @@ const RenderLanding = (() => {
             <a href="openapi.json" download>OpenAPI spec</a>
             <a href="https://github.com/edisontaimu9-ui/chakudya-api" target="_blank" rel="noopener">GitHub</a>
             <a href="https://wa.me/265886295324" target="_blank" rel="noopener">Thanzi Coach on WhatsApp</a>
-          </nav>
-          <nav aria-label="Connect">
-            <h3 class="lp-footer__h">Connect</h3>
-            <div class="lp-footer__social">
-              <a class="lp-social" href="mailto:edisontaimu9@gmail.com" aria-label="Email" title="Email">${socialIcon("mail")}</a>
-              <a class="lp-social" href="https://www.linkedin.com/in/edison-taimu-a37415367" target="_blank" rel="noopener" aria-label="LinkedIn" title="LinkedIn">${socialIcon("linkedin")}</a>
-              <a class="lp-social" href="https://x.com/edisontaimu" target="_blank" rel="noopener" aria-label="X (Twitter)" title="X (Twitter)">${socialIcon("x")}</a>
-              <a class="lp-social" href="https://www.facebook.com/share/1GixAae4hT/" target="_blank" rel="noopener" aria-label="Facebook" title="Facebook">${socialIcon("facebook")}</a>
-              <a class="lp-social" href="https://minutriq.me" target="_blank" rel="noopener" aria-label="Portfolio" title="Portfolio">${socialIcon("globe")}</a>
-            </div>
           </nav>
           <nav aria-label="Legal">
             <h3 class="lp-footer__h">Legal</h3>
