@@ -938,7 +938,7 @@ const RenderNutriMind = (() => {
 
   // A short follow-up such as "What about 50g?" means nothing on its own, and the search
   // can latch onto unrelated documents. Send it together with the question it follows.
-  const FOLLOW_UP = /^(and\b|what about\b|how about\b|what of\b|ok(ay)?\b)|^\d+(\.\d+)?\s*(g|kg|ml|l|cups?|spoons?|tbsp|tsp|pieces?|servings?|portions?)\b|\b\d+(\.\d+)?\s*(g|kg|ml|cups?|spoons?|tbsp|tsp)\b/i;
+  const FOLLOW_UP = /^(and\b|what about\b|how about\b|what of\b|ok(ay)?\b|compare\b|versus\b|vs\.?\s|also\b|same for\b|now\b|then\b|instead\b|with\b|without\b|which (one )?is\b)|^\d+(\.\d+)?\s*(g|kg|ml|l|cups?|spoons?|tbsp|tsp|pieces?|servings?|portions?)\b|\b\d+(\.\d+)?\s*(g|kg|ml|cups?|spoons?|tbsp|tsp)\b/i;
   const PRONOUN = /\b(it|its|that|this|they|them|their|those|these|there|same|more)\b/i;
   function contextualQuery(q) {
     const words = q.split(/\s+/).length;
@@ -948,6 +948,18 @@ const RenderNutriMind = (() => {
       if (m.role === "user") return `${m.apiText || m.text} ${q}`.slice(0, MAX_Q * 2);
     }
     return q;
+  }
+
+  // The last few turns, sent so the server can work out what a follow-up such as "Compare with
+  // nsima" refers to. It is used only to understand the question; answers still come from sources.
+  function chatHistory() {
+    return state.messages
+      .filter((m) => m && !m.error && typeof m.text === "string" && m.text.trim())
+      .slice(-4)
+      .map((m) => ({
+        role: m.role === "user" ? "user" : "assistant",
+        text: (m.role === "user" ? m.text : m.text.replace(/\[\d+\]/g, "")).replace(/\s+/g, " ").trim().slice(0, 300),
+      }));
   }
 
   // Never show a dosing answer to someone who did not ask about insulin or diabetes.
@@ -960,6 +972,7 @@ const RenderNutriMind = (() => {
     if (state.stream) finishStream();
     if (state.busy) return;
     const apiQuery = contextualQuery(q);
+    const history = chatHistory(); // before this question is added
     state.messages.push({ role: "user", text: q, apiText: apiQuery });
     state.busy = true;
     if (!opts.attempt) remember(q); // a retry is the same question, so it adds nothing new to memory
@@ -978,6 +991,7 @@ const RenderNutriMind = (() => {
         headers: { "Content-Type": "application/json", ...site.headers },
         body: JSON.stringify({
           query: apiQuery, context: state.mode,
+          ...(history.length ? { history } : {}),
           ...(opts.attempt ? { top_k: TOPK_STEPS[opts.attempt % TOPK_STEPS.length] } : {}),
           ...(withSession ? { session_id: sid } : {}),
         }),
