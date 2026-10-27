@@ -25,7 +25,7 @@
   <h3 class="muted" style="margin:14px 0 6px;font-size:14px">Latest failed and slow calls</h3>
   <div id="monRecent"></div>
   <button id="monMore" class="hide">Show more</button>
-  <p class="muted">Only failed calls (5xx, 429, other 4xx except 401 and 404) and slow calls are recorded, so this shows what is breaking, not an overall error rate. Needs <code>REQUEST_LOG_STORE=true</code> and <code>sql/031</code> on the API. Use the request id to find a call in the Worker logs.</p>
+  <p class="muted">Failed and slow calls only, not an overall error rate. Use the request id to find a call in the Worker logs.</p>
 </template>
 
 <script src="../js/config.js"></script>

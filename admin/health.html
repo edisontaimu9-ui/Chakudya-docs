@@ -24,7 +24,7 @@
   <div id="hIncidents"></div>
   <h3 class="muted" style="margin:14px 0 6px;font-size:14px">By day</h3>
   <div id="hDaily"></div>
-  <p class="muted">A scheduled probe runs the same checks as <code>/health</code> every 5 minutes. Only Supabase, Cohere and Groq can make a probe degraded. An outage is a run of degraded probes, accurate to about 5 minutes. Needs <code>HEALTH_CHECK_STORE=true</code> and <code>sql/034</code> on the API.</p>
+  <p class="muted">Checked every 5 minutes. An outage is a run of failed checks.</p>
 </template>
 
 <script src="../js/config.js"></script>
