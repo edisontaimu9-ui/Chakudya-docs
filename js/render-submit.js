@@ -78,10 +78,14 @@ const RenderSubmit = (() => {
               <p class="lp-contrib__hint">Add up to <strong>${MAX_PHOTOS} photos</strong>. The barcode and the nutrition label are often on different sides of the pack, so photograph each one. Keep the text flat, sharp and well lit.</p>
               <div class="lp-contrib__pick">
                 <button type="button" class="btn" id="lp-photo-cam">Take a photo</button>
-                <button type="button" class="btn" id="lp-photo-up">Upload photos</button>
                 <span class="lp-contrib__count" id="lp-photo-count" aria-live="polite">0 of ${MAX_PHOTOS} photos</span>
                 <input type="file" id="lp-photo-cam-in" accept="image/*" capture="environment" hidden />
                 <input type="file" id="lp-photo-up-in" accept="image/*" multiple hidden />
+              </div>
+              <div class="file-drop" id="lp-photo-up" role="button" tabindex="0" aria-label="Upload photos from your device">
+                <span class="file-drop__icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="currentColor"><path fill-rule="evenodd" clip-rule="evenodd" d="M10 1a1 1 0 0 0-.707.293l-6 6A1 1 0 0 0 3 8v12a3 3 0 0 0 3 3h1a1 1 0 1 0 0-2H6a1 1 0 0 1-1-1V9h5a1 1 0 0 0 1-1V3h7a1 1 0 0 1 1 1v5a1 1 0 1 0 2 0V4a3 3 0 0 0-3-3h-8ZM9 7H6.414L9 4.414V7Zm5 8.5a2.5 2.5 0 0 1 5 0V17h1a2 2 0 1 1 0 4h-7a2 2 0 1 1 0-4h1v-1.5ZM16.5 11a5.5 5.5 0 0 0-4.484 4.122A4.002 4.002 0 0 0 9 19a4 4 0 0 0 4 4h7a4 4 0 0 0 .984-7.878A5.5 5.5 0 0 0 16.5 11Z"/></svg></span>
+                <span class="file-drop__text" id="lp-photo-drop-text">Tap or click to upload photos</span>
+                <span class="file-drop__sub">or drag them here. Up to ${MAX_PHOTOS} photos.</span>
               </div>
               <ul class="lp-contrib__thumbs" id="lp-photo-thumbs" aria-label="Selected photos"></ul>
               <label class="field"><span class="field__label">Barcode <span class="param-required">required</span></span>
@@ -169,6 +173,13 @@ const RenderSubmit = (() => {
           <button type="button" class="lp-contrib__rm" data-id="${it.id}" aria-label="Remove photo ${i + 1}">\u00D7</button></li>`).join("") +
         (busy ? `<li class="lp-contrib__thumb lp-contrib__thumb--busy" aria-label="Preparing photo">${spinner(false)}</li>` : "");
       countEl.textContent = `${items.length} of ${MAX_PHOTOS} photos`;
+      const dz = form.querySelector("#lp-photo-up");
+      if (dz) {
+        const full = items.length >= MAX_PHOTOS;
+        dz.classList.toggle("is-full", full);
+        dz.setAttribute("aria-disabled", String(full));
+        form.querySelector("#lp-photo-drop-text").textContent = full ? "Photo limit reached" : "Tap or click to upload photos";
+      }
       const found = items.find((it) => it.barcode);
       if (!typed) bcIn.value = found ? found.barcode : "";
       bcNote.textContent = found && !typed ? `Barcode read from photo ${items.indexOf(found) + 1}. Check it matches the digits on the pack.`
@@ -193,6 +204,12 @@ const RenderSubmit = (() => {
       form.querySelector(btnId).addEventListener("click", () => input.click());
       input.addEventListener("change", () => { addFiles(input.files); input.value = ""; });
     }
+    // Drop zone: keyboard, drag and drop, and a "full" state.
+    const drop = form.querySelector("#lp-photo-up"), dropText = form.querySelector("#lp-photo-drop-text");
+    drop.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); drop.click(); } });
+    for (const ev of ["dragenter", "dragover"]) drop.addEventListener(ev, (e) => { e.preventDefault(); drop.classList.add("is-over"); });
+    for (const ev of ["dragleave", "dragend"]) drop.addEventListener(ev, () => drop.classList.remove("is-over"));
+    drop.addEventListener("drop", (e) => { e.preventDefault(); drop.classList.remove("is-over"); addFiles(e.dataTransfer && e.dataTransfer.files); });
     thumbs.addEventListener("click", (e) => {
       const rm = e.target.closest("[data-id]");
       if (!rm) return;

@@ -412,3 +412,21 @@ body.is-landing .content { max-width: 1180px; padding: 24px 28px 0; }
 /* Where it is used on the Submit page */
 .lp-contrib__actions .dot-spinner { --uib-size: 1.9rem; }
 .lp-contrib__thumb .dot-spinner { --uib-size: 2rem; }
+
+/* ── Photo drop zone (Submit page) ── */
+.file-drop {
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px;
+  min-height: 150px; width: 100%; padding: 1.25rem; text-align: center; cursor: pointer;
+  border: 2px dashed var(--border); border-radius: 12px;
+  background-color: var(--bg-raised); color: var(--text-secondary);
+  transition: border-color .2s ease, background-color .2s ease;
+}
+.file-drop:hover, .file-drop.is-over { border-color: var(--accent); background-color: var(--accent-bg); }
+.file-drop:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.file-drop__icon { display: flex; align-items: center; justify-content: center; }
+.file-drop__icon svg { height: 52px; width: 52px; fill: currentColor; }
+.file-drop__text { font-weight: 600; font-size: 15px; color: var(--text-primary); }
+.file-drop__sub { font-size: 13px; color: var(--text-tertiary); }
+.file-drop.is-full { opacity: .55; cursor: not-allowed; }
+.file-drop.is-full:hover { border-color: var(--border); background-color: var(--bg-raised); }
+@media (prefers-reduced-motion: reduce) { .file-drop { transition: none; } }
