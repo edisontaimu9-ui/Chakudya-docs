@@ -410,6 +410,7 @@ const RenderNutriMind = (() => {
   // ── Views ────────────────────────────────────────────────────
   const SEND_ICON = '<svg width="18" height="18" viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M3 10h13M11 4.5 16.5 10 11 15.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
 
+  const SCAN_ICON = '<svg width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M3 6.5V4.8A1.8 1.8 0 0 1 4.8 3h1.7M13.5 3h1.7A1.8 1.8 0 0 1 17 4.8v1.7M17 13.5v1.7a1.8 1.8 0 0 1-1.8 1.8h-1.7M6.5 17H4.8A1.8 1.8 0 0 1 3 15.2v-1.7M6.5 7v6M9 7v6M11 7v6M13.5 7v6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>';
   const HIST_ICON = '<svg width="16" height="16" viewBox="0 0 20 20" fill="none" aria-hidden="true"><circle cx="10" cy="10" r="7.2" stroke="currentColor" stroke-width="1.6"/><path d="M10 5.8V10l2.8 1.8" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>';
   const BRANCH_ICON = '<svg width="13" height="13" viewBox="0 0 16 16" fill="none" aria-hidden="true"><circle cx="4" cy="3.5" r="1.6" stroke="currentColor" stroke-width="1.4"/><circle cx="4" cy="12.5" r="1.6" stroke="currentColor" stroke-width="1.4"/><circle cx="12" cy="6" r="1.6" stroke="currentColor" stroke-width="1.4"/><path d="M4 5.1v5.8M12 7.6c0 2.2-2.4 2.4-5 2.8-1.2.2-3 .4-3 .9" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>';
   const RETRY_ICON = '<svg width="13" height="13" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M13.2 8A5.2 5.2 0 1 1 11.6 4.3M13.4 2.2v2.6h-2.6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>';
@@ -433,8 +434,11 @@ const RenderNutriMind = (() => {
           <div class="nm-modes" role="group" aria-label="Answer focus"></div>
           <div class="nm-box">
             <textarea id="nm-input" rows="1" maxlength="${MAX_Q}" placeholder="Ask about a food, nutrient or diet" aria-label="Your question"></textarea>
+            <button type="button" class="nm-scan" id="nm-scan" aria-label="Scan a barcode" title="Scan a barcode">${SCAN_ICON}</button>
+            <input type="file" id="nm-scanfile" accept="image/*" capture="environment" hidden>
             <button type="button" class="nm-send" id="nm-send" aria-label="Send question">${SEND_ICON}</button>
           </div>
+          <p class="nm-scanmsg" id="nm-scanmsg" role="status" hidden></p>
           <p class="nm-fine">NutriMind uses AI and may make mistakes. It gives general nutrition information and does not replace a qualified health professional. Please do not share personal or patient details. <a href="#/legal/disclaimer">Clinical disclaimer</a></p>
         </div>
         <div class="nm-drawer" id="nm-drawer" hidden>
@@ -462,6 +466,9 @@ const RenderNutriMind = (() => {
       thread: root.querySelector("#nm-thread"),
       input: root.querySelector("#nm-input"),
       send: root.querySelector("#nm-send"),
+      scan: root.querySelector("#nm-scan"),
+      scanFile: root.querySelector("#nm-scanfile"),
+      scanMsg: root.querySelector("#nm-scanmsg"),
       modes: root.querySelector(".nm-modes"),
     };
 
@@ -474,6 +481,12 @@ const RenderNutriMind = (() => {
       if (e.key === "Enter" && !e.shiftKey && !touch) { e.preventDefault(); submit(); }
     });
     view.input.addEventListener("input", autosize);
+    view.scan.addEventListener("click", () => { scanNote(""); view.scanFile.click(); });
+    view.scanFile.addEventListener("change", () => {
+      const f = view.scanFile.files && view.scanFile.files[0];
+      view.scanFile.value = "";
+      if (f) scanBarcode(f);
+    });
     root.querySelector("#nm-new").addEventListener("click", () => startNewChat());
     root.querySelector("#nm-hist").addEventListener("click", openDrawer);
     root.querySelector("#nm-d-new").addEventListener("click", () => { if (startNewChat()) closeDrawer(); });
@@ -966,8 +979,36 @@ const RenderNutriMind = (() => {
   const DOSING = /units? of (?:rapid|short|long)?[- ]?(?:acting )?insulin|insulin dos(?:e|ing)|units of insulin/i;
   const DIABETES_ASKED = /insulin|diabet|glucose|glycaem|glycem|carbohydrate counting|carb counting/i;
 
+  /* Barcode scanning: the photo is read in the browser (ZXing, via LabelScan). Only the digits are sent,
+   * as an ordinary NutriMind question, so the photo never leaves the device. */
+  function barcodeQuestion(code) {
+    return `What are the nutrition facts for the packaged product with barcode ${code}?`;
+  }
+  function scanNote(msg) {
+    if (!view || !view.scanMsg) return;
+    view.scanMsg.textContent = msg;
+    view.scanMsg.hidden = !msg;
+  }
+  async function scanBarcode(file) {
+    if (typeof LabelScan === "undefined") { scanNote("Barcode scanning is not available right now. Type the barcode number instead."); return; }
+    if (state.busy) { scanNote("Wait for the current answer, then scan again."); return; }
+    scanNote("Reading barcode\u2026");
+    view.scan.disabled = true;
+    try {
+      const { barcode } = await LabelScan.prepare(file);
+      if (barcode) { scanNote(""); ask(barcodeQuestion(barcode)); }
+      else scanNote("Could not read a barcode in that photo. Hold the camera steady, fill the frame with the bars, or type the number under the barcode.");
+    } catch (e) {
+      scanNote(e && e.message ? e.message : "Could not read that photo. Type the barcode number instead.");
+    } finally {
+      view.scan.disabled = false;
+    }
+  }
+
   async function ask(question, opts = {}) {
-    const q = String(question).trim().slice(0, MAX_Q);
+    let q = String(question).trim().slice(0, MAX_Q);
+    // A bare barcode number (8, 12, 13 or 14 digits with a valid check digit) is treated as a barcode lookup.
+    if (/^\d{8,14}$/.test(q) && typeof LabelScan !== "undefined" && LabelScan.gs1Ok(q)) q = barcodeQuestion(q);
     if (!q) return;
     if (state.stream) finishStream();
     if (state.busy) return;
