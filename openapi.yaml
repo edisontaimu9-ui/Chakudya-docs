@@ -21,13 +21,13 @@ info:
     Every operational route needs `Authorization: Bearer YOUR_API_KEY` (a consumer key from the developer console, or an
     admin or reviewer key). The only routes that work without a key are `GET /`, `GET /health` and the FHIR conformance
     reads (`GET /fhir/metadata`, `CodeSystem`, `OperationDefinition`, `StructureDefinition`, `ConceptMap`, `Questionnaire`).
-    `/developer/keys` takes your Supabase login token instead of an API key, and `POST /rag/webhook` takes a shared secret.
+    `/developer/keys` takes your Supabase login token instead of an API key, and `POST /rag/webhook` and `POST /hooks/signup` take a shared secret.
     Privileged registry writes (foods, exchange, renal, formulas, drug interactions, glycaemic index, reference tables,
     packaged CRUD and review, RAG ingest, bulk inserts) and key management need an admin key; a consumer key is refused
     there. Anonymous calls receive 401 with the code `api_key_required`. OAuth 2.0 was removed in v1.34.0.
 
     '
-  version: 1.69.0
+  version: 1.74.0
   contact:
     name: Edison Taimu
     x-location: Blantyre, Malawi
@@ -9130,6 +9130,25 @@ paths:
                 session_id:
                   type: string
                   description: Optional - enables memory-personalized answers.
+                history:
+                  type: array
+                  maxItems: 6
+                  description: Optional - the last few chat turns, oldest first. Used only to work out what a short follow-up
+                    such as "Compare with nsima" refers to; the answer is still built only from retrieved sources. The last 6
+                    entries are used and each text is cut to 400 characters.
+                  items:
+                    type: object
+                    required:
+                    - role
+                    - text
+                    properties:
+                      role:
+                        type: string
+                        enum:
+                        - user
+                        - assistant
+                      text:
+                        type: string
       responses:
         '200':
           description: Grounded answer with citations
@@ -9340,6 +9359,54 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '404':
           $ref: '#/components/responses/NotFound'
+  /hooks/signup:
+    post:
+      tags:
+      - Developer
+      summary: Sign-up notification webhook (shared secret)
+      description: 'Called by the database trigger on `auth.users` (sql/044) when a developer signs up. Sends one Telegram
+        message with the sign-up method and whether the address is confirmed. The email and user id are never sent. Authenticated
+        with the `x-webhook-secret` header (`SIGNUP_WEBHOOK_SECRET`), not a bearer token. Events other than an INSERT on
+        auth.users are skipped with a 200.'
+      security:
+      - signupWebhookSecret: []
+      parameters:
+      - name: x-webhook-secret
+        in: header
+        required: true
+        schema:
+          type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+              - type
+              - schema
+              - table
+              - record
+              properties:
+                type:
+                  type: string
+                  example: INSERT
+                schema:
+                  type: string
+                  example: auth
+                table:
+                  type: string
+                  example: users
+                record:
+                  type: object
+                  description: The new auth.users row. Only id, raw_app_meta_data.provider and email_confirmed_at are read.
+      responses:
+        '200':
+          $ref: '#/components/responses/MutationSuccess'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
   /rag/webhook:
     post:
       tags:
@@ -11327,6 +11394,11 @@ components:
       in: header
       name: x-webhook-secret
       description: Shared secret (INGEST_WEBHOOK_SECRET) for the database storage trigger. Only POST /rag/webhook uses it.
+    signupWebhookSecret:
+      type: apiKey
+      in: header
+      name: x-webhook-secret
+      description: Shared secret (SIGNUP_WEBHOOK_SECRET) for the auth.users sign-up trigger. Only POST /hooks/signup uses it.
     loginToken:
       type: http
       scheme: bearer

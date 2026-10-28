@@ -13,7 +13,7 @@ it's a separate, deployable-on-its-own frontend.
 Everything documented here was verified against the actual repository
 (`src/index.js`'s router and `routePolicy()`, the `src/fhir*.js` modules,
 `src/ragPipeline.js` and `wrangler.toml`) - nothing here was
-invented. Currently in line with API **v1.69.0**.
+invented. Currently in line with API **v1.74.0**.
 
 ---
 
@@ -216,11 +216,11 @@ of the OpenAPI document - they're read out of `routePolicy()` in
 
 ---
 
-## 6. Endpoints documented (286)
+## 6. Endpoints documented (287)
 
 Every route in the API's OpenAPI spec is documented. The `/surveillance` routes (added in API v1.54.0) are the one gap: the API's own spec does not list them yet, so they are not here either.
 `/manufacturers`, `/products`, and `/nutrition` were removed from the API in
-v1.15.0-v1.16.0 and no longer appear here. The list below matches API v1.69.0.
+v1.15.0-v1.16.0 and no longer appear here. The list below matches API v1.74.0.
 
 The portal UI renders **every** route in `openapi.json`: public, API-key, admin,
 root-only, login-token and webhook routes alike. Each endpoint page carries a
@@ -252,6 +252,7 @@ only)" summary in the spec.
 - `GET /developer/keys` - List your consumer API keys
 - `POST /developer/keys` - Create a consumer API key
 - `DELETE /developer/keys/{id}` - Revoke one of your keys
+- `POST /hooks/signup` - Sign-up notification webhook (shared secret, called by the `auth.users` trigger)
 
 **Foods**
 - `GET /foods` - List foods

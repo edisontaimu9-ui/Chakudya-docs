@@ -210,6 +210,7 @@ Every operational route needs `Authorization: Bearer <API key>`. Authentication 
 
 - `POST/GET/DELETE /developer/keys`: the caller's Supabase login access token, see [Developer portal](#developer-portal-and-consumer-keys-v1320)
 - `POST /rag/webhook`: the shared secret in the `x-webhook-secret` header (`INGEST_WEBHOOK_SECRET`)
+- `POST /hooks/signup`: the shared secret in the `x-webhook-secret` header (`SIGNUP_WEBHOOK_SECRET`), called by the `auth.users` sign-up trigger (sql/044)
 
 **Any valid API key** (a consumer key from the developer console, or a reviewer or admin key) is enough for
 everything else that reads data or computes, plus user-scoped data: all other `GET` routes,
