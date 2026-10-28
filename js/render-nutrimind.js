@@ -411,6 +411,7 @@ const RenderNutriMind = (() => {
   const SEND_ICON = '<svg width="18" height="18" viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M3 10h13M11 4.5 16.5 10 11 15.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
 
   const SCAN_ICON = '<svg width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M3 6.5V4.8A1.8 1.8 0 0 1 4.8 3h1.7M13.5 3h1.7A1.8 1.8 0 0 1 17 4.8v1.7M17 13.5v1.7a1.8 1.8 0 0 1-1.8 1.8h-1.7M6.5 17H4.8A1.8 1.8 0 0 1 3 15.2v-1.7M6.5 7v6M9 7v6M11 7v6M13.5 7v6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>';
+  const GALLERY_ICON = '<svg width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden="true"><rect x="3" y="4" width="14" height="12" rx="2" stroke="currentColor" stroke-width="1.5"/><circle cx="7.5" cy="8.5" r="1.3" stroke="currentColor" stroke-width="1.4"/><path d="M3.5 14l4-3.6 3 2.6 2.5-2.2 3.5 3.2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>';
   const HIST_ICON = '<svg width="16" height="16" viewBox="0 0 20 20" fill="none" aria-hidden="true"><circle cx="10" cy="10" r="7.2" stroke="currentColor" stroke-width="1.6"/><path d="M10 5.8V10l2.8 1.8" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>';
   const BRANCH_ICON = '<svg width="13" height="13" viewBox="0 0 16 16" fill="none" aria-hidden="true"><circle cx="4" cy="3.5" r="1.6" stroke="currentColor" stroke-width="1.4"/><circle cx="4" cy="12.5" r="1.6" stroke="currentColor" stroke-width="1.4"/><circle cx="12" cy="6" r="1.6" stroke="currentColor" stroke-width="1.4"/><path d="M4 5.1v5.8M12 7.6c0 2.2-2.4 2.4-5 2.8-1.2.2-3 .4-3 .9" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>';
   const RETRY_ICON = '<svg width="13" height="13" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M13.2 8A5.2 5.2 0 1 1 11.6 4.3M13.4 2.2v2.6h-2.6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>';
@@ -435,7 +436,9 @@ const RenderNutriMind = (() => {
           <div class="nm-box">
             <textarea id="nm-input" rows="1" maxlength="${MAX_Q}" placeholder="Ask about a food, nutrient or diet" aria-label="Your question"></textarea>
             <button type="button" class="nm-scan" id="nm-scan" aria-label="Scan a barcode" title="Scan a barcode">${SCAN_ICON}</button>
+            <button type="button" class="nm-scan" id="nm-scangal" aria-label="Upload barcode photos from your gallery" title="Upload barcode photos">${GALLERY_ICON}</button>
             <input type="file" id="nm-scanfile" accept="image/*" capture="environment" hidden>
+            <input type="file" id="nm-scanfiles" accept="image/*" multiple hidden>
             <button type="button" class="nm-send" id="nm-send" aria-label="Send question">${SEND_ICON}</button>
           </div>
           <p class="nm-scanmsg" id="nm-scanmsg" role="status" hidden></p>
@@ -468,6 +471,8 @@ const RenderNutriMind = (() => {
       send: root.querySelector("#nm-send"),
       scan: root.querySelector("#nm-scan"),
       scanFile: root.querySelector("#nm-scanfile"),
+      scanGal: root.querySelector("#nm-scangal"),
+      scanFiles: root.querySelector("#nm-scanfiles"),
       scanMsg: root.querySelector("#nm-scanmsg"),
       modes: root.querySelector(".nm-modes"),
     };
@@ -483,9 +488,15 @@ const RenderNutriMind = (() => {
     view.input.addEventListener("input", autosize);
     view.scan.addEventListener("click", () => { scanNote(""); view.scanFile.click(); });
     view.scanFile.addEventListener("change", () => {
-      const f = view.scanFile.files && view.scanFile.files[0];
+      const f = Array.from(view.scanFile.files || []);
       view.scanFile.value = "";
-      if (f) scanBarcode(f);
+      if (f.length) scanBarcode(f);
+    });
+    view.scanGal.addEventListener("click", () => { scanNote(""); view.scanFiles.click(); });
+    view.scanFiles.addEventListener("change", () => {
+      const f = Array.from(view.scanFiles.files || []);
+      view.scanFiles.value = "";
+      if (f.length) scanBarcode(f);
     });
     root.querySelector("#nm-new").addEventListener("click", () => startNewChat());
     root.querySelector("#nm-hist").addEventListener("click", openDrawer);
@@ -989,19 +1000,24 @@ const RenderNutriMind = (() => {
     view.scanMsg.textContent = msg;
     view.scanMsg.hidden = !msg;
   }
-  async function scanBarcode(file) {
+  async function scanBarcode(input) {
+    const files = (Array.isArray(input) ? input : [input]).filter((f) => f && /^image\//.test(f.type || "image/")).slice(0, 6);
+    if (!files.length) { scanNote("Choose a photo (JPG, PNG or WebP) that shows a barcode."); return; }
     if (typeof LabelScan === "undefined") { scanNote("Barcode scanning is not available right now. Type the barcode number instead."); return; }
     if (state.busy) { scanNote("Wait for the current answer, then scan again."); return; }
     scanNote("Reading barcode\u2026");
-    view.scan.disabled = true;
+    view.scan.disabled = true; view.scanGal.disabled = true;
     try {
-      const { barcode } = await LabelScan.prepare(file);
+      let barcode = null, lastErr = null;
+      for (const file of files) {
+        try { barcode = (await LabelScan.prepare(file)).barcode; } catch (e) { lastErr = e; }
+        if (barcode) break;
+      }
       if (barcode) { scanNote(""); ask(barcodeQuestion(barcode)); }
-      else scanNote("Could not read a barcode in that photo. Hold the camera steady, fill the frame with the bars, or type the number under the barcode.");
-    } catch (e) {
-      scanNote(e && e.message ? e.message : "Could not read that photo. Type the barcode number instead.");
+      else if (lastErr && lastErr.message) scanNote(lastErr.message);
+      else scanNote(files.length > 1 ? "Could not read a barcode in those photos. Use a sharp photo with the whole barcode in frame, or type the number under it." : "Could not read a barcode in that photo. Use a sharp photo with the whole barcode in frame, or type the number under it.");
     } finally {
-      view.scan.disabled = false;
+      view.scan.disabled = false; view.scanGal.disabled = false;
     }
   }
 
