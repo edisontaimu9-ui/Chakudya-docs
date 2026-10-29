@@ -14,7 +14,7 @@
   },
   "servers": [
     {
-      "url": "https://chakudya-api.edisontaimu9.workers.dev",
+      "url": "https://api.chakudya.xyz",
       "description": "Production (Cloudflare Workers)"
     }
   ],
