@@ -50,7 +50,7 @@ const RenderLanding = (() => {
   /** Hero photo: small file for phones, larger for desktop; the only eager image on the page. */
   function heroImg() {
     const alt = "A Malawian meal of nsima with fried fish, beans, greens and relish on a tray";
-    return `<img src="${IMG}hero-malawian-meal.webp" srcset="${IMG}hero-malawian-meal-600.webp 600w, ${IMG}hero-malawian-meal.webp 1000w" sizes="(max-width: 900px) 92vw, 560px" alt="${esc(alt)}" width="1000" height="750" fetchpriority="high" decoding="async" onerror="this.remove()" />`;
+    return `<img src="${IMG}hero-malawian-meal.webp" srcset="${IMG}hero-malawian-meal-600.webp 600w, ${IMG}hero-malawian-meal-800.webp 800w, ${IMG}hero-malawian-meal.webp 1000w" sizes="(max-width: 900px) 92vw, 560px" alt="${esc(alt)}" width="1000" height="750" fetchpriority="high" decoding="async" onerror="this.remove()" />`;
   }
 
   /* ───────── live data ───────── */
@@ -641,8 +641,10 @@ const RenderLanding = (() => {
     checkHealth().then((ok) => {
       const dot = root.querySelector("#lp-health-dot"), txt = root.querySelector("#lp-health-text");
       if (!dot || !dot.isConnected || !ok) return;
+      // Only the dot changes: rewriting the text made the pill wrap onto a second line and shifted the whole page (CLS).
       dot.classList.add("is-ok");
-      txt.textContent = "API online · Malawi's open nutrition intelligence platform";
+      dot.title = "API online";
+      txt.title = "API online";
     });
   }
 
