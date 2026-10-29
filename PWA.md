@@ -44,5 +44,9 @@ A new `BUILD` installs in the background. Open tabs show "Chakudya Nutrition Reg
 - Keep all paths relative (the site works under `/Chakudya-docs/` on GitHub Pages).
 - Supabase Redirect URLs must include the site URL (already needed for login).
 
+## Address bar showing inside the installed app
+Android shows a bar with an X, the page title and the domain (the Chrome Custom Tab look) when the app is in `minimal-ui`, when the current page is outside the manifest `scope`, or when a sign-in redirect (Google via Supabase) returns inside that tab. The manifest therefore asks for `standalone` only (no `minimal-ui` fallback) and starts at `./`.
+An installed app reads the manifest when it is installed, so after changing it: uninstall the app, clear Chrome's site data for chakudya.xyz, then install again. An app installed from the old github.io address keeps its old scope and must be reinstalled.
+
 ## Not done
 Fonts are still loaded from Google (cached after first use). Self-hosting them would make first-ever offline visits identical.
