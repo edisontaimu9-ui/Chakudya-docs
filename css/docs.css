@@ -5,17 +5,7 @@
    param tables, callouts, pager).
    ───────────────────────────────────────────────────────────── */
 
-/* Header: nav links + actions always right-aligned; wraps to its own row on small screens */
-.header-actions { margin-left: auto; }
-@media (max-width: 900px) {
-  .app-header__row { flex-wrap: wrap; row-gap: 4px; }
-  .header-nav { order: 9; flex: 1 1 100%; margin: 0 -6px; padding: 0 0 2px; overflow-x: auto; scrollbar-width: none; }
-  .header-nav::-webkit-scrollbar { display: none; }
-  .header-nav a { white-space: nowrap; padding: 8px 12px; }
-}
-@media (max-width: 560px) {
-  #github-link { display: none; }
-}
+/* Header layout rules (nav on its own row on phones) moved to landing.css so they are inlined in index.html and apply on first paint. */
 
 /* Sidebar: guide list + label */
 .nav-label {

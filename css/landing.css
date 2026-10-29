@@ -25,6 +25,18 @@ body.is-landing .loading-state { display: none; }
 .header-nav a:hover { color: var(--text-primary); background: var(--surface-hover); }
 .header-nav a[aria-current="page"] { color: var(--text-primary); background: var(--accent-bg); }
 
+/* Header: nav links + actions always right-aligned; wraps to its own row on small screens */
+.header-actions { margin-left: auto; }
+@media (max-width: 900px) {
+  .app-header__row { flex-wrap: wrap; row-gap: 4px; }
+  .header-nav { order: 9; flex: 1 1 100%; margin: 0 -6px; padding: 0 0 2px; overflow-x: auto; scrollbar-width: none; }
+  .header-nav::-webkit-scrollbar { display: none; }
+  .header-nav a { white-space: nowrap; padding: 8px 12px; }
+}
+@media (max-width: 560px) {
+  #github-link { display: none; }
+}
+
 .lp { --lp-gap: clamp(56px, 8vw, 104px); }
 .lp-section { margin-top: var(--lp-gap); scroll-margin-top: calc(var(--header-h) + 8px); }
 
