@@ -11,6 +11,10 @@
 /* On the landing page the sidebar is hidden and content goes full width. */
 body.is-landing .sidebar, body.is-landing .sidebar-scrim, body.is-landing .sidebar-toggle, body.is-landing .header-search { display: none !important; }
 body.is-landing .content { max-width: 1180px; padding: 24px 28px 0; }
+/* Static hero in index.html: only the landing route shows it (and hides the spinner). */
+#lp-prerender { display: none; }
+body.is-landing #lp-prerender { display: block; }
+body.is-landing .loading-state { display: none; }
 
 /* Header nav links */
 .header-nav { display: flex; align-items: center; gap: 2px; margin-left: 6px; }

@@ -595,12 +595,16 @@ const RenderLanding = (() => {
   /* ───────── render ───────── */
 
   function render(container) {
-    container.innerHTML = "";
     const showKey = typeof DevAuth !== "undefined" && DevAuth.configured();
+    // Reuse the hero that index.html already painted (no flicker, no layout shift); fall back to building it.
+    const prerendered = container.querySelector("#lp-prerender .lp-hero");
+    const hero = prerendered || heroSection({ showKey });
+    if (prerendered && !showKey) prerendered.querySelector(".lp-cta__link")?.remove();
+    container.innerHTML = "";
     const root = el(`<div class="lp"></div>`);
 
     root.append(
-      heroSection({ showKey }),
+      hero,
       statsSection(),
       contributeSection(),
       aboutSection(),

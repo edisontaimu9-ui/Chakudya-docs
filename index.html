@@ -98,8 +98,21 @@
 <link rel="stylesheet" href="css/layout.css" />
 <link rel="stylesheet" href="css/components.css" />
 <link rel="stylesheet" href="css/landing.css" />
-<link rel="stylesheet" href="css/nutrimind.css" />
-<link rel="stylesheet" href="css/docs.css" />
+<script>
+  // nutrimind.css and docs.css are not needed for the landing hero: load them without blocking first paint there.
+  // On every other route they stay render-blocking so those pages never flash unstyled.
+  (function () {
+    var landing = !location.hash || /^#\/?$/.test(location.hash);
+    ["css/nutrimind.css", "css/docs.css"].forEach(function (href) {
+      if (!landing) { document.write('<link rel="stylesheet" href="' + href + '">'); return; }
+      var l = document.createElement("link");
+      l.rel = "stylesheet"; l.href = href; l.media = "print";
+      l.onload = function () { l.media = "all"; };
+      document.head.appendChild(l);
+    });
+  })();
+</script>
+<noscript><link rel="stylesheet" href="css/nutrimind.css" /><link rel="stylesheet" href="css/docs.css" /></noscript>
 </head>
 <body>
 <script>
@@ -193,6 +206,36 @@
       <div class="loading-state">
         <div class="spinner" aria-hidden="true"></div>
         <p>Loading Chakudya…</p>
+      </div>
+      <!-- Static copy of the landing hero (identical to RenderLanding.heroSection) so the page paints without waiting for JS.
+           js/render-landing.js reuses this element instead of rebuilding it. Hidden on every route except the landing. -->
+      <div class="lp" id="lp-prerender">
+        <section class="lp-hero" aria-labelledby="lp-title">
+          <div class="lp-hero__glow" aria-hidden="true"></div>
+          <div class="lp-hero__copy">
+            <p class="lp-pill"><span class="lp-pill__dot" id="lp-health-dot" aria-hidden="true"></span><span id="lp-health-text">Malawi's open nutrition intelligence platform</span></p>
+            <h1 id="lp-title" class="lp-title">The intelligence behind better nutrition and <em>healthier lives.</em></h1>
+            <p class="lp-lead">Chakudya brings together food composition data, nutrition computation, growth and anthropometric assessment, disease-specific nutrition information, and clinical decision-support resources in one connected platform. Built for Malawi, designed for wider impact, and open to developers, students, researchers, health professionals, and innovators building the future of nutrition and health.</p>
+            <div class="lp-cta">
+              <a class="btn btn--primary btn--lg" href="#lp-try" data-scroll="lp-try">Explore nutrition data</a>
+              <a class="btn btn--lg" href="#lp-about" data-scroll="lp-about">Explore the platform</a>
+              <a class="lp-link lp-cta__link" href="#/account">Get an API key <span aria-hidden="true">&rarr;</span></a>
+            </div>
+            <p class="lp-trust__label">Platform highlights</p>
+            <ul class="lp-trust" aria-label="Platform highlights">
+              <li>Malawian food composition data</li>
+              <li>Nutrition computation and assessment</li>
+              <li>Clinical and disease-specific nutrition intelligence</li>
+              <li>Open infrastructure for health innovation</li>
+            </ul>
+          </div>
+          <div class="lp-hero__media">
+            <figure class="lp-photo lp-photo--hero">
+              <img src="assets/images/hero-malawian-meal.webp" srcset="assets/images/hero-malawian-meal-600.webp 600w, assets/images/hero-malawian-meal.webp 1000w" sizes="(max-width: 900px) 92vw, 560px" alt="A Malawian meal of nsima with fried fish, beans, greens and relish on a tray" width="1000" height="750" fetchpriority="high" decoding="async" onerror="this.remove()" />
+              <span class="lp-photo__ph" aria-hidden="true"><svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/></svg></span>
+            </figure>
+          </div>
+        </section>
       </div>
     </div>
   </main>
