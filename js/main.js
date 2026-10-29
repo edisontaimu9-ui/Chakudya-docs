@@ -105,7 +105,7 @@
 
   // ── Router ─────────────────────────────────────────────────
   function route() {
-    const hash = location.hash.replace(/^#\/?/, "");
+    const hash = Router.current();
     Seo.reset();
     // The landing page is full-width with no sidebar; docs and reference pages keep it.
     const isLanding = !hash;
@@ -160,6 +160,7 @@
     if (isLegal) {
       const legalId = hash.split("/")[1];
       if (!RenderLegal.has(legalId) || hash.split("/").length > 2) {
+        Seo.noindex(true);
         content.innerHTML = `
           <div class="empty-state">
             <h3>Page not found</h3>
@@ -178,11 +179,11 @@
     }
     if (hash === "reference") {
       // Old overview route: its content now lives in the docs guides.
-      location.replace("#/docs/getting-started");
+      Router.go("docs/getting-started", { replace: true });
       return;
     }
     if (isGuide) {
-      if (hash === "docs") { location.replace("#/docs/getting-started"); return; }
+      if (hash === "docs") { Router.go("docs/getting-started", { replace: true }); return; }
       // "#/docs/<guide>" or, for the guides split into smaller pages, "#/docs/<guide>/<page>".
       const parts = hash.split("/");
       const subId = parts[2];
@@ -190,6 +191,7 @@
         const back = subId && RenderDocs.has(guideId)
           ? `<a class="btn" href="#/docs/${RenderEndpoint.escapeHtml(guideId)}">Back to ${RenderEndpoint.escapeHtml(RenderDocs.meta(guideId).title)}</a>`
           : `<a class="btn" href="#/docs/getting-started">Go to Getting Started</a>`;
+        Seo.noindex(true);
         content.innerHTML = `
           <div class="empty-state">
             <h3>Page not found</h3>
@@ -214,6 +216,7 @@
     if (hash === "account") {
       RenderAccount.show(content);
       Seo.set("Developer account and API keys", "Sign in to create and manage Chakudya API keys for higher rate limits.");
+      Seo.noindex(true);
       Sidebar.setActive(null);
       AppState.set({ activeId: null });
       document.getElementById("main").focus({ preventScroll: true });
@@ -223,6 +226,7 @@
     }
     const endpoint = endpoints.find((e) => e.slug === hash);
     if (!endpoint) {
+      Seo.noindex(true);
       content.innerHTML = `
         <div class="empty-state">
           <h3>Endpoint not found</h3>
@@ -241,10 +245,13 @@
     closeSidebar();
   }
 
+  // Real paths now (/docs/errors/). Router handles link clicks and back/forward, then calls route().
+  Router.init(route);
   window.addEventListener("hashchange", async () => {
     // A confirmation / reset link opened while the docs are already loaded.
-    if (/access_token=|error_description=/.test(location.hash)) applyRedirect(await DevAuth.handleRedirect());
-    route();
+    if (/access_token=|error_description=/.test(location.hash)) { applyRedirect(await DevAuth.handleRedirect()); route(); return; }
+    // An old-style "#/docs/errors" link typed or pasted into the address bar.
+    if (/^#\/./.test(location.hash)) route();
   });
   route();
 
@@ -264,6 +271,6 @@
     const target = e.key === "ArrowLeft" ? list[i - 1] : list[i + 1];
     if (!target) return;
     e.preventDefault();
-    location.hash = `#/${target.slug}`;
+    Router.go(target.slug);
   });
 })();

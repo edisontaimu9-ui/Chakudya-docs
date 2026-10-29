@@ -63,7 +63,7 @@ const PwaModule = (() => {
   async function register() {
     if (!("serviceWorker" in navigator) || !secure) return;
     try {
-      const reg = await navigator.serviceWorker.register("sw.js", { scope: "./", updateViaCache: "none" });
+      const reg = await navigator.serviceWorker.register("/sw.js", { scope: "/", updateViaCache: "none" });
       if (reg.waiting && navigator.serviceWorker.controller) promptUpdate(reg.waiting);
       reg.addEventListener("updatefound", () => trackInstalling(reg));
       document.addEventListener("visibilitychange", () => {

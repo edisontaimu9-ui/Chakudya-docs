@@ -44,21 +44,34 @@ service worker, icons, offline strategy, install requirements).
 
 | Route | Page |
 |---|---|
-| `#/` | Consumer landing page (no sidebar) |
-| `#/docs/getting-started` | Getting Started: base URL, first request, live status |
-| `#/docs/endpoints` | API Endpoints: what the API provides, by resource |
-| `#/docs/authentication` | Authentication: key types, open routes, consumer keys, rate limits |
-| `#/docs/examples` | Request & Response Examples: overview of the pages below |
-| `#/docs/examples/<page>` | `response-format`, `foods`, `meals`, `knowledge` |
-| `#/docs/schemas` | Data Schemas: every `components.schemas` entry in the spec |
-| `#/docs/errors` | Error Handling: status codes, headers, retries |
-| `#/docs/integrations` | Integrations: overview of the pages below |
-| `#/docs/integrations/<page>` | `web-sdk`, `fhir`, `ai-rag`, `batching` |
-| `#/docs/api-reference` | API Reference: search every route, or browse by category |
-| `#/docs/api-reference/<category>` | `foods`, `meals`, `growth`, `velocity`, `diets`, `clinical`, `fhir`, `ai`, `platform` |
-| `#/<method>-<path-slug>` | One endpoint page (unchanged), e.g. `#/get-foods` |
-| `#/account` | Developer login and consumer keys (unchanged) |
-| `#/reference` | Legacy link; redirects to `#/docs/getting-started` |
+| `/` | Consumer landing page (no sidebar) |
+| `/docs/getting-started/` | Getting Started: base URL, first request, live status |
+| `/docs/endpoints/` | API Endpoints: what the API provides, by resource |
+| `/docs/authentication/` | Authentication: key types, open routes, consumer keys, rate limits |
+| `/docs/examples/` | Request & Response Examples: overview of the pages below |
+| `/docs/examples/<page>/` | `response-format`, `foods`, `meals`, `knowledge` |
+| `/docs/schemas/` | Data Schemas: every `components.schemas` entry in the spec |
+| `/docs/errors/` | Error Handling: status codes, headers, retries |
+| `/docs/integrations/` | Integrations: overview of the pages below |
+| `/docs/integrations/<page>/` | `web-sdk`, `fhir`, `ai-rag`, `batching` |
+| `/docs/api-reference/` | API Reference: search every route, or browse by category |
+| `/docs/api-reference/<category>/` | `foods`, `meals`, `growth`, `velocity`, `diets`, `clinical`, `fhir`, `ai`, `platform` |
+| `/api/<method>-<path-slug>/` | One endpoint page, e.g. `/api/get-foods/` |
+| `/account/` | Developer login and consumer keys (not indexed) |
+| `/nutrimind/`, `/submit/`, `/legal/<page>/` | NutriMind, packaged-food submission, legal pages |
+| `/#/docs/errors` etc. | Old hash links still work: they are rewritten to the real path on load |
+
+Every route is a real URL with its own generated HTML file (own title, description, canonical, Open Graph
+tags and breadcrumb data), so Google can index each page. Those files, `sitemap.xml` and `404.html` are produced
+by `tools/build-pages.mjs`, which reads `openapi.json` and the app's own guide/legal lists. **Run it whenever the
+spec, `index.html` or the page lists change, then commit the result:**
+
+```bash
+node tools/build-pages.mjs && node tools/stamp-sw.mjs
+```
+
+`node tools/build-pages.mjs --check` exits 1 if the generated files are out of date (handy in CI).
+The site must be served from the domain root (as `chakudya.xyz` is), because asset and page paths start with `/`.
 
 The 36 spec tags are grouped into the API Reference categories by `REF_CATEGORIES` in `js/render-docs.js`.
 A tag that is not listed there (for example one added to the spec later) appears under a "More routes"

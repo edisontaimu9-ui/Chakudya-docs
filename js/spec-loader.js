@@ -135,11 +135,11 @@ const SpecLoader = (() => {
 
   async function load() {
     const [spec, metadata] = await Promise.all([
-      fetch("openapi.json").then((r) => {
+      fetch("/openapi.json").then((r) => {
         if (!r.ok) throw new Error(`openapi.json: HTTP ${r.status}`);
         return r.json();
       }),
-      fetch("data/endpoint-metadata.json")
+      fetch("/data/endpoint-metadata.json")
         .then((r) => (r.ok ? r.json() : null))
         .catch(() => null),
     ]);

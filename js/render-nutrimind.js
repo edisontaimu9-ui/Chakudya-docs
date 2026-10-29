@@ -422,7 +422,7 @@ const RenderNutriMind = (() => {
     const root = el(`
       <div class="nm">
         <div class="nm-head">
-          <img class="nm-head__logo" src="assets/images/nutrimind-mark-96.png" srcset="assets/images/nutrimind-mark-192.png 2x" width="48" height="48" alt="" />
+          <img class="nm-head__logo" src="/assets/images/nutrimind-mark-96.png" srcset="/assets/images/nutrimind-mark-192.png 2x" width="48" height="48" alt="" />
           <div class="nm-head__text">
             <h1 class="nm-head__title">Chakudya NutriMind</h1>
             <p class="nm-head__sub">Nutrition answers from the Chakudya Nutrition Registry</p>
@@ -677,7 +677,7 @@ const RenderNutriMind = (() => {
     if (!hero) hero = buildHero();
     const w = el(`
       <div class="nm-welcome">
-        <img class="nm-welcome__logo" src="assets/images/nutrimind-logo-420.webp" width="120" height="120" alt="Chakudya NutriMind logo" />
+        <img class="nm-welcome__logo" src="/assets/images/nutrimind-logo-420.webp" width="120" height="120" alt="Chakudya NutriMind logo" />
         <h2></h2>
         <p></p>
         <div class="nm-prompts"></div>
@@ -803,7 +803,7 @@ const RenderNutriMind = (() => {
     }
     const b = el(`
       <div class="nm-msg nm-msg--bot${m.error ? " nm-msg--error" : ""}">
-        <img class="nm-avatar" src="assets/images/nutrimind-mark-96.png" width="28" height="28" alt="" />
+        <img class="nm-avatar" src="/assets/images/nutrimind-mark-96.png" width="28" height="28" alt="" />
         <div class="nm-bubble"></div>
       </div>
     `);
@@ -866,7 +866,7 @@ const RenderNutriMind = (() => {
   function typingEl() {
     return el(`
       <div class="nm-msg nm-msg--bot" role="status" aria-label="NutriMind is thinking">
-        <img class="nm-avatar" src="assets/images/nutrimind-mark-96.png" width="28" height="28" alt="" />
+        <img class="nm-avatar" src="/assets/images/nutrimind-mark-96.png" width="28" height="28" alt="" />
         <div class="nm-bubble nm-typing"><span></span><span></span><span></span></div>
       </div>
     `);

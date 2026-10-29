@@ -11,7 +11,7 @@
  *   - The API version comes from the spec's info.version.
  */
 const RenderLanding = (() => {
-  const IMG = "assets/images/";
+  const IMG = "/assets/images/";
   const reduceMotion = () => window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
   // Live record counts. One request per resource per page load, cached in memory.
@@ -365,7 +365,7 @@ const RenderLanding = (() => {
     return el(`
       <section class="lp-section lp-nutrimind reveal" id="lp-nutrimind" aria-labelledby="lp-nm-h">
         <div class="lp-try__panel lp-nm__panel">
-          <img class="lp-nm__logo" src="assets/images/nutrimind-logo-420.webp" width="112" height="112" alt="Chakudya NutriMind logo" loading="lazy" />
+          <img class="lp-nm__logo" src="/assets/images/nutrimind-logo-420.webp" width="112" height="112" alt="Chakudya NutriMind logo" loading="lazy" />
           <div class="lp-try__copy">
             <p class="lp-kicker">Nutrition assistant</p>
             <h2 id="lp-nm-h">Ask Chakudya NutriMind</h2>
@@ -403,7 +403,7 @@ const RenderLanding = (() => {
       ["Everyone", "heart", "Look up what's in everyday Malawian meals, from nsima to relish, in familiar portions.", "#lp-try", "Try a lookup"],
       ["Students", "book", "Learn with real composition data, glycaemic index, exchange lists and growth references instead of textbook tables.", "#/docs/api-reference", "Browse the data"],
       ["Health professionals", "steth", "Support nutrition care with growth assessment and renal, tube-feeding and drug-interaction information.", epLink("GET", "/growth/assess"), "See growth assessment"],
-      ["Researchers", "flask", "Find consistent, citable food and growth reference data with documented sources.", "openapi.json", "Download the data spec"],
+      ["Researchers", "flask", "Find consistent, citable food and growth reference data with documented sources.", "/openapi.json", "Download the data spec"],
       ["Food businesses", "store", "Standardised nutrition labels, barcode lookup and recipe nutrition totals for products and menus.", epLink("GET", "/foods/{id}/label"), "See label data"],
       ["Developers", "code", "Build apps on the same data with an open API, interactive docs and free keys.", "#lp-dev", "For developers"],
     ];
@@ -485,7 +485,7 @@ const RenderLanding = (() => {
           <div class="tag-list lp-dev__tech">${tech.map((t) => `<span>${esc(t)}</span>`).join("")}</div>
           <div class="lp-cta">
             <a class="btn btn--primary" href="#/docs/getting-started">Read the docs</a>
-            <a class="btn" href="openapi.yaml" download>Download openapi.yaml</a>
+            <a class="btn" href="/openapi.yaml" download>Download openapi.yaml</a>
           </div>
         </div>
         <div class="lp-code">
@@ -528,7 +528,7 @@ const RenderLanding = (() => {
       <footer class="lp-footer">
         <div class="lp-footer__grid">
           <div class="lp-footer__brand">
-            <img class="lp-footer__logo" src="assets/images/chakudya-logo-192.webp" alt="Chakudya Nutrition Registry logo" width="72" height="72" loading="lazy" onerror="this.remove()" />
+            <img class="lp-footer__logo" src="/assets/images/chakudya-logo-192.webp" alt="Chakudya Nutrition Registry logo" width="72" height="72" loading="lazy" onerror="this.remove()" />
             <p class="lp-footer__name">Chakudya Nutrition Registry</p>
             <p class="lp-footer__tag">Better food data. Healthier Malawi.</p>
             <nav class="lp-footer__connect" aria-label="Connect">
@@ -548,7 +548,7 @@ const RenderLanding = (() => {
             <a href="#lp-mission" data-scroll="lp-mission">About Chakudya</a>
             <a href="#/docs/getting-started">Documentation</a>
             <a href="#/docs/api-reference">API Reference</a>
-            <a href="openapi.json" download>OpenAPI spec</a>
+            <a href="/openapi.json" download>OpenAPI spec</a>
             <a href="https://github.com/edisontaimu9-ui/chakudya-api" target="_blank" rel="noopener">GitHub</a>
             <a href="https://wa.me/265886295324" target="_blank" rel="noopener">Thanzi Coach on WhatsApp</a>
           </nav>

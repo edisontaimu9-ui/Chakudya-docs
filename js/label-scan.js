@@ -2,7 +2,7 @@
  * with ZXing (self-hosted, loaded only when the first photo is added). Nothing leaves the device
  * until the person presses Submit. */
 const LabelScan = (() => {
-  const ZX_SRC = "assets/vendor/zxing-library-0.21.3.min.js";
+  const ZX_SRC = "/assets/vendor/zxing-library-0.21.3.min.js";
   const MAX_EDGE = 1600;          // long edge of the photo that is sent
   const MAX_DATAURL_CHARS = 900000; // about 650 KB per photo after compression
   let zxPromise = null;

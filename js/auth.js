@@ -16,7 +16,8 @@ const DevAuth = (() => {
     const c = cfg();
     return Boolean(c.supabaseUrl && c.supabaseAnonKey && !/^PASTE/i.test(c.supabaseAnonKey));
   };
-  const redirectUrl = () => location.origin + location.pathname;
+  // Always the site root, so the redirect URL allow-listed in Supabase keeps working from any page.
+  const redirectUrl = () => location.origin + "/";
   const nowSec = () => Math.floor(Date.now() / 1000);
 
   function loadSession() {

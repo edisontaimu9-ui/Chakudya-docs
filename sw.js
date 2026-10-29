@@ -16,7 +16,7 @@
  *   Run it before every deploy. A new BUILD installs a new cache in the background; the page
  *   then offers a "Reload" button (see js/pwa.js) so HTML and JS are never mixed across versions.
  */
-const BUILD = "1931ed0c2f3c";
+const BUILD = "36fc218fef7e";
 
 const SHELL_CACHE = "chakudya-shell-" + BUILD;
 const DATA_CACHE = "chakudya-data-v1";
@@ -37,6 +37,7 @@ const CORE = [
   "js/config.js",
   "js/state.js",
   "js/seo.js",
+  "js/router.js",
   "js/theme.js",
   "js/spec-loader.js",
   "js/schema-example.js",
@@ -90,6 +91,18 @@ const abs = (p) => new URL(p, scopeUrl).href;
 const INDEX = abs("index.html");
 const OFFLINE = abs("offline.html");
 const DATA_URLS = new Set(DATA.map(abs));
+
+// Page URLs the app answers itself (/, /docs/..., /api/<endpoint>/, ...). Every other path - /admin/,
+// sitemap.xml, robots.txt, the Google verification file, openapi.json - must reach the real file.
+const APP_PREFIXES = ["docs/", "api/", "nutrimind/", "submit/", "account/", "legal/"];
+function isAppRoute(url) {
+  const base = new URL(scopeUrl).pathname;
+  if (url.pathname === base || url.pathname === new URL(INDEX).pathname) return true;
+  if (!url.pathname.startsWith(base)) return false;
+  let rest = url.pathname.slice(base.length);
+  if (!rest.endsWith("/")) rest += "/";
+  return APP_PREFIXES.some((p) => rest.startsWith(p));
+}
 
 self.addEventListener("install", (event) => {
   event.waitUntil((async () => {
@@ -195,8 +208,7 @@ self.addEventListener("fetch", (event) => {
     if (req.mode === "navigate") {
       // Only the app itself gets the cached shell. Opening sitemap.xml, robots.txt, a
       // verification file or the spec directly in a tab must reach the real file.
-      const appPaths = [new URL(scopeUrl).pathname, new URL(INDEX).pathname];
-      if (appPaths.includes(url.pathname)) event.respondWith(handleNavigation());
+      if (isAppRoute(url)) event.respondWith(handleNavigation());
       return;
     }
     if (DATA_URLS.has(url.origin + url.pathname)) { event.respondWith(networkFirst(req)); return; }

@@ -304,7 +304,7 @@ const RenderDocs = (() => {
         <li><strong>Get an API key.</strong> <a href="#/account">Sign in</a> and create a self-service key. Only <code>GET /</code>, <code>GET /health</code> and the FHIR conformance reads work without one.</li>
         <li><strong>Send it as a bearer token.</strong> Add <code>Authorization: Bearer YOUR_API_KEY</code> to each request. Consumer keys get three times the standard rate limit and FHIR access.</li>
         <li><strong>Explore the reference.</strong> Every endpoint has parameters, example requests and responses, and a live <em>Try it</em> console in the <a href="#/docs/api-reference">API Reference</a>.</li>
-        <li><strong>Use the spec.</strong> Download <a href="openapi.yaml" download>openapi.yaml</a> or <a href="openapi.json" download>openapi.json</a> to generate clients or import into any OpenAPI 3 tool.</li>
+        <li><strong>Use the spec.</strong> Download <a href="/openapi.yaml" download>openapi.yaml</a> or <a href="/openapi.json" download>openapi.json</a> to generate clients or import into any OpenAPI 3 tool.</li>
       </ol>`);
 
     const next = el(`
@@ -600,7 +600,7 @@ const RenderDocs = (() => {
     return page("schemas",
       `The reusable object shapes defined in the OpenAPI spec. Most endpoints also show their own request and response examples on their reference page. Examples below are generated from the spec's own declared fields and examples.`,
       [
-        section("index", "Schemas", p(`${names.length} shared schemas are defined in <a href="openapi.json" download>openapi.json</a>.`), chips),
+        section("index", "Schemas", p(`${names.length} shared schemas are defined in <a href="/openapi.json" download>openapi.json</a>.`), chips),
         ...items,
       ]);
   }
@@ -738,7 +738,7 @@ const RenderDocs = (() => {
             el(`<p><a class="btn" href="https://github.com/edisontaimu9-ui/Chakudya-sdk" target="_blank" rel="noopener">Chakudya-sdk on GitHub</a></p>`)),
           section("openapi", "OpenAPI spec",
             p("The whole API is described in OpenAPI 3. Download it to generate a typed client in your language, or import it into any OpenAPI-compatible tool."),
-            el(`<p class="doc-actions"><a class="btn" href="openapi.yaml" download>Download openapi.yaml</a><a class="btn" href="openapi.json" download>Download openapi.json</a></p>`)),
+            el(`<p class="doc-actions"><a class="btn" href="/openapi.yaml" download>Download openapi.yaml</a><a class="btn" href="/openapi.json" download>Download openapi.json</a></p>`)),
         ],
       },
       {
@@ -886,7 +886,7 @@ const RenderDocs = (() => {
         section("routes", "Find a route", filter, results, empty),
         browse,
         section("spec", "Machine-readable spec",
-          el(`<p class="doc-actions"><a class="btn" href="openapi.yaml" download>Download openapi.yaml</a><a class="btn" href="openapi.json" download>Download openapi.json</a></p>`)),
+          el(`<p class="doc-actions"><a class="btn" href="/openapi.yaml" download>Download openapi.yaml</a><a class="btn" href="/openapi.json" download>Download openapi.json</a></p>`)),
       ]);
   }
 
@@ -932,5 +932,8 @@ const RenderDocs = (() => {
     container.appendChild(root);
   }
 
-  return { SECTIONS, has, meta, render, refCategoryFor };
+  /** Sub-pages of a guide as plain data: [{ id, title, blurb }] (used by tools/build-pages.mjs). */
+  const subpages = (id) => (SUBPAGES[id] ? SUBPAGES[id]().map((x) => ({ id: x.id, title: x.title, blurb: x.blurb })) : []);
+
+  return { SECTIONS, has, meta, render, refCategoryFor, subpages };
 })();

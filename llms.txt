@@ -7,9 +7,9 @@ Chakudya means "food" in Chichewa. The registry is served through a public REST 
 ## Documentation
 
 - [Home](https://chakudya.xyz/): Overview of the registry, live record counts and a food lookup demo
-- [Getting started](https://chakudya.xyz/#/docs/getting-started): First API request and authentication
-- [API reference](https://chakudya.xyz/#/docs/api-reference): Every endpoint, parameters and example responses
-- [NutriMind](https://chakudya.xyz/#/nutrimind): Nutrition assistant that answers with sources from the registry
+- [Getting started](https://chakudya.xyz/docs/getting-started/): First API request and authentication
+- [API reference](https://chakudya.xyz/docs/api-reference/): Every endpoint, parameters and example responses
+- [NutriMind](https://chakudya.xyz/nutrimind/): Nutrition assistant that answers with sources from the registry
 
 ## Machine-readable
 
@@ -20,4 +20,4 @@ Chakudya means "food" in Chichewa. The registry is served through a public REST 
 ## Optional
 
 - [Source code](https://github.com/edisontaimu9-ui/chakudya-api): API repository on GitHub
-- [Submit a packaged food](https://chakudya.xyz/#/submit): Contribute a missing product
+- [Submit a packaged food](https://chakudya.xyz/submit/): Contribute a missing product
