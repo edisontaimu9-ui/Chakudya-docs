@@ -1,0 +1,23 @@
+# Chakudya Nutrition Registry
+
+> Open nutrition data and intelligence infrastructure for Malawi: food composition, growth references, clinical nutrition data and an API for health professionals, researchers, students and developers.
+
+Chakudya means "food" in Chichewa. The registry is served through a public REST API described by an OpenAPI specification.
+
+## Documentation
+
+- [Home](https://chakudya.xyz/): Overview of the registry, live record counts and a food lookup demo
+- [Getting started](https://chakudya.xyz/#/docs/getting-started): First API request and authentication
+- [API reference](https://chakudya.xyz/#/docs/api-reference): Every endpoint, parameters and example responses
+- [NutriMind](https://chakudya.xyz/#/nutrimind): Nutrition assistant that answers with sources from the registry
+
+## Machine-readable
+
+- [OpenAPI specification (JSON)](https://chakudya.xyz/openapi.json): Full API description
+- [OpenAPI specification (YAML)](https://chakudya.xyz/openapi.yaml): Same specification in YAML
+- [Sitemap](https://chakudya.xyz/sitemap.xml): Indexable pages
+
+## Optional
+
+- [Source code](https://github.com/edisontaimu9-ui/chakudya-api): API repository on GitHub
+- [Submit a packaged food](https://chakudya.xyz/#/submit): Contribute a missing product
