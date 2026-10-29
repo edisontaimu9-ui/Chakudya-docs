@@ -1593,7 +1593,7 @@ Calculators from Krause and Mahan's *Food and the Nutrition Care Process*, 16th 
 | `POST /sports/plan` | All of the above for one athlete; each section as its own endpoint returns it, a bad value only errors its section |
 
 ```bash
-curl -X POST https://chakudya-api.edisontaimu9.workers.dev/sports/energy \
+curl -X POST https://api.chakudya.xyz/sports/energy \
   -H "Authorization: Bearer YOUR_KEY" -H "Content-Type: application/json" \
   -d '{"weight_kg":79.5,"lean_body_mass_kg":71.6,"activity_level":"extra_active"}'
 # REE 2075, x 1.9 = 3943, TEF 394, total 4337 kcal (Box 23.2 prints 4336: the chapter rounds as it goes)
@@ -1618,7 +1618,7 @@ Calculators from Krause and Mahan's *Food and the Nutrition Care Process*, 16th 
 | `POST /weight-management/diet-pattern` | Daily grams to energy, AMDR comparison, pattern tags (very low fat, ketogenic, high-protein low-carbohydrate), nutrients at risk, protein g/kg |
 
 ```bash
-curl -X POST https://chakudya-api.edisontaimu9.workers.dev/weight-management/loss-plan \
+curl -X POST https://api.chakudya.xyz/weight-management/loss-plan \
   -H "Authorization: Bearer YOUR_KEY" -H "Content-Type: application/json" \
   -d '{"sex":"female","age_years":35,"weight_kg":81.8,"height_cm":165.1,"pal_category":"sedentary"}'
 # maintenance 2124 kcal (IOM overweight equation), intake 1624 kcal, guideline 0.5-1 lb/week
@@ -1643,7 +1643,7 @@ Calculators from Krause and Mahan's *Food and the Nutrition Care Process*, 16th 
 | `POST /pregnancy/assess` | Independent sections: anemia by trimester with altitude and smoking, Table 14.4 labs, GDM glucose tests, preeclampsia criteria |
 
 ```bash
-curl -X POST https://chakudya-api.edisontaimu9.workers.dev/pregnancy/plan \
+curl -X POST https://api.chakudya.xyz/pregnancy/plan \
   -H "Authorization: Bearer YOUR_KEY" -H "Content-Type: application/json" \
   -d '{"status":"pregnant","age_years":28,"pre_pregnancy_weight_kg":60,"height_cm":162,"pal_category":"low_active","lmp":"2026-04-01","current_weight_kg":66}'
 # trimester 3: energy 2559 kcal (2107 + 452), protein 73 g (1.1 g/kg), iron 27 mg, folate 600 µg DFE
@@ -1671,7 +1671,7 @@ Calculators built on the *KDOQI Clinical Practice Guideline for Nutrition in CKD
 | `POST /renal-nutrition/food-plan` | Same body as `/requirements`, plus optional `exchange_type`, `q`, `limit` (1-300), `share_flag_pct` (5-100, default 25), `potassium_mg_per_day_max`, `phosphorus_mg_per_day_max`, `legacy_krause_limits`. Reads `exchange_lists` and `renal_foods` (read only) and returns each exchange item as a percentage of the daily protein, sodium, potassium and phosphorus limits, per-group averages with the exchanges that fit before the tightest limit, and the matching `renal_foods` row |
 
 ```bash
-curl -X POST https://chakudya-api.edisontaimu9.workers.dev/renal-nutrition/plan \
+curl -X POST https://api.chakudya.xyz/renal-nutrition/plan \
   -H "Authorization: Bearer YOUR_KEY" -H "Content-Type: application/json" \
   -d '{"sex":"male","age_years":67,"creatinine_mg_dl":3.3,"weight_kg":48,"height_cm":170,"diabetes":true,"labs":{"potassium_meq_l":5.8,"phosphorus_mg_dl":6.7}}'
 # eGFR 19.7 (G4) -> ckd_3_5; protein 0.6-0.8 g/kg (diabetes) on the adjusted weight; potassium and phosphorus flagged high with diet actions
@@ -1680,7 +1680,7 @@ curl -X POST https://chakudya-api.edisontaimu9.workers.dev/renal-nutrition/plan 
 **Linking the targets to the food exchange list (`v1.50.0+`).** `POST /renal-nutrition/food-plan` runs `/requirements` unchanged and divides its daily targets by what one exchange of each food supplies. Protein (KDOQI 2020, g/day maximum) and sodium (under 2.3 g/day) come from the targets. KDOQI 2020 gives no potassium or phosphorus intake number, so those budgets exist only when you send `potassium_mg_per_day_max` or `phosphorus_mg_per_day_max` (labelled `clinician-set`) or `legacy_krause_limits: true` (Krause Table 35.9, labelled older than KDOQI 2020). The column names of `exchange_lists` and `renal_foods` are detected rather than assumed: the result lists them in `field_map` and any nutrient it could not find in `missing_fields`. A value missing from an exchange row (`exchange_lists` has no sodium, potassium or phosphorus) is filled from the matching `renal_foods` row (`po4`, `na`, `k`) only on a strong name match, and marked `filled_from_renal_foods`. A one-word name match is returned as `renal_foods_possible_match` and nothing is copied. `renal_foods` values are for that row's own portion (`grams`, `measure`), not per 100 g. The share-of-day figures, group averages, `share_flag_pct` flag and the name matching are arithmetic added by this API, not from KDOQI 2020 or Krause.
 
 ```bash
-curl -X POST https://chakudya-api.edisontaimu9.workers.dev/renal-nutrition/food-plan \
+curl -X POST https://api.chakudya.xyz/renal-nutrition/food-plan \
   -H "Authorization: Bearer YOUR_KEY" -H "Content-Type: application/json" \
   -d '{"status":"hd","weight_kg":60,"potassium_mg_per_day_max":2000,"exchange_type":"protein"}'
 ```
@@ -1721,7 +1721,7 @@ Tube feeding prescription calculator that follows the Edge Nutrition *Tube Feedi
 Warnings are raised for adult rates above 150 ml/hr, flushes above 300 ml, adult refeeding fluid of 2 L/day or more, and overfeeding in ventilated patients (prescribed energy more than 5% above goal).
 
 ```bash
-curl -X POST https://chakudya-api.edisontaimu9.workers.dev/enteral-nutrition/calculate \
+curl -X POST https://api.chakudya.xyz/enteral-nutrition/calculate \
   -H "Authorization: Bearer $KEY" -H "Content-Type: application/json" \
   -d '{"kcal_needs":1800,"protein_needs_g":100,"fluid_needs_ml":2100,"weight_kg":70,
        "formula":{"kcal_per_ml":1.2,"protein_g_per_l":55.5,"water_ml_per_l":807}}'
@@ -1756,7 +1756,7 @@ Standardises the variables that differ between clinical nutrition studies so dat
 **Response.** `summary` (counts, conversions, flags), `warnings`, `columns` (how each column was matched and which unit source it used), `variables` (per variable: n, converted, out of range, mean, SD, median, range), `records` (`standardised`, `derived`, `diagnoses`, `flags`) and `table` (`columns`, `units`, `rows`, ready for R or pandas).
 
 ```bash
-curl -X POST https://chakudya-api.edisontaimu9.workers.dev/research/harmonise \
+curl -X POST https://api.chakudya.xyz/research/harmonise \
   -H "Authorization: Bearer $KEY" -H "Content-Type: application/json" \
   -d '{"unit_system":"si","studies":[
         {"study_id":"A","units":{"albumin":"g/dL","glucose":"mg/dL","weight":"lb","height":"in"},"records":[{"id":1,"age":40,"weight":160,"height":70,"albumin":3.1,"glucose":100}]},
@@ -1786,7 +1786,7 @@ Follows nutrition outcomes over repeated visits so cohort studies and follow-up 
 **Cohort.** Participants carry an optional `group`. The response has paired change with 95% intervals, transition tables from first to last assessed visit, incidence (new cases among those without the condition at the start) and recovery (among those with it), follow-up time, retention against `schedule_days` (days since each participant's first visit, within `schedule_tolerance_days`, default 14), a two-group Welch comparison, and with `include_table: true` a flat participant-visit table (`cond_*` columns hold the 0/1/2 states) ready for R or pandas. A participant that cannot be analysed (bad dates, duplicate id) is listed under `excluded` and the rest are still analysed; `include_visits: true` returns every participant's visit-by-visit detail instead of one summary line. Limits: 300 participants, 60 visits each, 3000 visits in all.
 
 ```bash
-curl -X POST https://chakudya-api.edisontaimu9.workers.dev/longitudinal/cohort \
+curl -X POST https://api.chakudya.xyz/longitudinal/cohort \
   -H "Authorization: Bearer $KEY" -H "Content-Type: application/json" \
   -d '{"participants":[
         {"id":"a","group":"intervention","sex":"girls","birth_date":"2023-06-01","visits":[{"date":"2024-06-01","muac_cm":11.2},{"date":"2024-09-01","muac_cm":12.8}]},
@@ -1830,7 +1830,7 @@ Population-level summaries of child malnutrition from survey or study records, u
 **Intervals and surveys.** Wilson by default or exact (`ci_method`), `confidence_level` 0.95; mean z-scores use a t interval. Intervals assume simple random sampling: send `design_effect` from your survey software for a cluster survey. Sampling weights are not applied, so prevalences from a weighted survey will not match published weighted estimates. `population: {"children": 120000}` adds expected prevalent cases (prevalence x population, with the interval scaled): cases at the time of the survey, not new cases over a year. `options.include_table: true` returns a flat table of classified children (0 not present, 1 moderate, 2 severe) for R or pandas.
 
 ```bash
-curl -X POST https://chakudya-api.edisontaimu9.workers.dev/malnutrition/analyse \
+curl -X POST https://api.chakudya.xyz/malnutrition/analyse \
   -H "Authorization: Bearer $KEY" -H "Content-Type: application/json" \
   -d '{"oedema":"oedema","strata":["district"],
        "columns":{"age_months":{"variable":"age-years","unit":"mo"},"weight_kg":{"variable":"weight","unit":"kg"},
@@ -1839,7 +1839,7 @@ curl -X POST https://chakudya-api.edisontaimu9.workers.dev/malnutrition/analyse 
                   {"id":"K2","sex":"M","age_months":30,"weight_kg":11.2,"height_cm":86.5,"muac_mm":137,"oedema":"no","district":"Machinga"}]}'
 
 # Secondary analysis of z-scores stored in hundredths (survey file)
-curl -X POST https://chakudya-api.edisontaimu9.workers.dev/malnutrition/analyse \
+curl -X POST https://api.chakudya.xyz/malnutrition/analyse \
   -H "Authorization: Bearer $KEY" -H "Content-Type: application/json" \
   -d '{"columns":{"b4":{"variable":"sex","value_map":{"1":"male","2":"female"}},"hw1":{"variable":"age-years","unit":"mo"}},
        "z_columns":{"haz":"hc70","whz":"hc72"},"z_scale":100,"missing_codes":[9996,9997,9998,9999],"design_effect":1.8,
@@ -1888,7 +1888,7 @@ Columns that are not registered variables are **left out** unless named in `incl
 **Provenance and verification.** `dataset` (id, title, description, creators, licence, version, contact, keywords, funding, ethics_approval, access_conditions) is carried into the provenance and Data Package; nothing is invented. The provenance records the engine and API version, the time, the input record count, column mapping and a SHA-256 of the input JSON (keys sorted), every transformation with counts, columns dropped and why, and the limits of the method. `POST /export/verify` with `{files:[{name, content}]}` (the provenance file may be among them or sent as `provenance`) returns `verified` and a per-file `match`, `mismatch`, `missing` or `not_listed`. Hashes are of the exact bytes: a rewritten line ending counts as a change.
 
 ```bash
-curl -X POST https://chakudya-api.edisontaimu9.workers.dev/export/dataset \
+curl -X POST https://api.chakudya.xyz/export/dataset \
   -H "Authorization: Bearer $KEY" -H "Content-Type: application/json" \
   -d '{"dataset":{"id":"zomba-2024","title":"Zomba child nutrition survey","licence":"CC-BY-4.0"},
        "population":"paediatric","include_columns":["district"],
@@ -1897,7 +1897,7 @@ curl -X POST https://chakudya-api.edisontaimu9.workers.dev/export/dataset \
                   {"id":"MW-1","sex":"F","age_months":23,"weight_kg":10.1,"hb":"9 g/dL","visit_date":"2024-09-20","district":"Zomba"}]}'
 
 # Check files you received against their provenance
-curl -X POST https://chakudya-api.edisontaimu9.workers.dev/export/verify \
+curl -X POST https://api.chakudya.xyz/export/verify \
   -H "Authorization: Bearer $KEY" -H "Content-Type: application/json" \
   -d '{"files":[{"name":"zomba_2024_data.csv","content":"..."},{"name":"zomba_2024_provenance.json","content":"..."}]}'
 ```
@@ -1946,7 +1946,7 @@ Z-scores are worked out for children with a usable sex and age up to 228 months;
 **Nothing is corrected.** A flagged value stays in the report with its reason and is left out of the table. SMART/ENA plausibility scores are not reproduced: read the statistics against your survey protocol.
 
 ```bash
-curl -X POST https://chakudya-api.edisontaimu9.workers.dev/data-quality/audit \
+curl -X POST https://api.chakudya.xyz/data-quality/audit \
   -H "Authorization: Bearer $KEY" -H "Content-Type: application/json" \
   -d '{"group_by":"team",
        "columns":{"age_months":{"variable":"age-years","unit":"mo"},"weight_kg":{"variable":"weight","unit":"kg"},
@@ -1990,7 +1990,7 @@ Turns a research dataset, or counts from a paper, into the measures an epidemiol
 **Incidence.** A cumulative incidence is a risk over the whole follow-up and is only valid if follow-up was complete and equal for everyone; otherwise send `person_time` and read the rates (per `rate_per`, default 1000 person-time units). The true onset time lies between visits.
 
 ```bash
-curl -X POST https://chakudya-api.edisontaimu9.workers.dev/epidemiology/analyse \
+curl -X POST https://api.chakudya.xyz/epidemiology/analyse \
   -H "Authorization: Bearer $KEY" -H "Content-Type: application/json" \
   -d '{"design":"cross_sectional","outcome":{"variable":"haz","below":-2},
        "exposure":{"variable":"food_insecure","positive":"yes"},
@@ -1998,7 +1998,7 @@ curl -X POST https://chakudya-api.edisontaimu9.workers.dev/epidemiology/analyse 
        "records":[{"food_insecure":"yes","sex":"F","age_months":14,"haz":-2.4},{"food_insecure":"no","sex":"M","age_months":30,"haz":-0.6}]}'
 
 # Published numbers: 20/100 exposed and 10/100 unexposed had the outcome
-curl -X POST https://chakudya-api.edisontaimu9.workers.dev/epidemiology/counts \
+curl -X POST https://api.chakudya.xyz/epidemiology/counts \
   -H "Authorization: Bearer $KEY" -H "Content-Type: application/json" \
   -d '{"design":"cohort","table":{"a":20,"b":80,"c":10,"d":90}}'
 # -> risk ratio 2.00 (0.99 to 4.05), odds ratio 2.25 (0.99 to 5.09), risk difference 10 points (0.2 to 19.8)
@@ -2023,7 +2023,7 @@ A micronutrient-only screen against the NASEM DRI tables, by age, sex, pregnancy
 **Response.** `summary` (headline, counts, top 5 gaps), `potential_inadequacies` (ranked), `excesses`, `adequate`, `nutrients` (full detail with `ear`, `target`, `percent_of_target`, `percent_of_ear`, `days_below_target`, `ul`), `requirements` (all values for the life stage), `not_provided`, `notes`.
 
 ```bash
-curl -X POST https://chakudya-api.edisontaimu9.workers.dev/micronutrients/assess \
+curl -X POST https://api.chakudya.xyz/micronutrients/assess \
   -H "Authorization: Bearer $KEY" -H "Content-Type: application/json" \
   -d '{"age":25,"sex":"female","plant_based_diet":true,"intake":{"iron_mg":9,"calcium_mg":600,"vitc_mg":40,"zinc_mg":6,"vitb12_mcg":1.5}}'
 ```
@@ -2051,7 +2051,7 @@ Reference calculators for ICU nutrition support, from a hospital dietetics guide
 **Known issues in the source (returned by `?section=known_issues`).** The "Severe" protein range is 1.6-2.5 g/kg in the stress table but 1.9-2.5 g/kg in the urinary nitrogen table, and both are returned as printed. The usual carbohydrate figure is printed as "3-5 g/kg/min", which cannot be right. **Energy equation selection for the critically ill is not here yet:** nothing in this module estimates energy. Use `POST /energy/requirements` with a measured REE and stress factors until a sourced equation-selection reference is added.
 
 ```bash
-curl -X POST https://chakudya-api.edisontaimu9.workers.dev/critical-care/nitrogen-balance \
+curl -X POST https://api.chakudya.xyz/critical-care/nitrogen-balance \
   -H "Authorization: Bearer $KEY" -H "Content-Type: application/json" \
   -d '{"urine_volume_l": 2, "urinary_urea_mmol_l": 250}'
 ```
@@ -2077,7 +2077,7 @@ Calculators for burn patients, moved here from the MCP server's burn tools (sour
 Every answer carries `disclaimer` and `citation`. No predictive equation is accurate for burns: indirect calorimetry is the gold standard and these are fallbacks. To correct a value, edit its row in `clinical_reference_values` in Supabase (`value` holds the numbers or text; `band_min`/`band_max` with the two inclusive flags choose the row for a patient value). Re-running the SQL file never overwrites an edited row; delete the row first to restore its seed value.
 
 ```bash
-curl -X POST https://chakudya-api.edisontaimu9.workers.dev/burns/fluid-resuscitation \
+curl -X POST https://api.chakudya.xyz/burns/fluid-resuscitation \
   -H "Authorization: Bearer $KEY" -H "Content-Type: application/json" \
   -d '{"weight_kg": 70, "tbsa_burned_percent": 40}'
 ```
@@ -2097,7 +2097,7 @@ ASPEN consensus refeeding calculators (da Silva et al, Nutr Clin Pract 2020;35(2
 Every answer carries `disclaimer` and `citation`. The criteria are expert consensus, not trial evidence. Edit a row in `clinical_reference_values` in Supabase to correct a value; re-running the SQL never overwrites an edited row.
 
 ```bash
-curl -X POST https://chakudya-api.edisontaimu9.workers.dev/refeeding/initiation \
+curl -X POST https://api.chakudya.xyz/refeeding/initiation \
   -H "Authorization: Bearer $KEY" -H "Content-Type: application/json" \
   -d '{"population": "adult", "weight_kg": 60}'
 ```
@@ -2117,7 +2117,7 @@ Harris-Benedict BEE, the Barak et al (2002) clinical stress factors, the 24-hour
 When more than one stress factor could apply, use only the single highest one. Every answer carries `disclaimer` and `citation`. Edit a row in `clinical_reference_values` in Supabase to correct a value; re-running the SQL never overwrites an edited row.
 
 ```bash
-curl -X POST https://chakudya-api.edisontaimu9.workers.dev/stress-factors/harris-benedict \
+curl -X POST https://api.chakudya.xyz/stress-factors/harris-benedict \
   -H "Authorization: Bearer $KEY" -H "Content-Type: application/json" \
   -d '{"sex": "male", "weight_kg": 70, "height_cm": 175, "age_years": 40, "stress_factor": 1.2}'
 ```
@@ -2139,7 +2139,7 @@ Carbohydrate counting, the mealtime quick-acting insulin dose and the related re
 A blood glucose below the target midpoint gives a correction of 0 (the MCP tool used to subtract insulin). Corrections belong at mealtimes or before bed, at least 4 hours after the last quick-acting dose. Every answer carries `disclaimer` and `citation`: ratios, correction factors and targets are set by the person's own diabetes team. Edit a row in `clinical_reference_values` in Supabase to correct a value; re-running the SQL never overwrites an edited row.
 
 ```bash
-curl -X POST https://chakudya-api.edisontaimu9.workers.dev/carb-counting/insulin-dose \
+curl -X POST https://api.chakudya.xyz/carb-counting/insulin-dose \
   -H "Authorization: Bearer $KEY" -H "Content-Type: application/json" \
   -d '{"total_carb_g": 50, "icr_units_per_10g": 1, "current_bg_mmol_l": 12, "target_bg_low_mmol_l": 6, "target_bg_high_mmol_l": 8}'
 ```
@@ -2163,11 +2163,11 @@ Calculators and reference tables from Krause 16th ed. chapter 30, the ADA Standa
 | `POST /diabetes/plan` | `labs`, `population`, `carb` → status, glucose targets and carbohydrate plan in one call |
 
 ```bash
-curl -X POST https://chakudya-api.edisontaimu9.workers.dev/diabetes/carb-plan \
+curl -X POST https://api.chakudya.xyz/diabetes/carb-plan \
   -H "Authorization: Bearer YOUR_KEY" -H "Content-Type: application/json" \
   -d '{"energy_kcal":1900,"carb_pct":50,"meals":3,"snacks":3}'
 
-curl -X POST https://chakudya-api.edisontaimu9.workers.dev/diabetes/exchange-plan \
+curl -X POST https://api.chakudya.xyz/diabetes/exchange-plan \
   -H "Authorization: Bearer YOUR_KEY" -H "Content-Type: application/json" \
   -d '{"carb_plan":{"carb_g_per_day":180,"meals":3,"snacks":2}}'
 ```

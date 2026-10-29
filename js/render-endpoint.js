@@ -244,7 +244,7 @@ const RenderEndpoint = (() => {
 
   function buildCurlBlock(endpoint) {
     const spec = AppState.state.spec;
-    const base = AppState.state.baseUrl || "https://your-worker.workers.dev";
+    const base = AppState.state.baseUrl || "https://api.chakudya.xyz";
     let path = endpoint.path;
     endpoint.parameters.filter((p) => p.in === "path").forEach((p) => {
       path = path.replace(`{${p.name}}`, `<${p.name}>`);

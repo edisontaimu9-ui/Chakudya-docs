@@ -538,7 +538,7 @@ const RenderLanding = (() => {
                 <a class="lp-social" href="https://www.linkedin.com/in/edison-taimu-a37415367" target="_blank" rel="noopener" aria-label="LinkedIn" title="LinkedIn">${socialIcon("linkedin")}</a>
                 <a class="lp-social" href="https://x.com/edisontaimu" target="_blank" rel="noopener" aria-label="X (Twitter)" title="X (Twitter)">${socialIcon("x")}</a>
                 <a class="lp-social" href="https://www.facebook.com/share/1GixAae4hT/" target="_blank" rel="noopener" aria-label="Facebook" title="Facebook">${socialIcon("facebook")}</a>
-                <a class="lp-social" href="https://minutriq.me" target="_blank" rel="noopener" aria-label="Portfolio" title="Portfolio">${socialIcon("globe")}</a>
+                <a class="lp-social" href="https://edisontaimu.online" target="_blank" rel="noopener" aria-label="Portfolio" title="Portfolio">${socialIcon("globe")}</a>
               </div>
             </nav>
           </div>

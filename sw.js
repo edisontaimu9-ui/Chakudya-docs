@@ -7,7 +7,7 @@
  *
  * What it deliberately does NOT do
  *   - It never touches cross-origin requests other than Google Fonts: the Chakudya API
- *     (*.workers.dev), Supabase login and everything else go straight to the network, so
+ *     (api.chakudya.xyz, gateway.chakudya.xyz), Supabase login and everything else go straight to the network, so
  *     live statistics, health checks, Try It and key management are never served from a cache.
  *   - It never handles non-GET requests or anything carrying credentials.
  *
@@ -16,7 +16,7 @@
  *   Run it before every deploy. A new BUILD installs a new cache in the background; the page
  *   then offers a "Reload" button (see js/pwa.js) so HTML and JS are never mixed across versions.
  */
-const BUILD = "55307e85da85";
+const BUILD = "30f10fde2e55";
 
 const SHELL_CACHE = "chakudya-shell-" + BUILD;
 const DATA_CACHE = "chakudya-data-v1";

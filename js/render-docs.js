@@ -32,7 +32,7 @@ const RenderDocs = (() => {
     t.innerHTML = html.trim();
     return t.content.firstElementChild;
   }
-  const base = () => (AppState.state.baseUrl || "https://your-worker.workers.dev").replace(/\/$/, "");
+  const base = () => (AppState.state.baseUrl || "https://api.chakudya.xyz").replace(/\/$/, "");
   // A guide exists, and so does its sub-page when one is asked for (see SUBPAGES below).
   const has = (id, sub) => SECTIONS.some((s) => s.id === id)
     && (!sub || (!!SUBPAGES[id] && SUBPAGES[id]().some((x) => x.id === sub)));
