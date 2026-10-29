@@ -16,6 +16,6 @@ window.CHAKUDYA_AUTH = {
 // siteKey is the older browser-side fallback, only used when gatewayUrl is empty. Leave it empty.
 window.CHAKUDYA_API = {
   baseUrl: "https://api.chakudya.xyz",
-  gatewayUrl: "https://chakudya-gateway.edisontaimu9.workers.dev",
+  gatewayUrl: "https://gateway.chakudya.xyz",
   siteKey: "",
 };
