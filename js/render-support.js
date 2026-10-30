@@ -6,9 +6,11 @@
 const RenderSupport = (() => {
   const WORKER_URL = "https://paychangu-payment-gateway.edisontaimu9.workers.dev";
   const CONTACT_EMAIL = "edisontaimu9@gmail.com";
-  const MIN_AMOUNT = 500;
-  const DEFAULT_AMOUNT = 5000;
-  const PRESETS = [2000, 5000, 10000, 20000];
+  // Whole amounts only: the Worker rounds to a whole number before sending to PayChangu.
+  const CURRENCIES = {
+    MWK: { label: "Kwacha (MWK)", min: 500, def: 5000, presets: [2000, 5000, 10000, 20000] },
+    USD: { label: "US dollars (USD)", min: 1, def: 10, presets: [5, 10, 25, 50] },
+  };
   const TIMEOUT_MS = 20000;
 
   const fmt = (n) => Number(n).toLocaleString("en-US");
@@ -22,9 +24,17 @@ const RenderSupport = (() => {
     return t.content.firstElementChild;
   }
 
+  function chipsHtml(code) {
+    const { presets, def } = CURRENCIES[code];
+    return presets.map((v) =>
+      `<button type="button" class="lp-chip" data-amount="${v}" aria-pressed="${v === def}">${code} ${fmt(v)}</button>`).join("");
+  }
+
   function page() {
-    const chips = PRESETS.map((v) =>
-      `<button type="button" class="lp-chip" data-amount="${v}" aria-pressed="${v === DEFAULT_AMOUNT}">MWK ${fmt(v)}</button>`).join("");
+    const cur = CURRENCIES.MWK;
+    const chips = chipsHtml("MWK");
+    const curChips = Object.keys(CURRENCIES).map((c) =>
+      `<button type="button" class="lp-chip" data-currency="${c}" aria-pressed="${c === "MWK"}">${CURRENCIES[c].label}</button>`).join("");
     return el(`
       <div class="lp submit-page support-page">
         <nav class="submit-crumb" aria-label="Breadcrumb"><a href="#/">Home</a><span aria-hidden="true"> / </span><span aria-current="page">Support</span></nav>
@@ -40,13 +50,14 @@ const RenderSupport = (() => {
         <section class="submit-flow" aria-labelledby="support-form-h">
           <h2 id="support-form-h" class="submit-flow__title">Make a contribution</h2>
 
-          <p class="submit-step"><span class="submit-step__n" aria-hidden="true">1</span> Choose an amount</p>
-          <div class="lp-contrib__modes" role="group" aria-label="Contribution amount">${chips}</div>
+          <p class="submit-step"><span class="submit-step__n" aria-hidden="true">1</span> Choose a currency and amount</p>
+          <div class="lp-contrib__modes" role="group" aria-label="Currency">${curChips}</div>
+          <div class="lp-contrib__modes" id="support-amounts" role="group" aria-label="Contribution amount">${chips}</div>
 
           <form class="lp-card lp-contrib__form" id="support-form" novalidate>
-            <label class="field"><span class="field__label">Amount (MWK) <span class="param-required">required</span></span>
-              <input type="text" name="amount" inputmode="numeric" autocomplete="off" value="${DEFAULT_AMOUNT}" aria-describedby="support-amount-hint" />
-              <span class="field__hint" id="support-amount-hint">Minimum MWK ${fmt(MIN_AMOUNT)}. Choose a button above or type your own amount.</span></label>
+            <label class="field"><span class="field__label"><span id="support-amount-label">Amount (MWK)</span> <span class="param-required">required</span></span>
+              <input type="text" name="amount" inputmode="numeric" autocomplete="off" value="${cur.def}" aria-describedby="support-amount-hint" />
+              <span class="field__hint" id="support-amount-hint">Minimum MWK ${fmt(cur.min)}. Choose a button above or type your own amount.</span></label>
 
             <div class="field-grid">
               <label class="field"><span class="field__label">Name</span>
@@ -56,7 +67,7 @@ const RenderSupport = (() => {
             </div>
 
             <div class="lp-contrib__actions">
-              <button class="btn btn--primary btn--lg btn-cut" type="submit" id="support-btn">Contribute MWK ${fmt(DEFAULT_AMOUNT)}</button>
+              <button class="btn btn--primary btn--lg btn-cut" type="submit" id="support-btn">Contribute MWK ${fmt(cur.def)}</button>
               ${spinner(true)}
               <p class="lp-contrib__msg" id="support-msg" role="status" aria-live="polite"></p>
             </div>
@@ -137,7 +148,9 @@ const RenderSupport = (() => {
     const form = root.querySelector("#support-form");
     const input = form.elements.amount;
     const btn = root.querySelector("#support-btn");
-    const chips = [...root.querySelectorAll(".lp-chip[data-amount]")];
+    const amounts = root.querySelector("#support-amounts");
+    const curChips = [...root.querySelectorAll(".lp-chip[data-currency]")];
+    let code = "MWK";
 
     const parse = () => {
       const digits = input.value.replace(/[,\s]/g, "");
@@ -145,17 +158,32 @@ const RenderSupport = (() => {
     };
     const sync = () => {
       const n = parse();
-      chips.forEach((c) => c.setAttribute("aria-pressed", String(Number(c.dataset.amount) === n)));
-      btn.textContent = Number.isFinite(n) && n > 0 ? `Contribute MWK ${fmt(n)}` : "Contribute";
+      amounts.querySelectorAll(".lp-chip").forEach((c) => c.setAttribute("aria-pressed", String(Number(c.dataset.amount) === n)));
+      curChips.forEach((c) => c.setAttribute("aria-pressed", String(c.dataset.currency === code)));
+      btn.textContent = Number.isFinite(n) && n > 0 ? `Contribute ${code} ${fmt(n)}` : "Contribute";
     };
 
-    chips.forEach((c) => c.addEventListener("click", () => { input.value = c.dataset.amount; say(root, ""); sync(); }));
+    amounts.addEventListener("click", (e) => {
+      const c = e.target.closest && e.target.closest(".lp-chip[data-amount]");
+      if (!c) return;
+      input.value = c.dataset.amount; say(root, ""); sync();
+    });
+    curChips.forEach((c) => c.addEventListener("click", () => {
+      code = c.dataset.currency;
+      const cfg = CURRENCIES[code];
+      amounts.innerHTML = chipsHtml(code);
+      input.value = cfg.def;
+      root.querySelector("#support-amount-label").textContent = `Amount (${code})`;
+      root.querySelector("#support-amount-hint").textContent = `Minimum ${code} ${fmt(cfg.min)}. Choose a button above or type your own amount.`;
+      say(root, ""); sync();
+    }));
     input.addEventListener("input", () => { say(root, ""); sync(); });
 
     form.addEventListener("submit", async (e) => {
       e.preventDefault();
       const amount = parse();
-      if (!Number.isFinite(amount) || amount < MIN_AMOUNT) return say(root, `Please enter a whole amount of at least MWK ${fmt(MIN_AMOUNT)}.`, "error");
+      const min = CURRENCIES[code].min;
+      if (!Number.isFinite(amount) || amount < min) return say(root, `Please enter a whole amount of at least ${code} ${fmt(min)}.`, "error");
       const name = form.elements.name.value.trim();
       const email = form.elements.email.value.trim();
       if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return say(root, "That email address does not look right.", "error");
@@ -171,9 +199,10 @@ const RenderSupport = (() => {
           signal: ctrl.signal,
           body: JSON.stringify({
             amount,
-            currency: "MWK",
+            currency: code,
             first_name: name || undefined,
             email: email || undefined,
+            title: "Support Chakudya",
             message: "Support the Chakudya Nutrition Registry",
             return_url: location.origin + "/support/",
           }),
