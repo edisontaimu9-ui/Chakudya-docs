@@ -454,6 +454,8 @@
 .account-msg--ok { border-color: var(--green, #5aa469); background: var(--accent-bg); }
 .account-msg--err { border-color: var(--red, #d9534f); }
 .account-social { display: flex; flex-direction: column; gap: 8px; max-width: 380px; }
+.account-social .btn { display: flex; align-items: center; justify-content: center; gap: 10px; }
+.account-social .social-ico { flex: none; display: block; }
 .account-or { display: flex; align-items: center; gap: 10px; color: var(--text-tertiary); font-size: 12px; max-width: 380px; }
 .account-or::before, .account-or::after { content: ""; flex: 1; border-top: 1px solid var(--border); }
 .account-links { margin: 0; font-size: 13px; }
