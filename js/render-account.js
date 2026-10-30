@@ -38,7 +38,7 @@ const RenderAccount = (() => {
       <section class="account">
         <p class="eyebrow">Developer account</p>
         <h1 class="hero__title">Get an API key</h1>
-        <p class="hero__lead">Create a free account to generate your own API keys. Use a key to call the Chakudya API, including the FHIR operations, and track how much each key is used.</p>
+        <p class="hero__lead">Create a free account to generate your own API keys. A key gives you access to the full Chakudya API, from food data to clinical calculators and reference tools, and shows how much each key is used.</p>
         <div class="account-card">
           <div class="account-tabs" role="tablist">
             <button type="button" class="account-tab ${mode === "signin" ? "is-active" : ""}" data-mode="signin">Sign in</button>
