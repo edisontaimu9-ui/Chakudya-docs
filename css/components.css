@@ -453,6 +453,7 @@
 .account-msg { border-radius: var(--radius-md); padding: 10px 12px; font-size: 13px; border: 1px solid var(--border); overflow-wrap: anywhere; }
 .account-msg--ok { border-color: var(--green, #5aa469); background: var(--accent-bg); }
 .account-msg--err { border-color: var(--red, #d9534f); }
+.account-social { display: flex; flex-direction: column; gap: 8px; max-width: 380px; }
 .account-or { display: flex; align-items: center; gap: 10px; color: var(--text-tertiary); font-size: 12px; max-width: 380px; }
 .account-or::before, .account-or::after { content: ""; flex: 1; border-top: 1px solid var(--border); }
 .account-links { margin: 0; font-size: 13px; }

@@ -80,6 +80,10 @@ const DevAuth = (() => {
     sessionStorage.removeItem(RECOVERY_KEY);
   }
 
+  function signInWithFacebook() {
+    // scopes=email so Supabase gets the address the API needs to issue developer keys.
+    location.href = `${cfg().supabaseUrl.replace(/\/$/, "")}/auth/v1/authorize?provider=facebook&scopes=email&redirect_to=${encodeURIComponent(redirectUrl())}`;
+  }
   function signInWithGoogle() {
     location.href = `${cfg().supabaseUrl.replace(/\/$/, "")}/auth/v1/authorize?provider=google&redirect_to=${encodeURIComponent(redirectUrl())}`;
   }
@@ -142,10 +146,11 @@ const DevAuth = (() => {
 
   return {
     configured, googleEnabled: () => Boolean(cfg().googleEnabled),
+    facebookEnabled: () => Boolean(cfg().facebookEnabled),
     session: loadSession, isSignedIn: () => Boolean(loadSession()),
     inRecovery: () => sessionStorage.getItem(RECOVERY_KEY) === "1",
     onChange: (fn) => listeners.push(fn),
-    signUp, signIn, signOut, resetPassword, setNewPassword, signInWithGoogle,
+    signUp, signIn, signOut, resetPassword, setNewPassword, signInWithGoogle, signInWithFacebook,
     getAccessToken, handleRedirect, setTryItKey, getTryItKey, clearTryItKey,
   };
 })();

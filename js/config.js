@@ -7,6 +7,7 @@ window.CHAKUDYA_AUTH = {
   supabaseUrl: "https://vivjinvanlttossdgiwc.supabase.co",
   supabaseAnonKey: "sb_publishable_LosrwYza1bjlBK5d_NwZBA_wBGOTf-v",
   googleEnabled: true, // Google provider is enabled in Supabase
+  facebookEnabled: true, // Facebook provider: enable it in Supabase first (Auth > Providers) or the button will error
 };
 
 // API access for the docs site itself (live stats, food demo, NutriMind, Try It without a key).

@@ -50,7 +50,7 @@ const RenderAccount = (() => {
               ${mode === "signup" ? `<span class="field__hint">At least 8 characters. We'll email you a link to confirm your address.</span>` : ""}</div>` : ""}
             <button class="btn btn--primary" type="submit">${btn}</button>
           </form>
-          ${DevAuth.googleEnabled() && mode !== "reset" ? `<div class="account-or"><span>or</span></div><button type="button" class="btn" id="acc-google">Continue with Google</button>` : ""}
+          ${(DevAuth.googleEnabled() || DevAuth.facebookEnabled()) && mode !== "reset" ? `<div class="account-or"><span>or</span></div><div class="account-social">${DevAuth.googleEnabled() ? `<button type="button" class="btn" id="acc-google">Continue with Google</button>` : ""}${DevAuth.facebookEnabled() ? `<button type="button" class="btn" id="acc-facebook">Continue with Facebook</button>` : ""}</div>` : ""}
           <p class="account-links">${mode === "signin" ? `<a href="#/account" data-mode="reset">Forgot your password?</a>` : mode === "reset" ? `<a href="#/account" data-mode="signin">Back to sign in</a>` : ""}</p>
         </div>
       </section>`;
@@ -59,6 +59,7 @@ const RenderAccount = (() => {
       e.preventDefault(); mode = n.dataset.mode; setFlash(null); renderSignedOut();
     }));
     container.querySelector("#acc-google")?.addEventListener("click", () => DevAuth.signInWithGoogle());
+    container.querySelector("#acc-facebook")?.addEventListener("click", () => DevAuth.signInWithFacebook());
     container.querySelector(".account-form").addEventListener("submit", async (e) => {
       e.preventDefault();
       const email = container.querySelector("#acc-email").value.trim();
