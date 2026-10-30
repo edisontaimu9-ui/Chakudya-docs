@@ -76,7 +76,7 @@
 
     const rows = (k.top || []).filter((x) => Array.isArray(x.daily));
     const cellMax = Math.max(1, ...rows.flatMap((x) => x.daily));
-    const head = `<tr><th class="k">Key</th>${days.map((d) => `<th class="num" style="text-align:center">${dayLabel(d.day)}</th>`).join("")}<th class="num">7 days</th></tr>`;
+    const head = `<tr><th class="k">Key<span class="kgrip" title="Drag to resize"></span></th>${days.map((d) => `<th class="num" style="text-align:center">${dayLabel(d.day)}</th>`).join("")}<th class="num">7 days</th></tr>`;
     const emailById = Object.fromEntries(keyRows.map((r) => [Number(r.id), r.owner_email]));
     const body = rows.map((x) => {
       const email = x.owner_email || emailById[Number(x.id)] || "";
@@ -118,6 +118,28 @@
     id: "keys",
     title: "API keys",
     init() {
+      // Drag the handle in the Key header to stretch or shrink the key column (width is remembered).
+      const pk = $("perKey");
+      try { const w = parseInt(localStorage.getItem("keyColW"), 10); if (w >= 120) pk.style.setProperty("--kw", w + "px"); } catch (_) {}
+      let drag = null;
+      pk.addEventListener("pointerdown", (e) => {
+        const g = e.target.closest(".kgrip"); if (!g) return;
+        const th = g.closest("th");
+        drag = { x: e.clientX, w: th.getBoundingClientRect().width };
+        g.setPointerCapture(e.pointerId); e.preventDefault();
+      });
+      pk.addEventListener("pointermove", (e) => {
+        if (!drag) return;
+        const w = Math.round(Math.min(Math.max(120, drag.w + e.clientX - drag.x), window.innerWidth * 0.9));
+        pk.style.setProperty("--kw", w + "px");
+      });
+      const endDrag = () => {
+        if (!drag) return; drag = null;
+        try { localStorage.setItem("keyColW", parseInt(pk.style.getPropertyValue("--kw"), 10)); } catch (_) {}
+      };
+      pk.addEventListener("pointerup", endDrag);
+      pk.addEventListener("pointercancel", endDrag);
+
       Admin.chips("keyFilter", "f", (v) => { keyFilter = v; renderKeys(); });
 
       document.addEventListener("click", async (e) => {

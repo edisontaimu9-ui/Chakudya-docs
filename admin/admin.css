@@ -62,7 +62,10 @@
   .trend .col.today .bar1 { background:var(--accent); }
   .trend .col.today .val { color:var(--text); font-weight:600; }
   .trend .day { font-size:11px; color:var(--text2); margin-top:6px; text-align:center; line-height:1.2; }
-  table.pk td.k, table.pk th.k { position:sticky; left:0; background:var(--raised); min-width:170px; max-width:230px; white-space:normal; overflow-wrap:anywhere; }
+  table.pk td.k, table.pk th.k { position:sticky; left:0; background:var(--raised); width:var(--kw,200px); min-width:var(--kw,200px); max-width:var(--kw,200px); box-sizing:border-box; white-space:normal; overflow-wrap:anywhere; }
+  table.pk th.k { z-index:2; }
+  table.pk .kgrip { position:absolute; top:0; right:-6px; bottom:0; width:22px; cursor:col-resize; touch-action:none; z-index:3; display:flex; align-items:center; justify-content:center; }
+  table.pk .kgrip::after { content:""; width:3px; height:24px; border-radius:2px; background:var(--accent); opacity:.7; }
   table.pk td.c { text-align:center; font-variant-numeric:tabular-nums; min-width:44px; }
   table.pk td.z { color:var(--border2); }
   table.pk tr.sum td { border-top:2px solid var(--border2); font-weight:600; }
