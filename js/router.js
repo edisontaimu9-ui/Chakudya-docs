@@ -5,14 +5,14 @@
  *   ""                       landing page                   ->  /
  *   "docs/errors"            a guide                        ->  /docs/errors/
  *   "docs/examples/foods"    a guide sub-page               ->  /docs/examples/foods/
- *   "nutrimind" | "submit" | "account" | "legal/privacy"    ->  /<route>/
+ *   "nutrimind" | "submit" | "support" | "account" | "legal/privacy"    ->  /<route>/
  *   "get-foods"              an endpoint slug               ->  /api/get-foods/
  *
  * Old links like  /#/docs/errors  still work: they are rewritten to the real path on load.
  * Links written as  href="#/..."  in the render modules are turned into real hrefs by fixLinks().
  */
 const Router = (() => {
-  const SECTION_ROOTS = new Set(["docs", "nutrimind", "submit", "account", "legal", "reference"]);
+  const SECTION_ROOTS = new Set(["docs", "nutrimind", "submit", "support", "account", "legal", "reference"]);
   let handler = () => {};
 
   const clean = (s) => String(s || "").replace(/^\/+|\/+$/g, "");

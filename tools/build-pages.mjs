@@ -31,7 +31,7 @@ const SITE_NAME = "Chakudya Nutrition Registry";
 const TODAY = new Date().toISOString().slice(0, 10);
 
 // Directories that contain ONLY generated pages (wiped and rewritten each run).
-const GENERATED_DIRS = ["docs", "api", "legal", "nutrimind", "submit", "account"];
+const GENERATED_DIRS = ["docs", "api", "legal", "nutrimind", "submit", "support", "account"];
 
 /* ───────────────────────── load the app's own modules ───────────────────────── */
 
@@ -153,6 +153,15 @@ pages.push({
   heading: "Submit a packaged food",
   body: "<p>Add a missing packaged food to the Chakudya Nutrition Registry by photographing its label or typing in the details. Every submission is reviewed before it is published.</p>",
   priority: "0.6", freq: "monthly",
+});
+pages.push({
+  path: "/support/",
+  title: "Support Chakudya",
+  desc: "Help keep the Chakudya Nutrition Registry free and online. Contribute by mobile money, bank transfer or card through PayChangu.",
+  crumbs: [["Support", null]],
+  heading: "Support Chakudya",
+  body: "<p>Chakudya is a free nutrition data registry for Malawi. If it is useful to you, a contribution helps keep the API online and the food data growing. Payments are handled securely by PayChangu: mobile money, bank transfer or card.</p>",
+  priority: "0.4", freq: "monthly",
 });
 pages.push({
   path: "/account/",

@@ -16,7 +16,7 @@
  *   Run it before every deploy. A new BUILD installs a new cache in the background; the page
  *   then offers a "Reload" button (see js/pwa.js) so HTML and JS are never mixed across versions.
  */
-const BUILD = "f293e0e6b532";
+const BUILD = "438efc8e21b8";
 
 const SHELL_CACHE = "chakudya-shell-" + BUILD;
 const DATA_CACHE = "chakudya-data-v1";
@@ -53,6 +53,7 @@ const CORE = [
   "js/render-legal.js",
   "js/render-nutrimind.js",
   "js/render-submit.js",
+  "js/render-support.js",
   "js/auth.js",
   "js/render-account.js",
   "js/try-it.js",
@@ -94,7 +95,7 @@ const DATA_URLS = new Set(DATA.map(abs));
 
 // Page URLs the app answers itself (/, /docs/..., /api/<endpoint>/, ...). Every other path - /admin/,
 // sitemap.xml, robots.txt, the Google verification file, openapi.json - must reach the real file.
-const APP_PREFIXES = ["docs/", "api/", "nutrimind/", "submit/", "account/", "legal/"];
+const APP_PREFIXES = ["docs/", "api/", "nutrimind/", "submit/", "support/", "account/", "legal/"];
 function isAppRoute(url) {
   const base = new URL(scopeUrl).pathname;
   if (url.pathname === base || url.pathname === new URL(INDEX).pathname) return true;

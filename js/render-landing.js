@@ -548,6 +548,7 @@ const RenderLanding = (() => {
             <a href="#lp-mission" data-scroll="lp-mission">About Chakudya</a>
             <a href="#/docs/getting-started">Documentation</a>
             <a href="#/docs/api-reference">API Reference</a>
+            <a href="#/support">Support Chakudya</a>
             <a href="/openapi.json" download>OpenAPI spec</a>
             <a href="https://github.com/edisontaimu9-ui/chakudya-api" target="_blank" rel="noopener">GitHub</a>
             <a href="https://wa.me/265886295324" target="_blank" rel="noopener">Thanzi Coach on WhatsApp</a>
