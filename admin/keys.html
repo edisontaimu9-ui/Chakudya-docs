@@ -49,6 +49,7 @@
   const { $, esc, fmt, stat, ago, call, dayLabel, trendBars } = Admin;
   let usage = {};
   let keyRows = [];
+  let lastKeys = null;
   let keyFilter = "active";
 
   function renderOverview(k) {
@@ -56,6 +57,7 @@
     $("keystats").innerHTML = stat("Active keys", k.active) + stat("Total keys", k.total) + stat("Calls today", k.usage_today) + stat("Calls, 7 days", k.usage_last_7_days)
       + `<div class="stat"><b style="font-size:15px">${esc(roles || "none")}</b><span>Active by role</span></div>`;
     usage = Object.fromEntries((k.top || []).map((x) => [x.id, x]));
+    lastKeys = k;
     renderTrend(k);
   }
 
@@ -75,11 +77,13 @@
     const rows = (k.top || []).filter((x) => Array.isArray(x.daily));
     const cellMax = Math.max(1, ...rows.flatMap((x) => x.daily));
     const head = `<tr><th class="k">Key</th>${days.map((d) => `<th class="num" style="text-align:center">${dayLabel(d.day)}</th>`).join("")}<th class="num">7 days</th></tr>`;
+    const emailById = Object.fromEntries(keyRows.map((r) => [Number(r.id), r.owner_email]));
     const body = rows.map((x) => {
+      const email = x.owner_email || emailById[Number(x.id)] || "";
       const cells = x.daily.map((n) => n
         ? `<td class="c" style="background:rgba(230,146,20,${(0.1 + 0.55 * (n / cellMax)).toFixed(2)})">${fmt(n)}</td>`
         : `<td class="c z">·</td>`).join("");
-      return `<tr><td class="k"><b>${esc(x.label)}</b> <span class="pill">${esc(x.role)}</span></td>${cells}<td class="num"><b>${fmt(x.last_7_days)}</b></td></tr>`;
+      return `<tr><td class="k"><b>${esc(x.label)}</b> <span class="pill">${esc(x.role)}</span>${email ? `<div class="muted" style="font-size:11px">${esc(email)}</div>` : ""}</td>${cells}<td class="num"><b>${fmt(x.last_7_days)}</b></td></tr>`;
     }).join("");
     const total = `<tr class="sum"><td class="k">All keys</td>${days.map((d) => `<td class="c">${fmt(d.count)}</td>`).join("")}<td class="num">${fmt(sum)}</td></tr>`;
     tbl.innerHTML = rows.length ? head + body + total : "";
@@ -160,6 +164,7 @@
       renderOverview(d.api_keys || {});
       await loadKeys();
       renderKeys();
+      if (lastKeys) renderTrend(lastKeys);
     },
   });
 })();

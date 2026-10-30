@@ -62,7 +62,7 @@
   .trend .col.today .bar1 { background:var(--accent); }
   .trend .col.today .val { color:var(--text); font-weight:600; }
   .trend .day { font-size:11px; color:var(--text2); margin-top:6px; text-align:center; line-height:1.2; }
-  table.pk td.k, table.pk th.k { position:sticky; left:0; background:var(--raised); max-width:150px; overflow:hidden; text-overflow:ellipsis; }
+  table.pk td.k, table.pk th.k { position:sticky; left:0; background:var(--raised); min-width:170px; max-width:230px; white-space:normal; overflow-wrap:anywhere; }
   table.pk td.c { text-align:center; font-variant-numeric:tabular-nums; min-width:44px; }
   table.pk td.z { color:var(--border2); }
   table.pk tr.sum td { border-top:2px solid var(--border2); font-weight:600; }
