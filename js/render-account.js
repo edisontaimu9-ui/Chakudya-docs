@@ -38,7 +38,7 @@ const RenderAccount = (() => {
       <section class="account">
         <p class="eyebrow">Developer account</p>
         <h1 class="hero__title">Get an API key</h1>
-        <p class="hero__lead">Create a free account to generate your own consumer API keys. A key gives you three times the public rate limit, access to the FHIR operations, and usage counts for each key.</p>
+        <p class="hero__lead">Create a free account to generate your own API keys. Use a key to call the Chakudya API, including the FHIR operations, and track how much each key is used.</p>
         <div class="account-card">
           <div class="account-tabs" role="tablist">
             <button type="button" class="account-tab ${mode === "signin" ? "is-active" : ""}" data-mode="signin">Sign in</button>
@@ -193,7 +193,7 @@ const RenderAccount = (() => {
 
       <h2 class="console-h">Understanding API key access</h2>
       <div class="access-grid">
-        <div class="access-card"><h3>More capacity</h3><p>Each API key receives three times the standard rate limit on public endpoints, subject to each endpoint's own limits.</p></div>
+        <div class="access-card"><h3>Your own rate limit</h3><p>Each key is counted in its own bucket, so other users can never use up your allowance. Each endpoint's own limits still apply.</p></div>
         <div class="access-card"><h3>Usage tracking</h3><p>Requests are counted against the key used, helping you monitor activity across your integrations.</p></div>
         <div class="access-card"><h3>Clinical resources</h3><p>Keys can use the clinical operations under <code>/fhir</code>. Audit events are never available to consumer keys, and every operation still applies its own validation.</p></div>
         <div class="access-card"><h3>Read and compute access</h3><p>Consumer keys can retrieve data and run supported computations. They cannot modify registry data or reach administrative routes.</p></div>
