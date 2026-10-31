@@ -3,7 +3,7 @@
   "info": {
     "title": "Chakudya Nutrition Registry API (CNR)",
     "description": "Chakudya is a Malawi focused nutrition data and intelligence API. It provides structured, searchable nutrition information for health applications, researchers, students, dietitians, and developers building tools for clinical or public health nutrition work. The API combines local food composition data with international sources such as USDA FoodData Central, Open Food Facts, and FatSecret, and adds retrieval augmented question answering and session memory for AI assisted applications.\n\nIt also covers clinical growth assessment (WHO child growth standards from birth to 19 years, Fenton preterm charts, and a combined `/growth/assess` call), recipe and meal nutrition analysis, dietary reference intakes, and a stateless FHIR R4 facade that exposes growth evaluation and the full Nutrition Care Process (screening, assessment, diagnosis, intervention, monitoring and ADIME documents).\n\nPeople can sign in on the docs site and create their own consumer API keys (higher rate limits, FHIR access, usage counts) with `/developer/keys`.\n\nEvery operational route needs `Authorization: Bearer YOUR_API_KEY` (a consumer key from the developer console, or an admin or reviewer key). The only routes that work without a key are `GET /`, `GET /health` and the FHIR conformance reads (`GET /fhir/metadata`, `CodeSystem`, `OperationDefinition`, `StructureDefinition`, `ConceptMap`, `Questionnaire`). `/developer/keys` takes your Supabase login token instead of an API key, and `POST /rag/webhook` and `POST /hooks/signup` take a shared secret. Privileged registry writes (foods, exchange, renal, formulas, drug interactions, glycaemic index, reference tables, packaged CRUD and review, RAG ingest, bulk inserts) and key management need an admin key; a consumer key is refused there. Anonymous calls receive 401 with the code `api_key_required`. OAuth 2.0 was removed in v1.34.0.\n",
-    "version": "1.74.0",
+    "version": "1.78.0",
     "contact": {
       "name": "Edison Taimu",
       "x-location": "Blantyre, Malawi"
@@ -15,7 +15,7 @@
   "servers": [
     {
       "url": "https://api.chakudya.xyz",
-      "description": "Production (Cloudflare Workers)"
+      "description": "Production"
     }
   ],
   "security": [
@@ -155,6 +155,10 @@
     {
       "name": "Energy and stress factors",
       "description": "Harris-Benedict BEE with Barak et al (2002) clinical stress factors, 24-hour energy adjustment factors and the fever (Hardy and DuBois) adjustment. Reference values are stored in clinical_reference_values (condition stress_factors), not coded."
+    },
+    {
+      "name": "Biochemistry",
+      "description": "Lookup and interpretation of laboratory results against stored adult (Ampath 2016, SI units) and paediatric (Harriet Lane / Lexicomp compilation, conventional units) reference ranges in clinical_reference_values. Reference and educational use."
     },
     {
       "name": "Carbohydrate counting",
@@ -14757,6 +14761,720 @@
         }
       }
     },
+    "/biochemistry/interpret": {
+      "post": {
+        "tags": [
+          "Biochemistry"
+        ],
+        "summary": "Interpret one or more lab results as low, normal, high or a category (API key)",
+        "description": "Send an age (age_years, age_months or age_days), optional sex, and results [{analyte, value, unit}] (up to 40), or analyte, value and unit for a single result. Age 18 or more uses the adult set, younger the paediatric set. The unit is required. Where the stored ranges differ by sex, method, altitude, blood-gas sample, CVD risk, diabetes target, elderly or premature and the request does not say which, all are evaluated; if they disagree the status is indeterminate and needs names what to send. A bad item is reported in its own result. Reference and educational use; the range on the patient lab report takes precedence.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "age_years": {
+                    "type": "number"
+                  },
+                  "age_months": {
+                    "type": "number"
+                  },
+                  "age_days": {
+                    "type": "number"
+                  },
+                  "sex": {
+                    "type": "string",
+                    "enum": [
+                      "male",
+                      "female"
+                    ]
+                  },
+                  "altitude": {
+                    "type": "string",
+                    "enum": [
+                      "inland",
+                      "sea_level"
+                    ]
+                  },
+                  "method": {
+                    "type": "string",
+                    "enum": [
+                      "beckman",
+                      "roche",
+                      "biorad",
+                      "abbott"
+                    ]
+                  },
+                  "cvd_risk": {
+                    "type": "string",
+                    "enum": [
+                      "low",
+                      "moderate",
+                      "high"
+                    ]
+                  },
+                  "diabetes_target": {
+                    "type": "string",
+                    "enum": [
+                      "general",
+                      "strict",
+                      "relaxed",
+                      "gdm"
+                    ]
+                  },
+                  "elderly": {
+                    "type": "boolean"
+                  },
+                  "premature": {
+                    "type": "boolean"
+                  },
+                  "results": {
+                    "type": "array",
+                    "maxItems": 40,
+                    "items": {
+                      "type": "object",
+                      "required": [
+                        "analyte",
+                        "value",
+                        "unit"
+                      ],
+                      "properties": {
+                        "analyte": {
+                          "type": "string"
+                        },
+                        "value": {
+                          "type": "number"
+                        },
+                        "unit": {
+                          "type": "string"
+                        },
+                        "sample": {
+                          "type": "string",
+                          "enum": [
+                            "arterial",
+                            "capillary",
+                            "venous"
+                          ]
+                        }
+                      }
+                    }
+                  }
+                }
+              },
+              "example": {
+                "age_years": 6,
+                "sex": "female",
+                "results": [
+                  {
+                    "analyte": "creatinine",
+                    "value": 80,
+                    "unit": "umol/L"
+                  },
+                  {
+                    "analyte": "Hb",
+                    "value": 9.8,
+                    "unit": "g/dL"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/MutationSuccess"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          },
+          "503": {
+            "description": "The stored reference values are missing or unreadable."
+          }
+        }
+      }
+    },
+    "/biochemistry/lookup": {
+      "get": {
+        "tags": [
+          "Biochemistry"
+        ],
+        "summary": "Reference range(s) that apply to a patient for one analyte (API key)",
+        "description": "Returns the stored range(s) for the analyte at that age and sex, with the unit, age band and source. Send unit to also get the range in another unit. When several ranges apply (for example inland and sea-level haemoglobin) all are returned and needs lists what narrows it.",
+        "parameters": [
+          {
+            "name": "analyte",
+            "in": "query",
+            "required": true,
+            "description": "Analyte id or alias (see GET /biochemistry/analytes)",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "age_years",
+            "in": "query",
+            "required": false,
+            "description": "Exactly one of age_years, age_months, age_days is required",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "age_months",
+            "in": "query",
+            "required": false,
+            "description": "Age in months (30 days each)",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "age_days",
+            "in": "query",
+            "required": false,
+            "description": "Age in days",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "sex",
+            "in": "query",
+            "required": false,
+            "description": "male or female",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "male",
+                "female"
+              ]
+            }
+          },
+          {
+            "name": "unit",
+            "in": "query",
+            "required": false,
+            "description": "Show the range in this unit",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "altitude",
+            "in": "query",
+            "required": false,
+            "description": "inland or sea_level",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "inland",
+                "sea_level"
+              ]
+            }
+          },
+          {
+            "name": "method",
+            "in": "query",
+            "required": false,
+            "description": "Assay platform",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "beckman",
+                "roche",
+                "biorad",
+                "abbott"
+              ]
+            }
+          },
+          {
+            "name": "sample",
+            "in": "query",
+            "required": false,
+            "description": "Blood-gas sample",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "arterial",
+                "capillary",
+                "venous"
+              ]
+            }
+          },
+          {
+            "name": "cvd_risk",
+            "in": "query",
+            "required": false,
+            "description": "Cholesterol goal class",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "low",
+                "moderate",
+                "high"
+              ]
+            }
+          },
+          {
+            "name": "diabetes_target",
+            "in": "query",
+            "required": false,
+            "description": "HbA1c target",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "general",
+                "strict",
+                "relaxed",
+                "gdm"
+              ]
+            }
+          },
+          {
+            "name": "elderly",
+            "in": "query",
+            "required": false,
+            "description": "true or false (homocysteine)",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "premature",
+            "in": "query",
+            "required": false,
+            "description": "true or false (newborn ranges)",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/MutationSuccess"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          },
+          "503": {
+            "description": "The stored reference values are missing or unreadable."
+          }
+        }
+      }
+    },
+    "/biochemistry/analytes": {
+      "get": {
+        "tags": [
+          "Biochemistry"
+        ],
+        "summary": "Analytes the biochemistry endpoints know (API key)",
+        "description": "Ids, aliases, kind (range, category, lowzone), accepted units, selectors and the sets (adult, paediatric) that hold each analyte.",
+        "parameters": [
+          {
+            "name": "set",
+            "in": "query",
+            "required": false,
+            "description": "adult or paediatric",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "adult",
+                "paediatric"
+              ]
+            }
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "description": "Filter by id, label or alias",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/MutationSuccess"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          },
+          "503": {
+            "description": "The stored reference values are missing or unreadable."
+          }
+        }
+      }
+    },
+    "/biochemistry/reference": {
+      "get": {
+        "tags": [
+          "Biochemistry"
+        ],
+        "summary": "The stored biochemistry reference rows (API key)",
+        "description": "Without parameters returns the sections and row counts of both sets. With set and section returns that section rows.",
+        "parameters": [
+          {
+            "name": "set",
+            "in": "query",
+            "required": false,
+            "description": "adult or paediatric",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "adult",
+                "paediatric"
+              ]
+            }
+          },
+          {
+            "name": "section",
+            "in": "query",
+            "required": false,
+            "description": "Section name (needs set)",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/MutationSuccess"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          },
+          "503": {
+            "description": "The stored reference values are missing or unreadable."
+          }
+        }
+      }
+    },
+    "/nfpe/interpret": {
+      "post": {
+        "tags": [
+          "Nutrition-focused physical examination"
+        ],
+        "summary": "Interpret NFPE site gradings, Academy/ASPEN characteristics and observed findings (API key)",
+        "description": "Send any of: sites [{site, grade}] (grade well_nourished, mild_moderate or severe), findings [{key} or {system, text} or a plain string], and aspen {energy_intake_pct, energy_intake_days, weight_loss_pct, weight_loss_days, body_fat, muscle_mass, fluid_accumulation (none, mild, moderate, severe), grip_strength_reduced} with context (acute, chronic or social). Returns the printed descriptor for each graded site, the Academy/ASPEN characteristics met for that context (a minimum of two of six is needed for a diagnosis of severe or non-severe malnutrition), and for findings the possible nutrition etiologies ranked by how many findings point to them plus the nonnutritional causes to exclude. Fat, muscle and fluid grades are the examiner's judgement. Educational aid, not a diagnosis. Reference rows are in clinical_reference_values (condition nfpe, sql/048) from Krause Appendix 11.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "context": {
+                    "type": "string",
+                    "enum": [
+                      "acute",
+                      "chronic",
+                      "social"
+                    ]
+                  },
+                  "sites": {
+                    "type": "array",
+                    "maxItems": 60,
+                    "items": {
+                      "type": "object",
+                      "required": [
+                        "site",
+                        "grade"
+                      ],
+                      "properties": {
+                        "site": {
+                          "type": "string",
+                          "description": "GET /nfpe/sites lists the keys, e.g. temporalis_muscle"
+                        },
+                        "grade": {
+                          "type": "string",
+                          "enum": [
+                            "well_nourished",
+                            "mild_moderate",
+                            "severe",
+                            "normal",
+                            "mild",
+                            "moderate"
+                          ]
+                        }
+                      }
+                    }
+                  },
+                  "findings": {
+                    "type": "array",
+                    "maxItems": 60,
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "key": {
+                          "type": "string",
+                          "description": "Exact finding key from GET /nfpe/findings"
+                        },
+                        "system": {
+                          "type": "string"
+                        },
+                        "text": {
+                          "type": "string"
+                        }
+                      }
+                    }
+                  },
+                  "aspen": {
+                    "type": "object",
+                    "properties": {
+                      "context": {
+                        "type": "string",
+                        "enum": [
+                          "acute",
+                          "chronic",
+                          "social"
+                        ]
+                      },
+                      "energy_intake_pct": {
+                        "type": "number",
+                        "description": "Intake as % of estimated requirement"
+                      },
+                      "energy_intake_days": {
+                        "type": "number"
+                      },
+                      "weight_loss_pct": {
+                        "type": "number",
+                        "description": "% of usual weight lost"
+                      },
+                      "weight_loss_days": {
+                        "type": "number",
+                        "description": "Over how many days"
+                      },
+                      "body_fat": {
+                        "type": "string",
+                        "enum": [
+                          "none",
+                          "mild",
+                          "moderate",
+                          "severe"
+                        ]
+                      },
+                      "muscle_mass": {
+                        "type": "string",
+                        "enum": [
+                          "none",
+                          "mild",
+                          "moderate",
+                          "severe"
+                        ]
+                      },
+                      "fluid_accumulation": {
+                        "type": "string",
+                        "enum": [
+                          "none",
+                          "mild",
+                          "moderate",
+                          "severe"
+                        ]
+                      },
+                      "grip_strength_reduced": {
+                        "type": "boolean"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/MutationSuccess"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          },
+          "503": {
+            "description": "The stored NFPE reference values are missing or unreadable."
+          }
+        }
+      }
+    },
+    "/nfpe/sites": {
+      "get": {
+        "tags": [
+          "Nutrition-focused physical examination"
+        ],
+        "summary": "How to examine and grade each fat, muscle and fluid site (API key)",
+        "description": "Part 1 of the chart: technique tip and the severe, mild-moderate and well-nourished descriptors for each site.",
+        "parameters": [
+          {
+            "name": "domain",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "fat",
+                "muscle",
+                "fluid"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/MutationSuccess"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          },
+          "503": {
+            "description": "The stored NFPE reference values are missing or unreadable."
+          }
+        }
+      }
+    },
+    "/nfpe/findings": {
+      "get": {
+        "tags": [
+          "Nutrition-focused physical examination"
+        ],
+        "summary": "Abnormal findings by body system with possible etiologies (API key)",
+        "description": "Part 3 of the chart. Filter by system, by words in the finding (q), or by nutrition etiology (for example etiology=zinc lists every finding linked to zinc deficiency). Each row gives the possible nutrition and metabolic etiologies and the nonnutritional etiologies.",
+        "parameters": [
+          {
+            "name": "system",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "etiology",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/MutationSuccess"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          },
+          "503": {
+            "description": "The stored NFPE reference values are missing or unreadable."
+          }
+        }
+      }
+    },
+    "/nfpe/systems": {
+      "get": {
+        "tags": [
+          "Nutrition-focused physical examination"
+        ],
+        "summary": "Normal findings for each body system (API key)",
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/MutationSuccess"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          },
+          "503": {
+            "description": "The stored NFPE reference values are missing or unreadable."
+          }
+        }
+      }
+    },
+    "/nfpe/aspen": {
+      "get": {
+        "tags": [
+          "Nutrition-focused physical examination"
+        ],
+        "summary": "The six Academy/ASPEN malnutrition characteristics (API key)",
+        "description": "Part 2 of the chart: energy intake, weight loss, body fat, muscle mass, fluid accumulation and grip strength for malnutrition in the context of acute illness, chronic illness or social/environmental circumstances, and the two-characteristic rule.",
+        "parameters": [
+          {
+            "name": "context",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "acute",
+                "chronic",
+                "social"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/MutationSuccess"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          },
+          "503": {
+            "description": "The stored NFPE reference values are missing or unreadable."
+          }
+        }
+      }
+    },
+    "/nfpe/reference": {
+      "get": {
+        "tags": [
+          "Nutrition-focused physical examination"
+        ],
+        "summary": "The stored NFPE reference rows, summarised (API key)",
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/MutationSuccess"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          },
+          "503": {
+            "description": "The stored NFPE reference values are missing or unreadable."
+          }
+        }
+      }
+    },
     "/carb-counting/carbohydrate-content": {
       "post": {
         "tags": [
@@ -15043,7 +15761,7 @@
           "Dietary assessment"
         ],
         "summary": "Dietary assessment - intake analysis, comparison with requirements, dietary gaps (API key, rate-limited)",
-        "description": "Takes 1-7 days of intake and returns the average intake of every assessable nutrient against the DRI of the person's life stage, with ranked gaps and excesses. Intake comes from `meals`, `ingredients` (resolved with the same resolver as /meals/analyze, max 40 ingredients in total) or `intake` (nutrient totals, for example the total_nutrients from /meals/analyze, no food lookups). Nutrients with an EAR and RDA are judged below EAR (likely inadequate), between EAR and RDA (borderline) or adequate. Nutrients with only an AI are adequate or possibly low. Sodium is judged against the CDRR as a limit. The UL is flagged on average intake from food. Energy is compared with the caller's `energy_target_kcal` or the IOM EER (weight_kg, height_cm, pal_category). Macronutrient shares are compared with the AMDR for the age, and food-group coverage is reported per day. Each nutrient carries a confidence from the share of foods that have a value, so a low result caused by missing food-table data is marked. Unless `suggest_foods` is false, the foods richest in the top gap nutrients (per 100 g) are added. Eleven nutrients beyond those in /dri/compare are covered (thiamin, riboflavin, niacin, B6, E, pantothenic acid, biotin, phosphorus, selenium, copper, manganese). A screen against reference values, not a diagnosis.\n",
+        "description": "Takes 1-7 days of intake and returns the average intake of every assessable nutrient against the DRI of the person's life stage, with ranked gaps and excesses. Intake comes from `meals`, `ingredients` (resolved with the same resolver as /meals/analyze, max 40 ingredients in total) or `intake` (nutrient totals, for example the total_nutrients from /meals/analyze, no food lookups). Nutrients with an EAR and RDA are judged below EAR (likely inadequate), between EAR and RDA (borderline) or adequate. Nutrients with only an AI are adequate or possibly low. Sodium is judged against the CDRR as a limit. The UL is flagged on average intake from food. Energy is compared with the caller's `energy_target_kcal` or the IOM EER (weight_kg, height_cm, pal_category). Macronutrient shares are compared with the AMDR for the age, and food-group coverage is reported per day. Each nutrient carries a confidence from the share of foods that have a value, so a low result caused by missing food-table data is marked. Unless `suggest_foods` is false, the foods richest in the top gap nutrients (per 100 g) are added. Eleven nutrients beyond those in /dri/compare are covered (thiamin, riboflavin, niacin, B6, E, pantothenic acid, biotin, phosphorus, selenium, copper, manganese). Optional `assessment_method` (24h_recall, food_record_weighed, food_record_estimated, ffq, diet_history, other) is echoed with what it represents and its limits. A `misreporting` block compares reported energy with BMR (Schofield 1985, needs sex and weight_kg) as EI:BMR against the PAL (`pal`, `pal_category`, or 1.55) using Goldberg/Black 95% limits that widen with fewer days. It flags possible under- or over-reporting and never excludes anyone; it is not applied in pregnancy or lactation. A screen against reference values, not a diagnosis.\n",
         "requestBody": {
           "required": true,
           "content": {
@@ -15104,6 +15822,24 @@
                   "suggest_foods": {
                     "type": "boolean",
                     "default": true
+                  },
+                  "assessment_method": {
+                    "type": "string",
+                    "enum": [
+                      "24h_recall",
+                      "food_record_weighed",
+                      "food_record_estimated",
+                      "ffq",
+                      "diet_history",
+                      "other"
+                    ],
+                    "description": "How the intake was collected. Echoed with what it represents (recent or habitual intake) and its limits."
+                  },
+                  "pal": {
+                    "type": "number",
+                    "minimum": 1,
+                    "maximum": 2.5,
+                    "description": "Physical activity level for the misreporting screen. Falls back to pal_category, then 1.55."
                   },
                   "days": {
                     "type": "array",

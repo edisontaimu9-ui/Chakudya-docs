@@ -2122,6 +2122,31 @@ curl -X POST https://api.chakudya.xyz/stress-factors/harris-benedict \
   -d '{"sex": "male", "weight_kg": 70, "height_cm": 175, "age_years": 40, "stress_factor": 1.2}'
 ```
 
+### Biochemistry lookup and interpretation (`/biochemistry`) -- `v1.75.0+`
+
+Looks up and interprets laboratory results against the stored reference ranges in `clinical_reference_values` (`biochemistry_adult`, sql/045, Ampath Desk Reference 2016, SI units; `biochemistry_paediatric`, sql/046, Harriet Lane / Lexicomp compilation, conventional units). Logic is in `src/biochemistryInterpret.js`. Any valid API key.
+
+| Route | What it does |
+|---|---|
+| `POST /biochemistry/interpret` | `age_years` or `age_months` or `age_days`, optional `sex`, and `results: [{analyte, value, unit}]` (up to 40), or `analyte`, `value`, `unit` for one result. Returns `low` / `normal` / `high` per analyte, a `category` for eGFR, ACR, vitamin D and triglycerides, the range used, the value in the range's unit, possible causes, and a `summary` |
+| `GET /biochemistry/lookup` | `analyte`, an age field, optional `sex`, `unit`: the range(s) that apply to that patient, optionally converted to another unit |
+| `GET /biochemistry/analytes` | Supported analytes with aliases, accepted units, selectors and which set holds them; `?set=adult\|paediatric&q=` |
+| `GET /biochemistry/reference` | Sections per set; `?set=adult\|paediatric&section=<n>` returns that section's rows |
+
+How a range is chosen:
+- Age 18 or more uses the adult set, younger the paediatric set. The adult set has no paediatric ranges, so a child with an adult-only analyte (for example ferritin) gets `no_reference`. An adult with an analyte only in the paediatric table (for example CK, blood gases) uses that table's adult or all-ages row, and the result says so.
+- Paediatric rows have age bounds in days (half-open). Rows with only a label (`Child`, `Adolescent`, `Adult`, `All ages`) get a window from the label: child 1 to under 12 years, adolescent 12 to under 18 years. This is marked `age_window_basis: label_assumed`. An age in a gap between two bands uses the nearest band within 35 days and says so. Cord-blood rows are never used.
+- Some ranges differ by `sex`, assay `method` (beckman, roche, biorad, abbott), `altitude` (inland, sea_level), blood-gas `sample` (arterial, capillary, venous), `cvd_risk` (low, moderate, high), `diabetes_target` (general, strict, relaxed, gdm), `elderly` (homocysteine) or `premature`. If the request does not say which, every stored range is evaluated: when they agree the answer is given, otherwise `status` is `indeterminate` and `needs` lists what to send.
+- `unit` is required (creatinine in umol/L and mg/dL are 88-fold apart, so the API does not guess). Built-in conversions cover electrolytes, creatinine, urea/BUN (mg/dL read as BUN), urate, glucose, calcium, phosphate, magnesium, proteins, bilirubin, ammonia, haemoglobin, CRP, lipids, iron, transferrin, ferritin, B12, folate, vitamin D, PTH, thyroid hormones and HbA1c (% and mmol/mol).
+- A bad item in a panel is reported in that item (`status: error`, with `code`), the rest is still read. Codes: `unknown_analyte`, `unit_required`, `unit_not_supported`, `invalid_value`, `invalid_selector`, `invalid_item`. `no_reference` means no stored range applies.
+- Reference and educational use. The range on the patient's own lab report takes precedence. No critical (panic) values are stored, so none are flagged. `INR` is offered only as `inr_on_warfarin` (the warfarin target), not as a general INR range.
+
+```bash
+curl -X POST https://api.chakudya.xyz/biochemistry/interpret \
+  -H "Authorization: Bearer $KEY" -H "Content-Type: application/json" \
+  -d '{"age_years": 6, "sex": "female", "results": [{"analyte": "creatinine", "value": 80, "unit": "umol/L"}, {"analyte": "Hb", "value": 9.8, "unit": "g/dL"}]}'
+```
+
 ### Carbohydrate counting and insulin dose (`/carb-counting`) — `v1.69.0+`
 
 Carbohydrate counting, the mealtime quick-acting insulin dose and the related reference lists, moved here from the MCP server (six tools). Same design as burns, refeeding and stress factors: the logic is in `src/carbCounting.js`; every list, handy measure, insulin profile, default (ISF 2.5 mmol/L per unit, half-unit rounding) and text is read from `clinical_reference_values` (condition `carb_counting`, seeded by `sql/042_add_carb_counting_reference_values.sql`) and cached in the Worker for five minutes. There is no built-in fallback: if the rows cannot be read the answer is a 503 that names the SQL file to run. Source: a UK diabetes network patient-education guide, in units per 10 g and mmol/L. This is separate from `/diabetes` (Krause ch. 30 and ADA 2026, mg/dL and grams per unit); the two do not share data.
@@ -2251,6 +2276,15 @@ Adds, on top of the recipe response shape:
 - A bare count with no stated unit (`"2 eggs"`) comes back as `unit: "serving"`, not grams — `resolveIngredientGrams()` treats a missing unit as grams, and "serving" is what it already falls back to for count-like foods via each food's own serving-size candidates (see Serving-Size Intelligence above), so "2 eggs" resolves to 2 whole eggs, not 2g of egg.
 - Primary parse is a Groq LLM call (handles plurals, descriptors like "chopped", word-form quantities like "half"); falls back to a local regex parser if `GROQ_API_KEY` isn't configured or the LLM call/parse fails. The fallback is cruder (numeric quantities only, keeps plurals as-is) but never throws.
 - Pipe the `ingredients[]` straight into `POST /recipes/calculate` or `POST /meals/analyze`.
+
+### Dietary assessment
+
+`POST /dietary-assessment` (any API key, nothing stored) compares 1-7 days of intake with the DRI, the IOM energy target and the AMDR, and ranks gaps. `GET /dietary-assessment/reference` lists the assessable nutrients, statuses and methods.
+
+Two optional additions support the "Dietary" step of ABCD (Dao et al. 2018, NCI Dietary Assessment Primer, DanoneDAT):
+
+- `assessment_method`: `24h_recall`, `food_record_weighed`, `food_record_estimated`, `ffq`, `diet_history` or `other`. The response returns `assessment_method` with what it represents (recent or habitual intake) and its main limits, and adds the same line to `notes`.
+- `misreporting`: BMR from the Schofield (1985) weight-only equations (needs `sex` and `weight_kg`), then EI:BMR against the PAL (`pal`, `pal_category`, or 1.55 by default) with Goldberg/Black 95% limits, `PAL x exp(+/-2S/100)` where `S = sqrt(23^2/days + 8.5^2 + 15^2)`. `status` is `plausible`, `possible_under_reporting` or `possible_over_reporting`. It flags possible misreporting and does not exclude anyone. It is not applied in pregnancy or lactation, and children get an adult-limits caution. When it cannot run, `misreporting.assessed` is `false` with a `reason`.
 
 ### Dietary Reference Intakes (DRI)
 

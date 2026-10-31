@@ -3065,6 +3065,116 @@
         "scope": "ip"
       },
       "note": "Static reference tables, no database."
+    },
+    {
+      "method": "POST",
+      "path": "/biochemistry/interpret",
+      "auth": "key",
+      "rateLimit": {
+        "limit": 100,
+        "windowSeconds": 60,
+        "scope": "ip"
+      },
+      "note": "Calculation from the request body plus reference rows read from clinical_reference_values (read only, cached in the Worker). Nothing is stored."
+    },
+    {
+      "method": "GET",
+      "path": "/biochemistry/lookup",
+      "auth": "key",
+      "rateLimit": {
+        "limit": 100,
+        "windowSeconds": 60,
+        "scope": "ip"
+      },
+      "note": "Reference rows read from clinical_reference_values (read only, cached in the Worker)."
+    },
+    {
+      "method": "GET",
+      "path": "/biochemistry/analytes",
+      "auth": "key",
+      "rateLimit": {
+        "limit": 100,
+        "windowSeconds": 60,
+        "scope": "ip"
+      },
+      "note": "Reference rows read from clinical_reference_values (read only, cached in the Worker)."
+    },
+    {
+      "method": "GET",
+      "path": "/biochemistry/reference",
+      "auth": "key",
+      "rateLimit": {
+        "limit": 100,
+        "windowSeconds": 60,
+        "scope": "ip"
+      },
+      "note": "Reference rows read from clinical_reference_values (read only, cached in the Worker)."
+    },
+    {
+      "method": "POST",
+      "path": "/nfpe/interpret",
+      "auth": "key",
+      "rateLimit": {
+        "limit": 100,
+        "windowSeconds": 60,
+        "scope": "ip"
+      },
+      "note": "Calculation from the request body plus reference rows read from clinical_reference_values (read only, cached in the Worker). Nothing is stored."
+    },
+    {
+      "method": "GET",
+      "path": "/nfpe/sites",
+      "auth": "key",
+      "rateLimit": {
+        "limit": 100,
+        "windowSeconds": 60,
+        "scope": "ip"
+      },
+      "note": "Reference rows read from clinical_reference_values (read only, cached in the Worker)."
+    },
+    {
+      "method": "GET",
+      "path": "/nfpe/findings",
+      "auth": "key",
+      "rateLimit": {
+        "limit": 100,
+        "windowSeconds": 60,
+        "scope": "ip"
+      },
+      "note": "Reference rows read from clinical_reference_values (read only, cached in the Worker)."
+    },
+    {
+      "method": "GET",
+      "path": "/nfpe/systems",
+      "auth": "key",
+      "rateLimit": {
+        "limit": 100,
+        "windowSeconds": 60,
+        "scope": "ip"
+      },
+      "note": "Reference rows read from clinical_reference_values (read only, cached in the Worker)."
+    },
+    {
+      "method": "GET",
+      "path": "/nfpe/aspen",
+      "auth": "key",
+      "rateLimit": {
+        "limit": 100,
+        "windowSeconds": 60,
+        "scope": "ip"
+      },
+      "note": "Reference rows read from clinical_reference_values (read only, cached in the Worker)."
+    },
+    {
+      "method": "GET",
+      "path": "/nfpe/reference",
+      "auth": "key",
+      "rateLimit": {
+        "limit": 100,
+        "windowSeconds": 60,
+        "scope": "ip"
+      },
+      "note": "Reference rows read from clinical_reference_values (read only, cached in the Worker)."
     }
   ]
 }

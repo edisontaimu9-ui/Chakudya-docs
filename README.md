@@ -13,7 +13,7 @@ it's a separate, deployable-on-its-own frontend.
 Everything documented here was verified against the actual repository
 (`src/index.js`'s router and `routePolicy()`, the `src/fhir*.js` modules,
 `src/ragPipeline.js` and `wrangler.toml`) - nothing here was
-invented. Currently in line with API **v1.74.0**.
+invented. Currently in line with API **v1.78.0**.
 
 ---
 
@@ -233,7 +233,7 @@ of the OpenAPI document - they're read out of `routePolicy()` in
 
 Every route in the API's OpenAPI spec is documented. The `/surveillance` routes (added in API v1.54.0) are the one gap: the API's own spec does not list them yet, so they are not here either.
 `/manufacturers`, `/products`, and `/nutrition` were removed from the API in
-v1.15.0-v1.16.0 and no longer appear here. The list below matches API v1.74.0.
+v1.15.0-v1.16.0 and no longer appear here. The list below matches API v1.78.0.
 
 The portal UI renders **every** route in `openapi.json`: public, API-key, admin,
 root-only, login-token and webhook routes alike. Each endpoint page carries a
@@ -449,8 +449,22 @@ only)" summary in the spec.
 - `POST /weight-management/diet-pattern` - Classify a daily macronutrient pattern
 
 **Dietary assessment** (calculations, nothing stored)
-- `POST /dietary-assessment` - Dietary assessment - intake analysis, comparison with requirements, dietary gaps (API key, rate-limited)
+- `POST /dietary-assessment` - Dietary assessment - intake analysis, comparison with requirements, dietary gaps, assessment method and a misreporting screen (Schofield BMR, EI:BMR) (API key, rate-limited)
 - `GET /dietary-assessment/reference` - Assessable nutrients, status definitions, accepted input and method notes (API key)
+
+**Biochemistry** (reference rows read from `clinical_reference_values`, nothing stored)
+- `POST /biochemistry/interpret` - Interpret one or more lab results as low, normal, high or a category (API key)
+- `GET /biochemistry/lookup` - Reference range(s) that apply to a patient for one analyte (API key)
+- `GET /biochemistry/analytes` - Analytes the biochemistry endpoints know (API key)
+- `GET /biochemistry/reference` - The stored biochemistry reference rows (API key)
+
+**Nutrition-focused physical examination** (reference rows read from `clinical_reference_values`, nothing stored)
+- `POST /nfpe/interpret` - Interpret NFPE site gradings, Academy/ASPEN characteristics and observed findings (API key)
+- `GET /nfpe/sites` - How to examine and grade each fat, muscle and fluid site (API key)
+- `GET /nfpe/findings` - Abnormal findings by body system with possible etiologies (API key)
+- `GET /nfpe/systems` - Normal findings for each body system (API key)
+- `GET /nfpe/aspen` - The six Academy/ASPEN malnutrition characteristics (API key)
+- `GET /nfpe/reference` - The stored NFPE reference rows, summarised (API key)
 
 **Paediatric nutrition** (calculations, nothing stored; `/pediatric` is an alias)
 - `POST /paediatric/energy` - Paediatric energy requirements (API key)
