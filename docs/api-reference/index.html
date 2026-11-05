@@ -221,6 +221,8 @@
 <li><a href="/api/delete-admin-keys-id/"><code>DELETE /admin/keys/{id}</code></a> - Revoke an API key (root key only)</li>
 <li><a href="/api/get-admin-monitoring/"><code>GET /admin/monitoring</code></a> - Failed calls and slow endpoints (root key only)</li>
 <li><a href="/api/get-admin-overview/"><code>GET /admin/overview</code></a> - Admin monitor snapshot (root key only)</li>
+<li><a href="/api/get-admin-summary/"><code>GET /admin/summary</code></a> - Preview the daily or weekly summary email (root key only)</li>
+<li><a href="/api/post-admin-summary/"><code>POST /admin/summary</code></a> - Send the summary email now (root key only)</li>
 <li><a href="/api/get-admin-usage/"><code>GET /admin/usage</code></a> - Usage by endpoint (root key only)</li>
 </ul>
 <h2>Developer keys</h2>
@@ -513,6 +515,16 @@
 <li><a href="/api/post-dietary-assessment/"><code>POST /dietary-assessment</code></a> - Dietary assessment - intake analysis, comparison with requirements, dietary gaps (API key, rate-limited)</li>
 <li><a href="/api/get-dietary-assessment-reference/"><code>GET /dietary-assessment/reference</code></a> - Assessable nutrients, status definitions, accepted input and method notes (API key)</li>
 </ul>
+<h2>Meal plan</h2>
+<ul>
+<li><a href="/api/post-meal-plan-generate/"><code>POST /meal-plan/generate</code></a> - Generate a Malawian meal plan sized to energy and macronutrient targets (API key)</li>
+<li><a href="/api/get-meal-plan-reference/"><code>GET /meal-plan/reference</code></a> - Meal plan inputs, portion limits, meal patterns and food selection rules (API key)</li>
+</ul>
+<h2>Care plan</h2>
+<ul>
+<li><a href="/api/post-care-plan-adime/"><code>POST /care-plan/adime</code></a> - One call from patient data to a finished ADIME note (API key)</li>
+<li><a href="/api/get-care-plan-reference/"><code>GET /care-plan/reference</code></a> - Care plan inputs, outputs and limits (API key)</li>
+</ul>
 <h2>Paediatric nutrition</h2>
 <ul>
 <li><a href="/api/post-paediatric-catch-up/"><code>POST /paediatric/catch-up</code></a> - Catch-up growth energy and protein (API key)</li>
@@ -660,6 +672,13 @@
 <li><a href="/api/get-memory-recall/"><code>GET /memory/recall</code></a> - Recall (deprecated - use POST, same params as query string)</li>
 <li><a href="/api/post-memory-recall/"><code>POST /memory/recall</code></a> - Recall top-K relevant memory rows for a session (API key, rate-limited, preferred)</li>
 <li><a href="/api/post-memory-write/"><code>POST /memory/write</code></a> - Write a raw memory fact (API key, rate-limited)</li>
+</ul>
+<h2>ML Laboratory</h2>
+<ul>
+<li><a href="/api/post-hooks-ml-lab/"><code>POST /hooks/ml-lab</code></a> - Signed model-status event from the lab</li>
+<li><a href="/api/post-ml-assess-slug/"><code>POST /ml/assess/{slug}</code></a> - Risk estimates from a deployed model (admin key, decision support only)</li>
+<li><a href="/api/get-ml-models/"><code>GET /ml/models</code></a> - Deployed models and their feature contract (admin key)</li>
+<li><a href="/api/get-ml-status/"><code>GET /ml/status</code></a> - ML laboratory link status (admin key)</li>
 </ul>
 <h2>Developer</h2>
 <ul>

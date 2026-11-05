@@ -5,7 +5,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 <title>AI, knowledge &amp; memory - API Reference - API Documentation | Chakudya Nutrition Registry</title>
-<meta name="description" content="Retrieval-augmented answers and session memory for assistants." />
+<meta name="description" content="Retrieval-augmented answers, session memory for assistants, and the ML Laboratory link." />
 <meta name="keywords" content="Malawi nutrition, Malawian foods, food composition, nsima, growth assessment, anthropometry, clinical nutrition, dietetics, nutrition API" />
 <meta name="author" content="Edison Taimu" />
 <meta name="robots" content="index, follow, max-image-preview:large" />
@@ -16,7 +16,7 @@
 <meta property="og:locale" content="en" />
 <meta property="og:url" content="https://chakudya.xyz/docs/api-reference/ai/" />
 <meta property="og:title" content="AI, knowledge &amp; memory - API Reference - API Documentation | Chakudya Nutrition Registry" />
-<meta property="og:description" content="Retrieval-augmented answers and session memory for assistants." />
+<meta property="og:description" content="Retrieval-augmented answers, session memory for assistants, and the ML Laboratory link." />
 <meta property="og:image" content="https://chakudya.xyz/assets/images/og-chakudya.jpg" />
 <meta property="og:image:width" content="1200" />
 <meta property="og:image:height" content="630" />
@@ -24,7 +24,7 @@
 <meta name="twitter:card" content="summary_large_image" />
 <meta name="twitter:site" content="@edisontaimu" />
 <meta name="twitter:title" content="AI, knowledge &amp; memory - API Reference - API Documentation | Chakudya Nutrition Registry" />
-<meta name="twitter:description" content="Retrieval-augmented answers and session memory for assistants." />
+<meta name="twitter:description" content="Retrieval-augmented answers, session memory for assistants, and the ML Laboratory link." />
 <meta name="twitter:image" content="https://chakudya.xyz/assets/images/og-chakudya.jpg" />
 <script type="application/ld+json">
 {
@@ -205,7 +205,7 @@
       <article class="static-page">
         <nav aria-label="Breadcrumb" class="field__hint"><a href="/">Home</a> &rsaquo; <a href="/docs/getting-started/">Documentation</a> &rsaquo; <a href="/docs/api-reference/">API Reference</a> &rsaquo; <span aria-current="page">AI, knowledge &amp; memory</span></nav>
         <h1>AI, knowledge &amp; memory</h1>
-        <p>Retrieval-augmented answers and session memory for assistants.</p>
+        <p>Retrieval-augmented answers, session memory for assistants, and the ML Laboratory link.</p>
 <h2>Routes in this category</h2>
 <ul>
 <li><a href="/api/post-rag-ask/"><code>POST /rag/ask</code></a> - RAG Search Orchestrator (API key, rate-limited)</li>
@@ -221,6 +221,10 @@
 <li><a href="/api/get-memory-recall/"><code>GET /memory/recall</code></a> - Recall (deprecated - use POST, same params as query string)</li>
 <li><a href="/api/post-memory-recall/"><code>POST /memory/recall</code></a> - Recall top-K relevant memory rows for a session (API key, rate-limited, preferred)</li>
 <li><a href="/api/post-memory-write/"><code>POST /memory/write</code></a> - Write a raw memory fact (API key, rate-limited)</li>
+<li><a href="/api/post-hooks-ml-lab/"><code>POST /hooks/ml-lab</code></a> - Signed model-status event from the lab</li>
+<li><a href="/api/post-ml-assess-slug/"><code>POST /ml/assess/{slug}</code></a> - Risk estimates from a deployed model (admin key, decision support only)</li>
+<li><a href="/api/get-ml-models/"><code>GET /ml/models</code></a> - Deployed models and their feature contract (admin key)</li>
+<li><a href="/api/get-ml-status/"><code>GET /ml/status</code></a> - ML laboratory link status (admin key)</li>
 </ul>
 <h2>More in API Reference</h2>
 <ul>
@@ -231,10 +235,10 @@
 <li><a href="/docs/api-reference/diets/">Diets, exchange &amp; formulas</a> - Glycaemic index, food exchange lists, renal nutrition and enteral formulas.</li>
 <li><a href="/docs/api-reference/clinical/">Energy &amp; drug interactions</a> - Energy requirements and known drug-nutrient interactions.</li>
 <li><a href="/docs/api-reference/conditions/">Condition-specific nutrition</a> - Calculators for diabetes and carbohydrate counting, kidney disease, pregnancy and lactation, children, sports and weight management.</li>
-<li><a href="/docs/api-reference/support/">Clinical nutrition support</a> - Critical care, burn, refeeding, enteral feeding and energy stress factor calculators.</li>
+<li><a href="/docs/api-reference/support/">Clinical nutrition support</a> - Critical care, burn, refeeding, enteral feeding, energy stress factor and biochemistry tools, and the one-call ADIME care plan.</li>
 <li><a href="/docs/api-reference/research/">Research &amp; epidemiology</a> - Harmonise study data, analyse outcomes and surveys, audit data quality and export analysis-ready datasets.</li>
 <li><a href="/docs/api-reference/fhir/">FHIR R4</a> - Stateless growth evaluation and the Nutrition Care Process as FHIR resources.</li>
-<li><a href="/docs/api-reference/ai/">AI, knowledge &amp; memory</a> - Retrieval-augmented answers and session memory for assistants.</li>
+<li><a href="/docs/api-reference/ai/">AI, knowledge &amp; memory</a> - Retrieval-augmented answers, session memory for assistants, and the ML Laboratory link.</li>
 <li><a href="/docs/api-reference/platform/">Keys &amp; platform</a> - API keys, developer keys, batching, health and metadata.</li>
 <li><a href="/docs/api-reference/more/">More routes</a> - Other documented routes.</li>
 </ul>

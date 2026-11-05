@@ -5,7 +5,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 <title>Clinical nutrition support - API Reference - API Documentation | Chakudya Nutrition Registry</title>
-<meta name="description" content="Critical care, burn, refeeding, enteral feeding and energy stress factor calculators." />
+<meta name="description" content="Critical care, burn, refeeding, enteral feeding, energy stress factor and biochemistry tools, and the one-call ADIME care plan." />
 <meta name="keywords" content="Malawi nutrition, Malawian foods, food composition, nsima, growth assessment, anthropometry, clinical nutrition, dietetics, nutrition API" />
 <meta name="author" content="Edison Taimu" />
 <meta name="robots" content="index, follow, max-image-preview:large" />
@@ -16,7 +16,7 @@
 <meta property="og:locale" content="en" />
 <meta property="og:url" content="https://chakudya.xyz/docs/api-reference/support/" />
 <meta property="og:title" content="Clinical nutrition support - API Reference - API Documentation | Chakudya Nutrition Registry" />
-<meta property="og:description" content="Critical care, burn, refeeding, enteral feeding and energy stress factor calculators." />
+<meta property="og:description" content="Critical care, burn, refeeding, enteral feeding, energy stress factor and biochemistry tools, and the one-call ADIME care plan." />
 <meta property="og:image" content="https://chakudya.xyz/assets/images/og-chakudya.jpg" />
 <meta property="og:image:width" content="1200" />
 <meta property="og:image:height" content="630" />
@@ -24,7 +24,7 @@
 <meta name="twitter:card" content="summary_large_image" />
 <meta name="twitter:site" content="@edisontaimu" />
 <meta name="twitter:title" content="Clinical nutrition support - API Reference - API Documentation | Chakudya Nutrition Registry" />
-<meta name="twitter:description" content="Critical care, burn, refeeding, enteral feeding and energy stress factor calculators." />
+<meta name="twitter:description" content="Critical care, burn, refeeding, enteral feeding, energy stress factor and biochemistry tools, and the one-call ADIME care plan." />
 <meta name="twitter:image" content="https://chakudya.xyz/assets/images/og-chakudya.jpg" />
 <script type="application/ld+json">
 {
@@ -205,9 +205,11 @@
       <article class="static-page">
         <nav aria-label="Breadcrumb" class="field__hint"><a href="/">Home</a> &rsaquo; <a href="/docs/getting-started/">Documentation</a> &rsaquo; <a href="/docs/api-reference/">API Reference</a> &rsaquo; <span aria-current="page">Clinical nutrition support</span></nav>
         <h1>Clinical nutrition support</h1>
-        <p>Critical care, burn, refeeding, enteral feeding and energy stress factor calculators.</p>
+        <p>Critical care, burn, refeeding, enteral feeding, energy stress factor and biochemistry tools, and the one-call ADIME care plan.</p>
 <h2>Routes in this category</h2>
 <ul>
+<li><a href="/api/post-care-plan-adime/"><code>POST /care-plan/adime</code></a> - One call from patient data to a finished ADIME note (API key)</li>
+<li><a href="/api/get-care-plan-reference/"><code>GET /care-plan/reference</code></a> - Care plan inputs, outputs and limits (API key)</li>
 <li><a href="/api/post-critical-care-carbohydrate/"><code>POST /critical-care/carbohydrate</code></a> - Carbohydrate requirement reference (API key)</li>
 <li><a href="/api/get-critical-care-cho-fat-ratio/"><code>GET /critical-care/cho-fat-ratio</code></a> - CHO:fat ratio of non-protein energy (API key)</li>
 <li><a href="/api/post-critical-care-electrolytes/"><code>POST /critical-care/electrolytes</code></a> - Phosphate, potassium and magnesium replacement reference (API key)</li>
@@ -240,6 +242,10 @@
 <li><a href="/api/post-stress-factors-fever/"><code>POST /stress-factors/fever</code></a> - Fever adjustment of a baseline REE (API key)</li>
 <li><a href="/api/post-stress-factors-harris-benedict/"><code>POST /stress-factors/harris-benedict</code></a> - Harris-Benedict BEE with optional stress, adjustment and temperature factors (API key)</li>
 <li><a href="/api/get-stress-factors-reference/"><code>GET /stress-factors/reference</code></a> - Stored stress factor reference values (API key)</li>
+<li><a href="/api/get-biochemistry-analytes/"><code>GET /biochemistry/analytes</code></a> - Analytes the biochemistry endpoints know (API key)</li>
+<li><a href="/api/post-biochemistry-interpret/"><code>POST /biochemistry/interpret</code></a> - Interpret one or more lab results as low, normal, high or a category (API key)</li>
+<li><a href="/api/get-biochemistry-lookup/"><code>GET /biochemistry/lookup</code></a> - Reference range(s) that apply to a patient for one analyte (API key)</li>
+<li><a href="/api/get-biochemistry-reference/"><code>GET /biochemistry/reference</code></a> - The stored biochemistry reference rows (API key)</li>
 <li><a href="/api/post-enteral-nutrition-calculate/"><code>POST /enteral-nutrition/calculate</code></a> - Tube feeding prescription calculator (API key)</li>
 <li><a href="/api/get-enteral-nutrition-reference/"><code>GET /enteral-nutrition/reference</code></a> - Enteral nutrition steps, limits and request fields (API key)</li>
 </ul>
@@ -252,10 +258,10 @@
 <li><a href="/docs/api-reference/diets/">Diets, exchange &amp; formulas</a> - Glycaemic index, food exchange lists, renal nutrition and enteral formulas.</li>
 <li><a href="/docs/api-reference/clinical/">Energy &amp; drug interactions</a> - Energy requirements and known drug-nutrient interactions.</li>
 <li><a href="/docs/api-reference/conditions/">Condition-specific nutrition</a> - Calculators for diabetes and carbohydrate counting, kidney disease, pregnancy and lactation, children, sports and weight management.</li>
-<li><a href="/docs/api-reference/support/">Clinical nutrition support</a> - Critical care, burn, refeeding, enteral feeding and energy stress factor calculators.</li>
+<li><a href="/docs/api-reference/support/">Clinical nutrition support</a> - Critical care, burn, refeeding, enteral feeding, energy stress factor and biochemistry tools, and the one-call ADIME care plan.</li>
 <li><a href="/docs/api-reference/research/">Research &amp; epidemiology</a> - Harmonise study data, analyse outcomes and surveys, audit data quality and export analysis-ready datasets.</li>
 <li><a href="/docs/api-reference/fhir/">FHIR R4</a> - Stateless growth evaluation and the Nutrition Care Process as FHIR resources.</li>
-<li><a href="/docs/api-reference/ai/">AI, knowledge &amp; memory</a> - Retrieval-augmented answers and session memory for assistants.</li>
+<li><a href="/docs/api-reference/ai/">AI, knowledge &amp; memory</a> - Retrieval-augmented answers, session memory for assistants, and the ML Laboratory link.</li>
 <li><a href="/docs/api-reference/platform/">Keys &amp; platform</a> - API keys, developer keys, batching, health and metadata.</li>
 <li><a href="/docs/api-reference/more/">More routes</a> - Other documented routes.</li>
 </ul>

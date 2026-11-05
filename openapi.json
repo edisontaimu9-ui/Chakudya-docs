@@ -3,7 +3,7 @@
   "info": {
     "title": "Chakudya Nutrition Registry API (CNR)",
     "description": "Chakudya is a Malawi focused nutrition data and intelligence API. It provides structured, searchable nutrition information for health applications, researchers, students, dietitians, and developers building tools for clinical or public health nutrition work. The API combines local food composition data with international sources such as USDA FoodData Central, Open Food Facts, and FatSecret, and adds retrieval augmented question answering and session memory for AI assisted applications.\n\nIt also covers clinical growth assessment (WHO child growth standards from birth to 19 years, Fenton preterm charts, and a combined `/growth/assess` call), recipe and meal nutrition analysis, dietary reference intakes, and a stateless FHIR R4 facade that exposes growth evaluation and the full Nutrition Care Process (screening, assessment, diagnosis, intervention, monitoring and ADIME documents).\n\nPeople can sign in on the docs site and create their own consumer API keys (higher rate limits, FHIR access, usage counts) with `/developer/keys`.\n\nEvery operational route needs `Authorization: Bearer YOUR_API_KEY` (a consumer key from the developer console, or an admin or reviewer key). The only routes that work without a key are `GET /`, `GET /health` and the FHIR conformance reads (`GET /fhir/metadata`, `CodeSystem`, `OperationDefinition`, `StructureDefinition`, `ConceptMap`, `Questionnaire`). `/developer/keys` takes your Supabase login token instead of an API key, and `POST /rag/webhook` and `POST /hooks/signup` take a shared secret. Privileged registry writes (foods, exchange, renal, formulas, drug interactions, glycaemic index, reference tables, packaged CRUD and review, RAG ingest, bulk inserts) and key management need an admin key; a consumer key is refused there. Anonymous calls receive 401 with the code `api_key_required`. OAuth 2.0 was removed in v1.34.0.\n",
-    "version": "1.78.0",
+    "version": "1.83.0",
     "contact": {
       "name": "Edison Taimu",
       "x-location": "Blantyre, Malawi"
@@ -137,6 +137,12 @@
     },
     {
       "name": "Dietary assessment"
+    },
+    {
+      "name": "Meal plan"
+    },
+    {
+      "name": "Care plan"
     },
     {
       "name": "Paediatric nutrition"
@@ -369,6 +375,92 @@
           },
           "429": {
             "$ref": "#/components/responses/RateLimited"
+          }
+        }
+      }
+    },
+    "/admin/summary": {
+      "get": {
+        "tags": [
+          "API Keys"
+        ],
+        "summary": "Preview the daily or weekly summary email (root key only)",
+        "description": "Builds the same summary the Worker emails every day at 06:00 Malawi time (previous day) and every Monday (previous 7 days) - usage, uptime, failed requests, upstream failures, keys and pipelines. A section whose table is off shows as not available. Needs the root key.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "period",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "daily",
+                "weekly"
+              ],
+              "default": "daily"
+            }
+          },
+          {
+            "name": "day",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            },
+            "description": "Last Malawi day to include (default yesterday)."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Subject, email text and the underlying figures"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "API Keys"
+        ],
+        "summary": "Send the summary email now (root key only)",
+        "description": "Emails the summary to SUMMARY_EMAIL_TO. Requires `send=true`. Needs the GMAIL_* secrets.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "period",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "daily",
+                "weekly"
+              ]
+            }
+          },
+          {
+            "name": "send",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "true"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Sent"
+          },
+          "502": {
+            "description": "Gmail refused or was unreachable"
           }
         }
       }
@@ -15978,6 +16070,591 @@
         }
       }
     },
+    "/care-plan/adime": {
+      "post": {
+        "tags": [
+          "Care plan"
+        ],
+        "summary": "One call from patient data to a finished ADIME note (API key)",
+        "description": "Runs the API's own read-only engines on one patient record (energy requirements, WHO growth for people under 19, biochemistry, NFPE and Academy/ASPEN malnutrition criteria, dietary assessment, optional meal plan) and assembles the Assessment, provisional PES nutrition diagnoses (NCP terms), the energy and protein prescription with goals and strategies, Monitoring and Evaluation, and the whole note as Markdown. Diagnoses are rule-based and provisional. The \"related to\" part is never taken from clinical.conditions. A medical condition is context (adime.diagnosis.context_conditions) and becomes a cause only when the clinician links it under clinical.etiologies; otherwise the cause is a reported symptom that limits intake (marked provisional) or \"cause not stated\". Each sign is marked confirmed or provisional (evidence.confirmed, evidence.provisional with the assumption stated). Codes are checked against the NCP terminology edition the Worker is configured for (NCP_TERMINOLOGY_VERSION, default 2006). An unknown code, another edition or a \"(specify)\" term without its nutrient is not generated and is listed under adime.diagnosis.terminology.issues. Duplicate and redundant diagnoses are merged or suppressed (adime.diagnosis.suppressed). An engine that fails is listed under sections_unavailable and the rest is still returned. Assumptions (for example a sedentary activity level) are listed. Acute malnutrition in children gets a protocol pathway and no kcal figure. Condition-specific targets (kidney, diabetes, critical care, burns, pregnancy) are pointed to their own endpoints. REE and the total energy requirement are reported separately, and a weight-based estimate is marked provisional and is not turned into a prescription. For patients at risk of refeeding syndrome, prescription.refeeding gives the starting target (from the stored ASPEN reference) and the eventual goal separately. Writes nothing. A draft for clinician review. The response also carries missing_information (clinically important items the request did not contain, grouped by domain, which is one of dietary_intake, symptoms, biochemical, medical_history, nfpe or anthropometric, and ranked essential, important or useful, each with why it matters and the request field that would supply it), clinical_warnings (severity critical, high, moderate or info, plus domain, message, the supplied facts it rests on and the action) and data_completeness (counts by rank). Nothing missing is filled in or assumed normal, and a field sent as an empty list counts as provided, meaning none reported. Input problems such as a misspelt field, a yes/no field sent as text, a lab row without a unit or figures that contradict each other are reported as clinical_warnings with domain data_quality and never cause an error. These fields are additive and every earlier field is unchanged.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "patient",
+                  "anthropometry"
+                ],
+                "properties": {
+                  "patient": {
+                    "type": "object",
+                    "required": [
+                      "sex"
+                    ],
+                    "properties": {
+                      "name": {
+                        "type": "string"
+                      },
+                      "id": {
+                        "type": "string"
+                      },
+                      "sex": {
+                        "type": "string",
+                        "enum": [
+                          "male",
+                          "female"
+                        ]
+                      },
+                      "age_years": {
+                        "type": "number"
+                      },
+                      "age_months": {
+                        "type": "number"
+                      },
+                      "setting": {
+                        "type": "string",
+                        "enum": [
+                          "hospital",
+                          "outpatient",
+                          "community"
+                        ],
+                        "default": "outpatient"
+                      },
+                      "pregnancy": {
+                        "type": "object",
+                        "properties": {
+                          "trimester": {
+                            "type": "integer",
+                            "enum": [
+                              1,
+                              2,
+                              3
+                            ]
+                          }
+                        }
+                      },
+                      "lactation": {
+                        "type": "object",
+                        "properties": {
+                          "months_postpartum": {
+                            "type": "number"
+                          }
+                        }
+                      }
+                    }
+                  },
+                  "anthropometry": {
+                    "type": "object",
+                    "required": [
+                      "weight_kg"
+                    ],
+                    "properties": {
+                      "weight_kg": {
+                        "type": "number"
+                      },
+                      "height_cm": {
+                        "type": "number"
+                      },
+                      "usual_weight_kg": {
+                        "type": "number"
+                      },
+                      "weight_loss_pct": {
+                        "type": "number"
+                      },
+                      "weight_loss_days": {
+                        "type": "number"
+                      },
+                      "weight_loss_intentional": {
+                        "type": "boolean"
+                      },
+                      "muac_mm": {
+                        "type": "number",
+                        "description": "Millimetres."
+                      },
+                      "waist_cm": {
+                        "type": "number"
+                      },
+                      "oedema": {
+                        "type": "boolean",
+                        "description": "Bilateral pitting oedema."
+                      }
+                    }
+                  },
+                  "clinical": {
+                    "type": "object",
+                    "properties": {
+                      "conditions": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        },
+                        "maxItems": 20
+                      },
+                      "symptoms": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        },
+                        "maxItems": 20
+                      },
+                      "appetite": {
+                        "type": "string",
+                        "enum": [
+                          "good",
+                          "fair",
+                          "poor"
+                        ]
+                      },
+                      "context": {
+                        "type": "string",
+                        "enum": [
+                          "acute",
+                          "chronic",
+                          "social"
+                        ],
+                        "description": "Used for the Academy/ASPEN malnutrition criteria when nfpe is sent, and for the percent-of-requirement intake rows of the ASPEN refeeding screen (acute or chronic needed)."
+                      },
+                      "goal": {
+                        "type": "string",
+                        "enum": [
+                          "maintenance",
+                          "weight_loss",
+                          "weight_gain"
+                        ]
+                      },
+                      "intake": {
+                        "type": "object",
+                        "description": "Days of inadequate intake, for the adult ASPEN refeeding screen (Table 3). Not supplied means not graded, and it is listed under assessment.refeeding_screen.missing_information.",
+                        "properties": {
+                          "days_negligible": {
+                            "type": "number",
+                            "minimum": 0,
+                            "maximum": 365,
+                            "description": "Days of little or no intake. 5 to 6 = moderate, 7 or more = significant."
+                          },
+                          "days_below_75pct": {
+                            "type": "number",
+                            "minimum": 0,
+                            "maximum": 365,
+                            "description": "Days below 75% of requirement. Moderate when more than 7 (acute) or more than 30 (chronic)."
+                          },
+                          "days_below_50pct": {
+                            "type": "number",
+                            "minimum": 0,
+                            "maximum": 365,
+                            "description": "Days below 50% of requirement. Significant when more than 5 (acute) or more than 30 (chronic)."
+                          }
+                        }
+                      },
+                      "prefeeding_electrolytes_severely_low": {
+                        "type": "boolean",
+                        "description": "Delays the start of refeeding per ASPEN (shown in prescription.refeeding.delay_initiation_note). Also scores the electrolyte criterion as significant."
+                      },
+                      "stress": {
+                        "type": "array",
+                        "items": {
+                          "type": "object"
+                        },
+                        "description": "Stress factors as for POST /energy/requirements."
+                      },
+                      "etiologies": {
+                        "type": "array",
+                        "maxItems": 20,
+                        "description": "The clinician's 'related to' for a diagnosis. This is the only way a medical condition becomes a cause. Each entry is tied to the NCP code it explains.",
+                        "items": {
+                          "type": "object",
+                          "required": [
+                            "diagnosis",
+                            "text"
+                          ],
+                          "properties": {
+                            "diagnosis": {
+                              "description": "An NCP code such as NC-3.2, or a list of codes.",
+                              "oneOf": [
+                                {
+                                  "type": "string"
+                                },
+                                {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "string"
+                                  }
+                                }
+                              ]
+                            },
+                            "text": {
+                              "type": "string",
+                              "maxLength": 120
+                            },
+                            "status": {
+                              "type": "string",
+                              "enum": [
+                                "confirmed",
+                                "suspected"
+                              ],
+                              "default": "suspected",
+                              "description": "A suspected cause is printed as \"(suspected",
+                              "to be confirmed)\".": null
+                            },
+                            "basis": {
+                              "type": "string",
+                              "maxLength": 160
+                            },
+                            "condition": {
+                              "type": "string",
+                              "description": "Must match one of clinical.conditions. Records that the cause is that condition."
+                            }
+                          }
+                        }
+                      }
+                    }
+                  },
+                  "activity": {
+                    "type": "object",
+                    "properties": {
+                      "pal_category": {
+                        "type": "string",
+                        "enum": [
+                          "sedentary",
+                          "low_active",
+                          "active",
+                          "very_active"
+                        ]
+                      },
+                      "pal": {
+                        "type": "number"
+                      },
+                      "activity_factor": {
+                        "type": "string"
+                      }
+                    }
+                  },
+                  "biochemistry": {
+                    "type": "array",
+                    "maxItems": 40,
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "analyte": {
+                          "type": "string"
+                        },
+                        "value": {
+                          "type": "number"
+                        },
+                        "unit": {
+                          "type": "string"
+                        }
+                      }
+                    }
+                  },
+                  "nfpe": {
+                    "type": "object",
+                    "description": "As for POST /nfpe/interpret."
+                  },
+                  "diet": {
+                    "type": "object",
+                    "description": "Either days as for POST /dietary-assessment, or a reported intake {energy_kcal, protein_g}."
+                  },
+                  "meal_plan": {
+                    "description": "true, or options as for POST /meal-plan/generate (energy and protein come from the prescription). Ages 2 and over.",
+                    "oneOf": [
+                      {
+                        "type": "boolean"
+                      },
+                      {
+                        "type": "object"
+                      }
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/MutationSuccess"
+          },
+          "400": {
+            "description": "Invalid input"
+          }
+        }
+      }
+    },
+    "/care-plan/reference": {
+      "get": {
+        "tags": [
+          "Care plan"
+        ],
+        "summary": "Care plan inputs, outputs and limits (API key)",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/MutationSuccess"
+          }
+        }
+      }
+    },
+    "/meal-plan/generate": {
+      "post": {
+        "tags": [
+          "Meal plan"
+        ],
+        "summary": "Generate a Malawian meal plan sized to energy and macronutrient targets (API key)",
+        "description": "Builds 1 to 7 days of meals (porridge or root for breakfast; nsima with vegetable and protein relishes for lunch and dinner; snacks) from cooked and ready-to-eat rows of the foods table, then sizes the grams toward the protein, fat and energy (or carbohydrate) targets within normal portion limits. Targets are aims, not guarantees. Each day shows its difference from target, target_check and the method text say whether they were reached. A day below its protein, carbohydrate or fat target by more than the tolerance gets suggested_adjustments, which are energy-aware options labelled replacement (swap some of one food in the day for another in the same meal) or addition, each with the original food, the suggested food, portions and the projected day totals (see MealPlanAdjustment). They come only from foods the plan itself may use, so the diet, avoid list, excluded ids, dietary rules, season, meat-free days and low budget are respected, and each keeps energy within 7% of its target. When none qualifies, the day has unresolved_shortfalls explaining why (see MealPlanUnresolvedShortfall). Returns each day versus its targets, nutrients per day, a summary (average per day and a shopping list for the days requested; the older week block is kept for existing clients) and a payload for POST /dietary-assessment. options.carbohydrate_target explains carbohydrate_target_followed. Read only. Ages 2 years and over. A planning aid, not a prescription.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "energy_kcal": {
+                    "type": "number",
+                    "minimum": 800,
+                    "maximum": 6000
+                  },
+                  "sex": {
+                    "type": "string",
+                    "enum": [
+                      "male",
+                      "female"
+                    ]
+                  },
+                  "age_years": {
+                    "type": "number",
+                    "minimum": 2
+                  },
+                  "weight_kg": {
+                    "type": "number"
+                  },
+                  "height_cm": {
+                    "type": "number"
+                  },
+                  "pal_category": {
+                    "type": "string",
+                    "enum": [
+                      "sedentary",
+                      "low_active",
+                      "active",
+                      "very_active"
+                    ]
+                  },
+                  "energy_adjust_kcal": {
+                    "type": "number",
+                    "minimum": -1500,
+                    "maximum": 1500
+                  },
+                  "protein_g": {
+                    "type": "number"
+                  },
+                  "protein_g_per_kg": {
+                    "type": "number"
+                  },
+                  "protein_pct": {
+                    "type": "number"
+                  },
+                  "fat_pct": {
+                    "type": "number"
+                  },
+                  "carb_g_per_day": {
+                    "type": "number"
+                  },
+                  "days": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 7,
+                    "default": 7
+                  },
+                  "meals_per_day": {
+                    "type": "integer",
+                    "enum": [
+                      3,
+                      4,
+                      5
+                    ],
+                    "default": 4
+                  },
+                  "diet": {
+                    "type": "string",
+                    "enum": [
+                      "omnivore",
+                      "vegetarian",
+                      "vegan"
+                    ],
+                    "default": "omnivore"
+                  },
+                  "avoid": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    },
+                    "maxItems": 20
+                  },
+                  "exclude_ids": {
+                    "type": "array",
+                    "items": {
+                      "type": "integer"
+                    },
+                    "maxItems": 100
+                  },
+                  "max_sodium_mg": {
+                    "type": "number"
+                  },
+                  "max_potassium_mg": {
+                    "type": "number"
+                  },
+                  "max_phosphorus_mg": {
+                    "type": "number"
+                  },
+                  "start_date": {
+                    "type": "string",
+                    "format": "date",
+                    "description": "Sets the month for the seasonal calendar and labels each day with its weekday."
+                  },
+                  "month": {
+                    "description": "1 to 12 or a month name. Default is the current month in Malawi.",
+                    "oneOf": [
+                      {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 12
+                      },
+                      {
+                        "type": "string"
+                      }
+                    ]
+                  },
+                  "seasonal": {
+                    "type": "boolean",
+                    "default": true
+                  },
+                  "region": {
+                    "type": "string",
+                    "enum": [
+                      "north",
+                      "central",
+                      "south",
+                      "lakeshore"
+                    ],
+                    "description": "A broad tendency for the usual staple and relish; staple_preference overrides it."
+                  },
+                  "staple_preference": {
+                    "type": "string",
+                    "enum": [
+                      "maize",
+                      "cassava",
+                      "sorghum_millet",
+                      "mixed"
+                    ]
+                  },
+                  "staple_pattern": {
+                    "type": "string",
+                    "enum": [
+                      "nsima_twice",
+                      "varied"
+                    ],
+                    "default": "nsima_twice"
+                  },
+                  "dietary_rules": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "enum": [
+                        "halal",
+                        "no_pork",
+                        "no_beef"
+                      ]
+                    }
+                  },
+                  "meatless_days": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "enum": [
+                        "monday",
+                        "tuesday",
+                        "wednesday",
+                        "thursday",
+                        "friday",
+                        "saturday",
+                        "sunday"
+                      ]
+                    },
+                    "description": "Needs start_date."
+                  },
+                  "ramadan": {
+                    "type": "boolean",
+                    "description": "Builds the day as suhoor",
+                    "iftar": null,
+                    "dinner and a late snack.": null
+                  },
+                  "budget": {
+                    "type": "string",
+                    "enum": [
+                      "standard",
+                      "low"
+                    ],
+                    "default": "standard"
+                  },
+                  "language": {
+                    "type": "string",
+                    "enum": [
+                      "en",
+                      "ny"
+                    ],
+                    "default": "en",
+                    "description": "ny gives meal names in Chichewa."
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/MutationSuccess"
+          },
+          "400": {
+            "description": "Invalid input or not enough usable foods"
+          }
+        }
+      }
+    },
+    "/meal-plan/reference": {
+      "get": {
+        "tags": [
+          "Meal plan"
+        ],
+        "summary": "Meal plan inputs, portion limits, meal patterns and food selection rules (API key)",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/MutationSuccess"
+          }
+        }
+      }
+    },
     "/ingredients/parse": {
       "post": {
         "tags": [
@@ -19435,6 +20112,154 @@
         }
       }
     },
+    "/ml/status": {
+      "get": {
+        "tags": [
+          "ML Laboratory"
+        ],
+        "summary": "ML laboratory link status (admin key)",
+        "description": "Lab reachability, whether the service key is accepted, deployed models and the last event the lab sent per model.",
+        "responses": {
+          "200": {
+            "description": "Status"
+          },
+          "401": {
+            "description": "Missing or invalid API key"
+          },
+          "403": {
+            "description": "Admin key required"
+          },
+          "503": {
+            "description": "ML_LAB_URL or ML_LAB_KEY not configured"
+          }
+        }
+      }
+    },
+    "/ml/models": {
+      "get": {
+        "tags": [
+          "ML Laboratory"
+        ],
+        "summary": "Deployed models and their feature contract (admin key)",
+        "responses": {
+          "200": {
+            "description": "Models with the features each expects"
+          },
+          "409": {
+            "description": "Relayed from the lab"
+          },
+          "502": {
+            "description": "Lab unreachable or key rejected"
+          }
+        }
+      }
+    },
+    "/ml/assess/{slug}": {
+      "post": {
+        "tags": [
+          "ML Laboratory"
+        ],
+        "summary": "Risk estimates from a deployed model (admin key, decision support only)",
+        "description": "Up to 50 cases, each an opaque case_ref plus measurements. Never a diagnosis. 409 when no model is deployed for the slug.",
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "cases"
+                ],
+                "properties": {
+                  "cases": {
+                    "type": "array",
+                    "maxItems": 50,
+                    "items": {
+                      "type": "object",
+                      "required": [
+                        "case_ref",
+                        "features"
+                      ],
+                      "properties": {
+                        "case_ref": {
+                          "type": "string",
+                          "description": "Opaque reference only CNR can map to a person. No names, emails, phones or ID numbers."
+                        },
+                        "features": {
+                          "type": "object",
+                          "description": "Measurements named in GET /ml/models"
+                        }
+                      }
+                    }
+                  }
+                }
+              },
+              "example": {
+                "cases": [
+                  {
+                    "case_ref": "cnr-8f3a21",
+                    "features": {
+                      "age_months": 20,
+                      "weight_kg": 6.1
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "One risk estimate per case_ref, with model version and caveats"
+          },
+          "400": {
+            "description": "Invalid request"
+          },
+          "409": {
+            "description": "No approved model is deployed for this slug"
+          },
+          "422": {
+            "description": "Invalid feature, relayed from the lab"
+          },
+          "429": {
+            "description": "Lab rate limit"
+          },
+          "502": {
+            "description": "Lab unreachable, paused, or key rejected"
+          }
+        }
+      }
+    },
+    "/hooks/ml-lab": {
+      "post": {
+        "tags": [
+          "ML Laboratory"
+        ],
+        "summary": "Signed model-status event from the lab",
+        "description": "Verified with HMAC-SHA256 over \"<x-ml-lab-timestamp>.<body>\" (x-ml-lab-signature: sha256=<hex>), five-minute window. Not for people.",
+        "responses": {
+          "200": {
+            "description": "Accepted (or a duplicate event_id)"
+          },
+          "401": {
+            "description": "Bad signature or stale timestamp"
+          },
+          "503": {
+            "description": "ML_LAB_WEBHOOK_SECRET not configured"
+          }
+        }
+      }
+    },
     "/renal-nutrition/food-plan": {
       "post": {
         "tags": [
@@ -19770,6 +20595,271 @@
       }
     },
     "schemas": {
+      "MealPlanAdjustment": {
+        "type": "object",
+        "description": "One entry of plan[].suggested_adjustments in POST /meal-plan/generate. A change to a day that closes part or all of a protein, carbohydrate or fat shortfall while keeping energy within tolerance.",
+        "required": [
+          "for",
+          "type",
+          "food_id",
+          "food",
+          "role",
+          "grams",
+          "suggested",
+          "original",
+          "adds",
+          "net_change",
+          "projected_day_totals",
+          "projected_macro_percent_of_energy",
+          "projected_versus_target",
+          "energy_check",
+          "corrects_shortfall",
+          "reason"
+        ],
+        "properties": {
+          "for": {
+            "type": "string",
+            "enum": [
+              "protein_g",
+              "carbs_g",
+              "fat_g"
+            ],
+            "description": "the shortfall this addresses"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "replacement",
+              "addition"
+            ]
+          },
+          "food_id": {
+            "type": "integer",
+            "description": "the suggested food (also in suggested; kept for older clients)"
+          },
+          "food": {
+            "type": "string"
+          },
+          "role": {
+            "type": "string"
+          },
+          "grams": {
+            "type": "number"
+          },
+          "household": {
+            "type": "string",
+            "description": "approximate household measure for grams, when the role has one"
+          },
+          "suggested": {
+            "type": "object",
+            "properties": {
+              "food_id": {
+                "type": "integer"
+              },
+              "food": {
+                "type": "string"
+              },
+              "role": {
+                "type": "string"
+              },
+              "grams": {
+                "type": "number"
+              },
+              "household": {
+                "type": "string"
+              },
+              "meal": {
+                "type": "string",
+                "description": "the meal it goes in"
+              },
+              "availability": {
+                "type": "string",
+                "enum": [
+                  "in season",
+                  "peak season"
+                ]
+              }
+            }
+          },
+          "original": {
+            "nullable": true,
+            "description": "replacements only; null for additions",
+            "type": "object",
+            "properties": {
+              "food_id": {
+                "type": "integer"
+              },
+              "food": {
+                "type": "string"
+              },
+              "role": {
+                "type": "string"
+              },
+              "meal": {
+                "type": "string"
+              },
+              "grams_in_plan": {
+                "type": "number"
+              },
+              "replace_grams": {
+                "type": "number",
+                "description": "how much of the original comes out"
+              },
+              "remaining_grams": {
+                "type": "number"
+              },
+              "household": {
+                "type": "string"
+              },
+              "removes": {
+                "type": "object",
+                "description": "the nutrient named in for, and kcal, that come out",
+                "additionalProperties": {
+                  "type": "number"
+                }
+              }
+            }
+          },
+          "adds": {
+            "type": "object",
+            "description": "what the suggested food contributes: the nutrient named in for, and kcal",
+            "additionalProperties": {
+              "type": "number"
+            }
+          },
+          "net_change": {
+            "type": "object",
+            "description": "the day's overall change (adds minus removes)",
+            "additionalProperties": {
+              "type": "number"
+            }
+          },
+          "projected_day_totals": {
+            "type": "object",
+            "description": "every nutrient of the day after the change; a nutrient with no table value counts as 0",
+            "additionalProperties": {
+              "type": "number"
+            }
+          },
+          "projected_macro_percent_of_energy": {
+            "type": "object",
+            "properties": {
+              "protein": {
+                "type": "number"
+              },
+              "carbohydrate": {
+                "type": "number"
+              },
+              "fat": {
+                "type": "number"
+              }
+            }
+          },
+          "projected_versus_target": {
+            "type": "object",
+            "description": "percent difference from target after the change",
+            "properties": {
+              "energy_kcal": {
+                "type": "number"
+              },
+              "protein_g": {
+                "type": "number"
+              },
+              "carbs_g": {
+                "type": "number"
+              },
+              "fat_g": {
+                "type": "number"
+              }
+            }
+          },
+          "energy_check": {
+            "type": "object",
+            "properties": {
+              "reference_kcal": {
+                "type": "number",
+                "description": "the energy target, or in a carb_g_per_day plan the energy the macro targets imply"
+              },
+              "tolerance_percent": {
+                "type": "number"
+              },
+              "projected_kcal": {
+                "type": "number"
+              },
+              "within_tolerance": {
+                "type": "boolean"
+              }
+            }
+          },
+          "corrects_shortfall": {
+            "type": "boolean",
+            "description": "true when the nutrient is back within its tolerance; false for a partial correction"
+          },
+          "closes_percent_of_gap": {
+            "type": "number",
+            "nullable": true
+          },
+          "reason": {
+            "type": "string"
+          },
+          "incomplete_nutrients": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "nutrients the table has no value for in the suggested food, so their projected totals are minimums"
+          },
+          "note": {
+            "type": "string"
+          }
+        }
+      },
+      "MealPlanUnresolvedShortfall": {
+        "type": "object",
+        "description": "One entry of plan[].unresolved_shortfalls: a below-target nutrient for which no adjustment qualified.",
+        "required": [
+          "for",
+          "shortfall_g",
+          "shortfall_percent",
+          "reason",
+          "blocked_by"
+        ],
+        "properties": {
+          "for": {
+            "type": "string",
+            "enum": [
+              "protein_g",
+              "carbs_g",
+              "fat_g"
+            ]
+          },
+          "shortfall_g": {
+            "type": "number"
+          },
+          "shortfall_percent": {
+            "type": "number"
+          },
+          "reason": {
+            "type": "string"
+          },
+          "blocked_by": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "no_foods_available",
+                "portion_limits",
+                "energy_above_tolerance",
+                "energy_below_tolerance",
+                "protein_out_of_tolerance",
+                "carbohydrate_out_of_tolerance",
+                "fat_out_of_tolerance",
+                "overshoots_target"
+              ]
+            }
+          }
+        }
+      },
       "EpidemiologyRule": {
         "type": "object",
         "required": [

@@ -2791,6 +2791,32 @@ Setup: run `sql/037_add_surveillance.sql` in Supabase and keep `SURVEILLANCE_STO
 | `GET /surveillance/trends` | admin key | Monthly series, trend test, change against the same month last year |
 | `GET /surveillance/alerts` | admin key | Early warning: recent months against the baseline, per district |
 | `GET /surveillance/insights` | admin key | All of the above as prioritised, actionable findings |
+| `GET /surveillance/report` | admin key | Preview the weekly surveillance report email (subject, text, data) |
+| `POST /surveillance/report?send=true` | admin key | Send the surveillance report email now. It also goes out automatically every Monday 07:00 Malawi time (needs `SURVEILLANCE_STORE=true` and the `GMAIL_*` secrets) |
+| `GET /surveillance/dhis2?month=YYYY-MM` | admin key | Preview the DHIS2 dataValueSet for a month (default: last month) plus mapping gaps. Sends nothing |
+| `POST /surveillance/dhis2?month=YYYY-MM&send=true` | admin key | Push that month to DHIS2, directly or through OpenHIM, now. Runs automatically on day 2 of each month when `DHIS2_PUSH="true"`. Aggregates only; small cells are never sent |
+| `POST /openmrs/push` | admin key | Preview what would be written to an OpenMRS patient chart. Body: `patient` (OpenMRS uuid), optional `encounter`, and `bundle` (from `$evaluate-growth`) or `observations`. Sends nothing |
+| `POST /openmrs/push?send=true` | admin key | Write the growth measurements to OpenMRS through its FHIR R4 module (one Observation per measurement, z-score and status in the note). Needs `OPENMRS_URL` and credentials |
+| `GET /openmrs/status` | admin key | Check that the OpenMRS FHIR endpoint is reachable and the login works |
+
+### ML Laboratory integration (`/ml`, `/hooks/ml-lab`) — `v1.83.0+`
+
+Two-way link with the CNR Machine Learning Laboratory (contract `cnr-ml-contract/1`). Nothing is stored here and request or response bodies are never logged. Estimates are **decision support, never a diagnosis**; the lab's safety notice, model version and caveats are passed through untouched.
+
+| Route | Key | Purpose |
+|---|---|---|
+| `GET /ml/status` | admin key | Is the lab configured and reachable, is our service key accepted, which models are deployed, the last event the lab sent per model |
+| `GET /ml/models` | admin key | Deployed models with the exact features each expects (numeric names, categorical names and known values) |
+| `POST /ml/assess/{slug}` | admin key | Body `{"cases":[{"case_ref":"cnr-8f3a21","features":{"age_months":20,"weight_kg":6.1}}]}`, up to 50 cases. Returns one risk estimate per `case_ref` with model version, approval reference and caveats |
+| `POST /hooks/ml-lab` | HMAC signature | Called by the lab when a model is deployed, rolled back or withdrawn. Not for people |
+
+**Rules.** `case_ref` is an opaque reference only CNR can map back to a person (1-64 of `A-Za-z0-9._:-`); emails and 9+ digit numbers are refused. `features` are measurements only; the lab rejects unknown fields. An optional `X-Request-Id` header is forwarded to the lab and echoed as `correlation_id`.
+
+**Errors.** `409` the lab has no deployed model for that slug (relayed as is; hide the feature, do not retry in a loop) · `422` invalid case or feature · `429` lab rate limit, with `Retry-After` · `502` the lab is unreachable, paused, or rejected this service's key (check `ML_LAB_KEY`) · `503` not configured.
+
+**Webhook.** Events `model.deployed`, `model.rolled_back`, `model.retired`, each with `event_id`, `occurred_at` and `model: {slug, version, version_id}`; no patient data. Headers: `x-ml-lab-timestamp` (unix seconds, accepted within 5 minutes) and `x-ml-lab-signature: sha256=<hex>`, the HMAC-SHA256 of `"<timestamp>.<raw body>"` with `ML_LAB_WEBHOOK_SECRET`. The signature is checked before the body is read; a repeated `event_id` is acknowledged but not processed again. A verified event sends one Telegram notice and records the last event per model (shown by `/ml/status`). The lab stays the authority: whatever an event says, a call with no deployed model is still answered 409 by the lab.
+
+**Configuration.** `ML_LAB_URL` (var, `https://ml.chakudya.xyz`), secrets `ML_LAB_KEY` (a lab key with the `service` role) and `ML_LAB_WEBHOOK_SECRET` (32+ characters, the same value as `CNR_WEBHOOK_SECRET` on the lab).
 
 ### Sending records
 

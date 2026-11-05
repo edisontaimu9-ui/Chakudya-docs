@@ -770,21 +770,21 @@ const RenderDocs = (() => {
 
   /* ───────── 8. API Reference ───────── */
 
-  // The spec has many small tags (56). They are gathered into a few categories so the reference is a set of
+  // The spec has many small tags (60). They are gathered into a few categories so the reference is a set of
   // short pages instead of one list of every route. Matching is by tag name; a tag that is not listed here
   // (for example one added to the spec later) lands in "More routes", so no route ever disappears.
   const REF_CATEGORIES = [
     { id: "foods", title: "Foods & packaged foods", blurb: "Search, look up, compare, substitute and submit foods and branded products.", tags: ["Foods", "Packaged"] },
-    { id: "meals", title: "Meals, intake & food log", blurb: "Analyze meals and recipes, assess intake against dietary reference intakes, and keep a food diary.", tags: ["Meals", "Recipes", "Ingredients", "DRI", "Dietary assessment", "Micronutrient assessment", "Food Log", "Favorites", "History"] },
+    { id: "meals", title: "Meals, intake & food log", blurb: "Analyze meals and recipes, assess intake against dietary reference intakes, and keep a food diary.", tags: ["Meals", "Recipes", "Ingredients", "DRI", "Dietary assessment", "Meal plan", "Micronutrient assessment", "Food Log", "Favorites", "History"] },
     { id: "growth", title: "WHO growth standards", blurb: "Z-scores, percentiles and status bands from birth to 19 years, and the combined assessment.", tags: ["Growth assessment", "Weight for age", "Length height for age", "Weight for length height", "BMI for age", "BMI for age under 5", "HC for age", "MUAC for age", "MUAC fixed cut-offs"] },
     { id: "velocity", title: "Growth velocity & preterm", blurb: "WHO increment bands for infants and Fenton preterm growth charts.", tags: ["Weight velocity", "Length velocity", "HC velocity", "Fenton Preterm"] },
     { id: "diets", title: "Diets, exchange & formulas", blurb: "Glycaemic index, food exchange lists, renal nutrition and enteral formulas.", tags: ["Glycaemic Index", "Exchange", "Renal", "Formulas"] },
     { id: "clinical", title: "Energy & drug interactions", blurb: "Energy requirements and known drug-nutrient interactions.", tags: ["Energy", "Drug Interactions"] },
     { id: "conditions", title: "Condition-specific nutrition", blurb: "Calculators for diabetes and carbohydrate counting, kidney disease, pregnancy and lactation, children, sports and weight management.", tags: ["Diabetes Nutrition", "Carbohydrate counting", "Renal Nutrition", "Pregnancy", "Paediatric nutrition", "Sports Nutrition", "Weight Management"] },
-    { id: "support", title: "Clinical nutrition support", blurb: "Critical care, burn, refeeding, enteral feeding and energy stress factor calculators.", tags: ["Critical care nutrition", "Burn nutrition", "Refeeding syndrome", "Enteral nutrition", "Energy and stress factors"] },
+    { id: "support", title: "Clinical nutrition support", blurb: "Critical care, burn, refeeding, enteral feeding, energy stress factor and biochemistry tools, and the one-call ADIME care plan.", tags: ["Critical care nutrition", "Burn nutrition", "Refeeding syndrome", "Enteral nutrition", "Energy and stress factors", "Biochemistry", "Care plan"] },
     { id: "research", title: "Research & epidemiology", blurb: "Harmonise study data, analyse outcomes and surveys, audit data quality and export analysis-ready datasets.", tags: ["Research engine", "Longitudinal outcomes", "Nutrition epidemiology", "Data quality", "Malnutrition research", "Dataset export"] },
     { id: "fhir", title: "FHIR R4", blurb: "Stateless growth evaluation and the Nutrition Care Process as FHIR resources.", tags: ["FHIR"] },
-    { id: "ai", title: "AI, knowledge & memory", blurb: "Retrieval-augmented answers and session memory for assistants.", tags: ["RAG", "Memory"] },
+    { id: "ai", title: "AI, knowledge & memory", blurb: "Retrieval-augmented answers, session memory for assistants, and the ML Laboratory link.", tags: ["RAG", "Memory", "ML Laboratory"] },
     { id: "platform", title: "Keys & platform", blurb: "API keys, developer keys, batching, health and metadata.", tags: ["API Keys", "Developer keys", "Batch", "Health", "Meta"] },
   ];
 

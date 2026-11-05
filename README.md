@@ -13,7 +13,7 @@ it's a separate, deployable-on-its-own frontend.
 Everything documented here was verified against the actual repository
 (`src/index.js`'s router and `routePolicy()`, the `src/fhir*.js` modules,
 `src/ragPipeline.js` and `wrangler.toml`) - nothing here was
-invented. Currently in line with API **v1.78.0**.
+invented. Currently in line with API **v1.83.0**.
 
 ---
 
@@ -73,7 +73,7 @@ node tools/build-pages.mjs && node tools/stamp-sw.mjs
 `node tools/build-pages.mjs --check` exits 1 if the generated files are out of date (handy in CI).
 The site must be served from the domain root (as `chakudya.xyz` is), because asset and page paths start with `/`.
 
-The 36 spec tags are grouped into the API Reference categories by `REF_CATEGORIES` in `js/render-docs.js`.
+The 60 spec tags are grouped into the API Reference categories by `REF_CATEGORIES` in `js/render-docs.js`.
 A tag that is not listed there (for example one added to the spec later) appears under a "More routes"
 category, so no route is ever hidden. To add a sub-page to another guide, add it to `SUBPAGES` in the same file.
 
@@ -233,7 +233,7 @@ of the OpenAPI document - they're read out of `routePolicy()` in
 
 Every route in the API's OpenAPI spec is documented. The `/surveillance` routes (added in API v1.54.0) are the one gap: the API's own spec does not list them yet, so they are not here either.
 `/manufacturers`, `/products`, and `/nutrition` were removed from the API in
-v1.15.0-v1.16.0 and no longer appear here. The list below matches API v1.78.0.
+v1.15.0-v1.16.0 and no longer appear here. The list below matches API v1.83.0.
 
 The portal UI renders **every** route in `openapi.json`: public, API-key, admin,
 root-only, login-token and webhook routes alike. Each endpoint page carries a
@@ -260,6 +260,8 @@ only)" summary in the spec.
 - `GET /admin/monitoring` - Failed calls and slow endpoints (root key only)
 - `GET /admin/usage` - Calls per endpoint (root key only)
 - `GET /admin/health-history` - Uptime, upstream status and outage timeline (root key only)
+- `GET /admin/summary` - Preview the daily or weekly summary email (root key only)
+- `POST /admin/summary` - Send the summary email now, needs `send=true` (root key only)
 
 **Developer keys** (self-service consumer keys; authenticate with a developer login token, not an API key)
 - `GET /developer/keys` - List your consumer API keys
@@ -458,6 +460,14 @@ only)" summary in the spec.
 - `GET /biochemistry/analytes` - Analytes the biochemistry endpoints know (API key)
 - `GET /biochemistry/reference` - The stored biochemistry reference rows (API key)
 
+**Meal plan** (read only, nothing stored)
+- `POST /meal-plan/generate` - Generate a 1-7 day Malawian meal plan sized to energy and macronutrient targets, with seasonal availability, cultural options, suggested adjustments for shortfalls and a payload for `POST /dietary-assessment` (API key, rate-limited)
+- `GET /meal-plan/reference` - Meal plan inputs, portion limits, meal patterns and food selection rules (API key)
+
+**Care plan** (read only, nothing stored)
+- `POST /care-plan/adime` - One call from patient data to a draft ADIME note: assessment, provisional PES diagnoses, prescription, monitoring and evaluation, plus missing information and clinical warnings (API key)
+- `GET /care-plan/reference` - Care plan inputs, outputs and limits (API key)
+
 **Nutrition-focused physical examination** (reference rows read from `clinical_reference_values`, nothing stored)
 - `POST /nfpe/interpret` - Interpret NFPE site gradings, Academy/ASPEN characteristics and observed findings (API key)
 - `GET /nfpe/sites` - How to examine and grade each fat, muscle and fluid site (API key)
@@ -650,6 +660,12 @@ only)" summary in the spec.
 - `GET /rag/jobs` - List recent ingestion jobs (admin)
 - `GET /rag/jobs/{id}` - Get one ingestion job (admin)
 - `POST /rag/webhook` - Storage trigger webhook (shared secret)
+
+**ML Laboratory** (two-way link to the CNR ML Laboratory, decision support only)
+- `GET /ml/status` - Laboratory link status (admin key)
+- `GET /ml/models` - Deployed models and their feature contract (admin key)
+- `POST /ml/assess/{slug}` - Risk estimates from a deployed model, up to 50 cases per call (admin key)
+- `POST /hooks/ml-lab` - Signed model-status event from the laboratory (HMAC-SHA256, not for people)
 
 **Memory**
 - `POST /memory/write` - Write a raw memory fact (API key, rate-limited)
